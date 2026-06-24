@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title desc">
+  <title id="title">Bag Work</title>
+  <desc id="desc">Hex badge with a heavy bag and wrapped fist impact.</desc>
+  <path d="M32 4.5 55.8 18.25v27.5L32 59.5 8.2 45.75v-27.5L32 4.5Z" fill="#F5F4EF" stroke="#256D85" stroke-width="3" stroke-linejoin="round"/>
+  <path d="M28 14h8M32 14v6" fill="none" stroke="#171717" stroke-width="3.2" stroke-linecap="round"/>
+  <path d="M24 21.5h16l3.5 7v15.2c0 5.5-4.5 9.3-11.5 9.3s-11.5-3.8-11.5-9.3V28.5l3.5-7Z" fill="none" stroke="#171717" stroke-width="3.2" stroke-linejoin="round"/>
+  <path d="M24 30h18M22 40h20" fill="none" stroke="#256D85" stroke-width="3.2" stroke-linecap="round"/>
+  <path d="M14.5 33.5c0-3.6 2.7-6.2 6.2-6.2h4.9c2.4 0 4.4 2 4.4 4.4v3.7c0 3.2-2.6 5.8-5.8 5.8h-4.7c-2.8 0-5-2.2-5-5v-2.7Z" fill="none" stroke="#171717" stroke-width="3.2" stroke-linejoin="round"/>
+  <path d="M19.3 27.6v6.4M24.3 27.6v6.4M17 38.2h10" fill="none" stroke="#171717" stroke-width="3.2" stroke-linecap="round"/>
+  <path d="M17 42.5h8" fill="none" stroke="#D14A32" stroke-width="3.2" stroke-linecap="round"/>
+  <path d="M43.5 27.5l4.2-2M44.5 36h5M42.6 45l4.3 2" fill="none" stroke="#D14A32" stroke-width="2.6" stroke-linecap="round"/>
+</svg>
+

@@ -1,0 +1,821 @@
+[
+  {
+    "id": "bag-drill-hook-to-low-kick-same-side",
+    "title": "Bag Drill Hook To Low Kick Same Side",
+    "summary": "Use the lead hook to shift weight and set up the same-side low kick on the bag.",
+    "steps": [
+      "Stand close enough for lead hook range.",
+      "Throw lead hook and let the hip rotate.",
+      "As the hook retracts, step or sit into lead low kick.",
+      "Recover into guard without drifting square.",
+      "Alternate sides every five reps."
+    ],
+    "trainingMethods": [
+      "Bag Work"
+    ],
+    "trainingTags": [
+      "Hook",
+      "Low Kick",
+      "Balance",
+      "Rhythm"
+    ],
+    "coreIdea": "Rhythm Change",
+    "customTags": []
+  },
+  {
+    "id": "bag-drill-three-teeps-and-angle-out",
+    "title": "Bag Drill Three Teeps And Angle Out",
+    "summary": "A bag drill for building teep balance and learning not to stand in front after long-range strikes.",
+    "steps": [
+      "Throw lead teep to the bag.",
+      "Throw rear teep to the bag.",
+      "Throw lead teep again as the bag returns.",
+      "Land and angle out to either side.",
+      "Reset before the bag swings back into you."
+    ],
+    "trainingMethods": [
+      "Bag Work"
+    ],
+    "trainingTags": [
+      "Teep",
+      "Distance",
+      "Angles",
+      "Exits",
+      "Balance"
+    ],
+    "coreIdea": "Exit After Scoring",
+    "customTags": []
+  },
+  {
+    "id": "bag-round-four-count-low-kick-rhythm",
+    "title": "Bag Round Four Count Low Kick Rhythm",
+    "summary": "A heavy bag rhythm drill to blend hands and low kicks under fatigue.",
+    "steps": [
+      "Start with jab-cross to the bag.",
+      "Add rear low kick after the cross.",
+      "Reset and throw cross-hook-rear low kick.",
+      "Every fourth sequence, teep the bag to manage distance.",
+      "Keep the round continuous for three minutes."
+    ],
+    "trainingMethods": [
+      "Bag Work"
+    ],
+    "trainingTags": [
+      "Low Kick",
+      "Jab",
+      "Cross",
+      "Rhythm",
+      "Balance",
+      "Pressure"
+    ],
+    "coreIdea": "Rhythm Change",
+    "customTags": [
+      "late-round-cardio"
+    ]
+  },
+  {
+    "id": "catch-body-kick-sweep-to-angle-reset",
+    "title": "Catch Body Kick Sweep To Angle Reset",
+    "summary": "Catch a body kick, off-balance the partner, sweep or dump lightly, then reset at an angle instead of standing square.",
+    "steps": [
+      "Partner throws a controlled body kick.",
+      "Catch with elbow tight and ribs covered.",
+      "Step slightly outside to avoid absorbing full force.",
+      "Pull the caught leg across while sweeping or steering their base leg.",
+      "Release safely and reset at an angle."
+    ],
+    "trainingMethods": [
+      "Partner Drill"
+    ],
+    "trainingTags": [
+      "Catch",
+      "Sweep",
+      "Balance",
+      "Angles"
+    ],
+    "coreIdea": "Catch To Sweep",
+    "customTags": [
+      "clinch-balance",
+      "sparring-focus"
+    ],
+    "status": [
+      "Starred"
+    ]
+  },
+  {
+    "id": "check-low-kick-return-cross-low-kick",
+    "title": "Check Low Kick Return Cross Low Kick",
+    "summary": "Defend the low kick, land a quick cross as they reset, then return the low kick before they regain stance.",
+    "steps": [
+      "Partner throws a light rear low kick.",
+      "Check with the lead shin and keep hands high.",
+      "As the kicking leg lands, step down into a right cross.",
+      "Immediately return the low kick to their lead leg.",
+      "Reset outside their punching line."
+    ],
+    "trainingMethods": [
+      "Partner Drill"
+    ],
+    "trainingTags": [
+      "Check",
+      "Low Kick",
+      "Cross",
+      "Timing"
+    ],
+    "coreIdea": "Check And Return",
+    "customTags": [
+      "sparring-focus"
+    ]
+  },
+  {
+    "id": "clinch-knee-shield-to-turn",
+    "title": "Clinch Knee Shield To Turn",
+    "summary": "Use a knee shield inside the clinch to block pressure, then turn the partner as their weight shifts.",
+    "steps": [
+      "Start in light clinch with partner applying forward pressure.",
+      "Bring knee shield inside to create space at the hip line.",
+      "Keep upper-body frame or collar tie stable.",
+      "As partner adjusts, step and turn them to the open side.",
+      "Reset with posture before throwing any knee."
+    ],
+    "trainingMethods": [
+      "Clinch"
+    ],
+    "trainingTags": [
+      "Frame",
+      "Knee",
+      "Balance"
+    ],
+    "coreIdea": "Turn To Attack",
+    "customTags": [
+      "clinch-balance"
+    ]
+  },
+  {
+    "id": "clinch-hand-fight-to-inside-knee",
+    "title": "Clinch Hand Fight To Inside Knee",
+    "summary": "Fight for inside hand position, stabilize posture, and throw a short inside knee without losing head position.",
+    "steps": [
+      "Start chest-to-chest with both partners light on collar ties.",
+      "Swim one arm inside to improve hand position.",
+      "Bring hips under the body and keep forehead pressure.",
+      "Throw a controlled inside knee to thigh or body line.",
+      "Return to base and continue hand fighting."
+    ],
+    "trainingMethods": [
+      "Clinch"
+    ],
+    "trainingTags": [
+      "Hand Fighting",
+      "Knee",
+      "Balance",
+      "Pressure"
+    ],
+    "coreIdea": "Inside Control",
+    "customTags": [
+      "clinch-balance"
+    ],
+    "status": [
+      "Drill Back In"
+    ]
+  },
+  {
+    "id": "cross-parry-to-outside-angle-combo",
+    "title": "Cross Parry To Outside Angle Combo",
+    "summary": "Parry the cross, step to the outside angle, and answer with a compact counter before exiting.",
+    "steps": [
+      "Partner feeds jab-cross.",
+      "Catch or slip the jab lightly.",
+      "Parry the cross inward with a small motion.",
+      "Step outside the punching shoulder and throw hook-cross or cross-hook.",
+      "Exit before partner squares up."
+    ],
+    "trainingMethods": [
+      "Partner Drill"
+    ],
+    "trainingTags": [
+      "Parry",
+      "Cross",
+      "Angles",
+      "Exits",
+      "Shadowboxing"
+    ],
+    "coreIdea": "Angle After Defense",
+    "customTags": [
+      "anti-reach"
+    ]
+  },
+  {
+    "id": "double-jab-to-body-kick-on-shell",
+    "title": "Double Jab To Body Kick On Shell",
+    "summary": "Draw the guard high with double jab pressure, then punish the covered side with a body kick.",
+    "steps": [
+      "Throw the first jab to measure distance.",
+      "Throw the second jab harder to bring the guard up.",
+      "As the partner shells, step slightly outside.",
+      "Throw the rear body kick into the open side.",
+      "Recover with guard high and exit before the counter cross."
+    ],
+    "trainingMethods": [
+      "Pad Work",
+      "Partner Drill"
+    ],
+    "trainingTags": [
+      "Jab",
+      "Round Kick",
+      "Pressure",
+      "Distance"
+    ],
+    "coreIdea": "Feint To Draw",
+    "customTags": [
+      "lead-side-work"
+    ]
+  },
+  {
+    "id": "elbow-shell-counter-on-pocket-entry",
+    "title": "Elbow Shell Counter On Pocket Entry",
+    "summary": "Shell against a short punching entry, then answer with a compact elbow as the opponent stays in the pocket.",
+    "steps": [
+      "Partner steps in with light jab-cross or cross-hook.",
+      "Shell tight without dropping head blindly.",
+      "Feel the second punch land on guard.",
+      "Step in half a beat and throw compact elbow to pad or shoulder target.",
+      "Frame and exit."
+    ],
+    "trainingMethods": [
+      "Partner Drill"
+    ],
+    "trainingTags": [
+      "Elbow",
+      "Shell",
+      "Entries",
+      "Timing"
+    ],
+    "coreIdea": "Shell And Return",
+    "customTags": [
+      "sparring-focus"
+    ]
+  },
+  {
+    "id": "inside-low-kick-after-cross-check",
+    "title": "Inside Low Kick After Cross Check",
+    "summary": "Use the cross to bring weight onto the opponent lead leg, then chop the inside low kick before they step out.",
+    "steps": [
+      "Throw a straight right cross down the middle.",
+      "Let the cross step land slightly outside.",
+      "As their guard reacts, turn the hip into the inside low kick.",
+      "Recover the kicking leg under the body.",
+      "Reset or follow with jab to prevent the counter."
+    ],
+    "trainingMethods": [
+      "Pad Work",
+      "Bag Work"
+    ],
+    "trainingTags": [
+      "Cross",
+      "Low Kick",
+      "Balance",
+      "Timing"
+    ],
+    "coreIdea": "Rhythm Change",
+    "customTags": []
+  },
+  {
+    "id": "jab-cross-rear-kick-pad-return",
+    "title": "Jab Cross Rear Kick Pad Return",
+    "summary": "Basic pad sequence that links straight punches to a rear round kick without pausing between hand range and kicking range.",
+    "steps": [
+      "Start in stance with pad holder giving a light forward walk.",
+      "Throw jab-cross down the middle.",
+      "As the cross retracts, let the rear hip load without stepping too wide.",
+      "Throw the rear kick to body-height pad.",
+      "Recover the kicking leg under the body and reset guard before moving."
+    ],
+    "trainingMethods": [
+      "Pad Work"
+    ],
+    "trainingTags": [
+      "Jab",
+      "Cross",
+      "Round Kick",
+      "Balance",
+      "Timing"
+    ],
+    "coreIdea": "Rhythm Change",
+    "customTags": [
+      "coach-cue"
+    ]
+  },
+  {
+    "id": "jab-only-sparring-with-teep-interrupt",
+    "title": "Jab Only Sparring With Teep Interrupt",
+    "summary": "Constraint sparring where both partners use only jabs, with the defender allowed to interrupt forward pressure using the lead teep.",
+    "steps": [
+      "Both partners begin at light contact.",
+      "Only jabs are allowed for offense.",
+      "If one partner pressures too directly, the other may use a lead teep to the body.",
+      "After each teep, both reset distance and continue.",
+      "Focus on timing and distance rather than winning the exchange."
+    ],
+    "trainingMethods": [
+      "Partner Drill"
+    ],
+    "trainingTags": [
+      "Jab",
+      "Teep",
+      "Distance",
+      "Timing",
+      "Pressure"
+    ],
+    "coreIdea": "Teep To Interrupt",
+    "customTags": [
+      "sparring-focus"
+    ]
+  },
+  {
+    "id": "lead-knee-off-hand-trap",
+    "title": "Lead Knee Off Hand Trap",
+    "summary": "Trap or pin the lead hand, step in, and throw a lead knee before settling into clinch position.",
+    "steps": [
+      "Partner keeps lead hand active in long guard.",
+      "Use rear hand to pin or redirect their lead wrist.",
+      "Step in with the rear foot to close distance.",
+      "Throw lead knee to body line or belly pad.",
+      "Land into frame or collar tie."
+    ],
+    "trainingMethods": [
+      "Partner Drill",
+      "Clinch"
+    ],
+    "trainingTags": [
+      "Hand Trap",
+      "Knee",
+      "Entries",
+      "Timing",
+      "Pressure"
+    ],
+    "coreIdea": "Hand Trap Entry",
+    "customTags": [
+      "coach-cue"
+    ]
+  },
+  {
+    "id": "long-guard-frame-to-knee-entry",
+    "title": "Long Guard Frame To Knee Entry",
+    "summary": "Use a long guard frame to stop forward pressure and turn it into a knee entry before the opponent can clinch cleanly.",
+    "steps": [
+      "Partner pressures forward with hands high.",
+      "Build a long guard frame across shoulder or collarbone line.",
+      "Keep rear hand ready to protect from the hook.",
+      "Step the rear foot in and throw a long knee to the body line.",
+      "Recover into collar tie, frame, or exit depending on partner reaction."
+    ],
+    "trainingMethods": [
+      "Partner Drill",
+      "Clinch"
+    ],
+    "trainingTags": [
+      "Long Guard",
+      "Frame",
+      "Knee",
+      "Entries",
+      "Distance"
+    ],
+    "coreIdea": "Frame To Knee",
+    "customTags": [
+      "clinch-balance"
+    ]
+  },
+  {
+    "id": "long-guard-to-rear-teep-reset",
+    "title": "Long Guard To Rear Teep Reset",
+    "summary": "Use long guard to slow pressure, then rear teep to create a clean reset instead of backing straight up.",
+    "steps": [
+      "Partner walks forward behind light punches.",
+      "Build long guard and frame shoulder/chest line.",
+      "Take one angled step, not a straight retreat.",
+      "Fire rear teep to body line.",
+      "Reset stance and guard at long range."
+    ],
+    "trainingMethods": [
+      "Partner Drill"
+    ],
+    "trainingTags": [
+      "Long Guard",
+      "Teep",
+      "Distance",
+      "Frame",
+      "Exits",
+      "Pressure"
+    ],
+    "coreIdea": "Teep To Interrupt",
+    "customTags": [
+      "anti-reach",
+      "sparring-focus"
+    ]
+  },
+  {
+    "id": "pad-drill-hook-cross-rear-knee",
+    "title": "Pad Drill Hook Cross Rear Knee",
+    "summary": "Short pad sequence that uses hook-cross to close the distance for a rear knee.",
+    "steps": [
+      "Pad holder steps in with mitts high.",
+      "Throw lead hook to turn the guard.",
+      "Throw cross down the middle.",
+      "Step the rear foot in and throw rear knee to belly pad.",
+      "Pad holder gives light shove so fighter recovers stance."
+    ],
+    "trainingMethods": [
+      "Pad Work"
+    ],
+    "trainingTags": [
+      "Hook",
+      "Cross",
+      "Knee",
+      "Entries",
+      "Pressure"
+    ],
+    "coreIdea": "Pressure Entry",
+    "customTags": [
+      "late-round-cardio"
+    ]
+  },
+  {
+    "id": "parry-jab-cross-to-rear-knee",
+    "title": "Parry Jab Cross To Rear Knee",
+    "summary": "Parry the jab, counter cross to occupy the guard, then enter behind the cross with the rear knee.",
+    "steps": [
+      "Partner feeds a light jab.",
+      "Parry across with the rear hand without overreaching.",
+      "Throw the cross immediately after the parry.",
+      "Step in and drive the rear knee to belly pad or body line.",
+      "Recover to clinch frame or exit."
+    ],
+    "trainingMethods": [
+      "Partner Drill",
+      "Pad Work"
+    ],
+    "trainingTags": [
+      "Parry",
+      "Jab",
+      "Cross",
+      "Knee",
+      "Entries",
+      "Timing"
+    ],
+    "coreIdea": "Parry To Counter",
+    "customTags": [
+      "ask-coach"
+    ]
+  },
+  {
+    "id": "partner-drill-feint-teep-to-catch-counter",
+    "title": "Partner Drill Feint Teep To Catch Counter",
+    "summary": "Feint the teep to draw a catch reaction, then punish the reaching hands with a punch or kick counter.",
+    "steps": [
+      "Show the lead teep slowly enough for partner to react.",
+      "Partner reaches as if trying to catch.",
+      "Retract before contact and plant the foot.",
+      "Throw cross, hook, or low kick depending on their reach.",
+      "Reset and switch roles."
+    ],
+    "trainingMethods": [
+      "Partner Drill"
+    ],
+    "trainingTags": [
+      "Teep",
+      "Catch",
+      "Timing",
+      "Distance"
+    ],
+    "coreIdea": "Feint To Draw",
+    "customTags": [
+      "ask-coach"
+    ]
+  },
+  {
+    "id": "rear-kick-feint-to-step-in-elbow",
+    "title": "Rear Kick Feint To Step-In Elbow",
+    "summary": "Show the rear kick to lift the opponent posture or freeze the guard, then step in behind the feint for an elbow entry.",
+    "steps": [
+      "Load the rear hip like a body kick.",
+      "Start the kick motion but do not turn fully over.",
+      "As the pad holder reacts, step the rear foot down closer.",
+      "Throw the step-in horizontal elbow or diagonal elbow to the pad.",
+      "Frame or exit immediately after the elbow."
+    ],
+    "trainingMethods": [
+      "Pad Work",
+      "Partner Drill"
+    ],
+    "trainingTags": [
+      "Elbow",
+      "Entries",
+      "Round Kick",
+      "Timing",
+      "Pressure"
+    ],
+    "coreIdea": "Feint To Draw",
+    "customTags": [
+      "coach-cue"
+    ]
+  },
+  {
+    "id": "ring-cutting-jab-low-kick-constraint",
+    "title": "Ring Cutting Jab Low Kick Constraint",
+    "summary": "Constraint sparring where one partner practices cutting space with jab and low kick while the other tries to circle out.",
+    "steps": [
+      "Partner A pressures at light contact.",
+      "Partner B circles and exits without throwing heavy counters.",
+      "Partner A may use jab, feint, and low kick only.",
+      "Goal is to step across the escape path, not chase.",
+      "Switch roles every round."
+    ],
+    "trainingMethods": [
+      "Partner Drill"
+    ],
+    "trainingTags": [
+      "Jab",
+      "Low Kick",
+      "Pressure",
+      "Angles",
+      "Distance"
+    ],
+    "coreIdea": "Ring Cutting",
+    "customTags": [
+      "pressure-round",
+      "sparring-focus"
+    ],
+    "status": [
+      "Drill Back In"
+    ]
+  },
+  {
+    "id": "roll-under-hook-to-right-kick",
+    "title": "Roll Under Hook To Right Kick",
+    "summary": "Roll under the left hook and answer with a right kick as the partner turns past center.",
+    "steps": [
+      "Partner throws jab-cross-left hook at light speed.",
+      "Slip or guard the jab-cross.",
+      "Roll under the hook, keeping eyes up.",
+      "As you come out, throw the right kick to body or leg.",
+      "Exit toward the side you rolled to."
+    ],
+    "trainingMethods": [
+      "Partner Drill"
+    ],
+    "trainingTags": [
+      "Roll",
+      "Round Kick",
+      "Angles"
+    ],
+    "coreIdea": "Roll And Return",
+    "customTags": [
+      "sparring-focus"
+    ]
+  },
+  {
+    "id": "shadowbox-exit-after-every-combination",
+    "title": "Shadowbox Exit After Every Combination",
+    "summary": "Shadowboxing constraint where every combination must finish with an angle, pivot, frame, or step-out.",
+    "steps": [
+      "Start with any two-to-four strike combination.",
+      "After the final strike, immediately exit off the centerline.",
+      "Use a pivot, L-step, frame-and-step, or long step back at an angle.",
+      "Reset the guard before beginning the next combination.",
+      "Repeat for the full round without allowing a straight-back exit."
+    ],
+    "trainingMethods": [
+      "Technical Work"
+    ],
+    "trainingTags": [
+      "Exits",
+      "Angles",
+      "Pivot",
+      "Shadowboxing"
+    ],
+    "coreIdea": "Exit After Scoring",
+    "customTags": [
+      "bad-habit",
+      "anti-reach"
+    ]
+  },
+  {
+    "id": "shadowboxing-counter-rotation-round",
+    "title": "Shadowboxing Counter Rotation Round",
+    "summary": "A shadowboxing round built around loading counters through rotation instead of throwing arm-only shots.",
+    "steps": [
+      "Start each exchange by imagining an incoming straight punch.",
+      "Slip or shoulder turn to load the counter side.",
+      "Throw uppercut or hook from the loaded rotation.",
+      "Move the feet so the counter does not leave you square.",
+      "Finish each sequence with an exit step."
+    ],
+    "trainingMethods": [
+      "Technical Work"
+    ],
+    "trainingTags": [
+      "Uppercut",
+      "Hook",
+      "Balance",
+      "Shadowboxing"
+    ],
+    "coreIdea": "Counter Rotation",
+    "customTags": [
+      "southpaw-transition"
+    ]
+  },
+  {
+    "id": "slip-right-step-through-uppercut-exit",
+    "title": "Slip Right Step-Through Uppercut Exit",
+    "summary": "A counter drill for slipping the cross, stepping through into a temporary southpaw shape, firing the left uppercut, then exiting before the return shot.",
+    "steps": [
+      "Partner or pad holder feeds jab-cross at realistic rhythm.",
+      "On the cross, slip right and let the right foot step slightly across so the stance turns southpaw.",
+      "Keep the head off center and load the left side without standing up.",
+      "Drive the left uppercut as the rear foot steps through back toward orthodox.",
+      "Exit off-line with a small pivot or angle step instead of backing straight out."
+    ],
+    "trainingMethods": [
+      "Partner Drill",
+      "Pad Work"
+    ],
+    "trainingTags": [
+      "Stance Switch",
+      "Slip",
+      "Uppercut",
+      "Step Through",
+      "Exits"
+    ],
+    "coreIdea": "Counter Rotation",
+    "customTags": [
+      "southpaw-transition",
+      "sparring-focus"
+    ],
+    "status": [
+      "Starred"
+    ]
+  },
+  {
+    "id": "southpaw-open-stance-jab-to-rear-body-kick",
+    "title": "Southpaw Open Stance Jab To Rear Body Kick",
+    "summary": "From southpaw/open stance, jab to occupy the lead hand and land the rear body kick across the open side.",
+    "steps": [
+      "Start in southpaw or switch into southpaw.",
+      "Jab to the chest or face line.",
+      "Step slightly outside the opponent lead foot.",
+      "Throw the rear body kick across the open side.",
+      "Recover and exit away from their rear hand."
+    ],
+    "trainingMethods": [
+      "Pad Work",
+      "Partner Drill"
+    ],
+    "trainingTags": [
+      "Stance Switch",
+      "Jab",
+      "Round Kick",
+      "Distance",
+      "Angles"
+    ],
+    "coreIdea": "Open Stance Attack",
+    "customTags": [
+      "southpaw-transition",
+      "sparring-focus"
+    ]
+  },
+  {
+    "id": "switch-step-lead-kick-off-jab",
+    "title": "Switch Step Lead Kick Off Jab",
+    "summary": "Use the jab to hide the switch step and land the lead body kick without telegraphing.",
+    "steps": [
+      "Throw a relaxed jab while staying tall.",
+      "As the jab retracts, switch the feet quietly.",
+      "Turn the hip over into the lead body kick.",
+      "Land balanced and bring hands back to guard.",
+      "Repeat with occasional fake switch to keep rhythm honest."
+    ],
+    "trainingMethods": [
+      "Pad Work"
+    ],
+    "trainingTags": [
+      "Switch Step",
+      "Round Kick",
+      "Jab",
+      "Rhythm",
+      "Shadowboxing"
+    ],
+    "coreIdea": "Stance Switch Attack",
+    "customTags": [
+      "lead-side-work"
+    ]
+  },
+  {
+    "id": "teep-entry-to-right-cross",
+    "title": "Teep Entry To Right Cross",
+    "summary": "Use the lead teep to freeze or move the opponent, then step in behind the retracting leg to land the cross.",
+    "steps": [
+      "Show the lead teep from long range.",
+      "Touch the body or hip with the teep, focusing on balance over power.",
+      "Retract the leg straight back under the hip.",
+      "As the opponent settles, step in and throw the right cross.",
+      "Exit to the lead side or follow with left hook if the pad holder stays shelled."
+    ],
+    "trainingMethods": [
+      "Pad Work",
+      "Partner Drill"
+    ],
+    "trainingTags": [
+      "Teep",
+      "Entries",
+      "Distance",
+      "Cross",
+      "Timing",
+      "Pressure"
+    ],
+    "coreIdea": "Range Finding",
+    "customTags": [
+      "lead-side-work",
+      "sparring-focus"
+    ],
+    "status": [
+      "Starred"
+    ]
+  },
+  {
+    "id": "wall-drill-posture-break-and-turn",
+    "title": "Wall Drill Posture Break And Turn",
+    "summary": "Use the wall as a constraint to practice breaking posture and turning the partner without muscling the clinch.",
+    "steps": [
+      "Partner starts with back near wall or ropes.",
+      "Establish collar tie and bicep control.",
+      "Use a small pull-and-step to break posture.",
+      "Turn the partner off the wall by stepping across their base.",
+      "Reset and switch roles."
+    ],
+    "trainingMethods": [
+      "Clinch",
+      "Partner Drill"
+    ],
+    "trainingTags": [
+      "Balance",
+      "Frame",
+      "Angles"
+    ],
+    "coreIdea": "Posture Break",
+    "customTags": [
+      "clinch-balance",
+      "wall-drill"
+    ]
+  },
+  {
+    "id": "technical-defensive-mirror-round",
+    "title": "Technical Defensive Mirror Round",
+    "summary": "A mirror-style technical drill where one person leads defensive movement and the other copies to sharpen footwork and head movement.",
+    "steps": [
+      "Partner A leads with slips, rolls, pivots, and small exits.",
+      "Partner B mirrors the movement without throwing strikes.",
+      "Switch leader every thirty seconds.",
+      "Keep stance width and guard consistent.",
+      "Add light jab feints in the final minute."
+    ],
+    "trainingMethods": [
+      "Technical Work"
+    ],
+    "trainingTags": [
+      "Slip",
+      "Roll",
+      "Pivot",
+      "Balance",
+      "Shadowboxing"
+    ],
+    "coreIdea": "Angle After Defense",
+    "customTags": [],
+    "status": [
+      "Drill Back In"
+    ]
+  },
+  {
+    "id": "technical-line-drill-teep-to-pivot",
+    "title": "Technical Line Drill Teep To Pivot",
+    "summary": "A simple technical line drill for teeping, landing balanced, and pivoting off the centerline.",
+    "steps": [
+      "Move forward in stance across the mat.",
+      "Throw lead teep every three steps.",
+      "Retract the teep and land softly.",
+      "Pivot off the lead foot as if avoiding the counter.",
+      "Continue down the line and switch directions back."
+    ],
+    "trainingMethods": [
+      "Technical Work"
+    ],
+    "trainingTags": [
+      "Teep",
+      "Pivot",
+      "Distance",
+      "Balance"
+    ],
+    "coreIdea": "Angle After Strike",
+    "customTags": []
+  }
+]

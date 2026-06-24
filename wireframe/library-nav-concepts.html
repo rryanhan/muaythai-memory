@@ -1,0 +1,315 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Library Navigation Concepts</title>
+    <link rel="stylesheet" href="./library-nav-concepts.css" />
+  </head>
+  <body>
+    <main class="board">
+      <header class="board-header">
+        <p>Library UI Studies</p>
+        <h1>Context navigation patterns</h1>
+      </header>
+
+      <section class="concept-grid" aria-label="Library navigation concept wireframes">
+        <article class="concept-card">
+          <div class="concept-title">
+            <span>01</span>
+            <h2>Left Index Spine</h2>
+          </div>
+          <div class="phone-frame">
+            <div class="phone-screen">
+              <nav class="left-spine" aria-label="Collapsed context spine">
+                <button class="spine-tab is-active"><img src="../assets/context-badges/pad-work-simple.svg" alt="Pad Work" /></button>
+                <button class="spine-tab"><img src="../assets/context-badges/bag-work-simple.svg" alt="Bag Work" /></button>
+                <button class="spine-tab"><img src="../assets/context-badges/shadowboxing-simple.svg" alt="Shadowboxing" /></button>
+                <button class="spine-tab"><img src="../assets/context-badges/partner-drill-simple.svg" alt="Partner Drill" /></button>
+                <button class="spine-tab"><img src="../assets/context-badges/clinch-simple.svg" alt="Clinch" /></button>
+                <button class="spine-tab"><img src="../assets/context-badges/technical-work-simple.svg" alt="Technical Work" /></button>
+              </nav>
+              <section class="library-page spine-offset">
+                <div class="page-kicker">Training Log</div>
+                <header class="library-header">
+                  <img src="../assets/context-badges/pad-work-simple.svg" alt="" />
+                  <div>
+                    <h3>Pad Work</h3>
+                    <p>8 captured drills</p>
+                  </div>
+                </header>
+                <label class="lab-search">Search for keyword</label>
+                <div class="entry-stack">
+                  <article class="log-entry marked">
+                    <p>Counter Rotation</p>
+                    <h4>Slip Right Step-Through Uppercut Exit</h4>
+                    <span>Head Movement · Uppercut · Exit Step</span>
+                  </article>
+                  <article class="log-entry">
+                    <p>Knee Entry</p>
+                    <h4>Pad Drill Hook Cross Rear Knee</h4>
+                    <span>Boxing · Knees · Pressure</span>
+                  </article>
+                  <article class="log-entry">
+                    <p>Lead-Side Disguise</p>
+                    <h4>Switch Step Lead Kick Off Jab</h4>
+                    <span>Jab · Lead Kick · Rhythm</span>
+                  </article>
+                </div>
+              </section>
+            </div>
+          </div>
+          <p class="concept-note">Best for frequent switching. Feels like a lab notebook index, but needs careful width control on mobile.</p>
+        </article>
+
+        <article class="concept-card">
+          <div class="concept-title">
+            <span>02</span>
+            <h2>Expanded Index Spine</h2>
+          </div>
+          <div class="phone-frame">
+            <div class="phone-screen">
+              <nav class="expanded-spine" aria-label="Expanded context spine">
+                <button class="expanded-tab is-active"><img src="../assets/context-badges/pad-work-simple.svg" alt="" /><span>Pad Work</span></button>
+                <button class="expanded-tab"><img src="../assets/context-badges/bag-work-simple.svg" alt="" /><span>Bag Work</span></button>
+                <button class="expanded-tab"><img src="../assets/context-badges/shadowboxing-simple.svg" alt="" /><span>Shadow</span></button>
+                <button class="expanded-tab"><img src="../assets/context-badges/partner-drill-simple.svg" alt="" /><span>Partner</span></button>
+                <button class="expanded-tab"><img src="../assets/context-badges/clinch-simple.svg" alt="" /><span>Clinch</span></button>
+                <button class="expanded-tab"><img src="../assets/context-badges/technical-work-simple.svg" alt="" /><span>Technical</span></button>
+              </nav>
+              <section class="library-page expanded-offset">
+                <div class="page-kicker">Notebook</div>
+                <h3 class="section-heading">Pad Work</h3>
+                <label class="lab-search compact">Search for keyword</label>
+                <div class="entry-stack">
+                  <article class="log-entry tight marked">
+                    <p>Counter Rotation</p>
+                    <h4>Slip Right Step-Through Uppercut Exit</h4>
+                    <span>Partner · Pad · Southpaw</span>
+                  </article>
+                  <article class="log-entry tight">
+                    <p>Parry To Knee</p>
+                    <h4>Parry Jab Cross To Rear Knee</h4>
+                    <span>Defense · Timing · Knee Entry</span>
+                  </article>
+                  <article class="log-entry tight">
+                    <p>Teep Entry</p>
+                    <h4>Teep Entry To Right Cross</h4>
+                    <span>Distance · Cross · Pressure</span>
+                  </article>
+                </div>
+              </section>
+            </div>
+          </div>
+          <p class="concept-note">Clearer labels, less mystery. The cost is that it starts feeling like a sidebar instead of pure notebook tabs.</p>
+        </article>
+
+        <article class="concept-card">
+          <div class="concept-title">
+            <span>03</span>
+            <h2>Edge Page Tabs</h2>
+          </div>
+          <div class="phone-frame">
+            <div class="phone-screen">
+              <nav class="edge-tabs" aria-label="Notebook edge tabs">
+                <button class="edge-tab is-active"><img src="../assets/context-badges/pad-work-simple.svg" alt="Pad Work" /></button>
+                <button class="edge-tab"><img src="../assets/context-badges/bag-work-simple.svg" alt="Bag Work" /></button>
+                <button class="edge-tab"><img src="../assets/context-badges/shadowboxing-simple.svg" alt="Shadowboxing" /></button>
+                <button class="edge-tab"><img src="../assets/context-badges/partner-drill-simple.svg" alt="Partner Drill" /></button>
+                <button class="edge-tab"><img src="../assets/context-badges/clinch-simple.svg" alt="Clinch" /></button>
+                <button class="edge-tab"><img src="../assets/context-badges/technical-work-simple.svg" alt="Technical Work" /></button>
+              </nav>
+              <section class="library-page tabbed-page">
+                <div class="page-kicker">Section 01</div>
+                <header class="library-header">
+                  <img src="../assets/context-badges/pad-work-simple.svg" alt="" />
+                  <div>
+                    <h3>Pad Work</h3>
+                    <p>Index card view</p>
+                  </div>
+                </header>
+                <label class="lab-search">Search for keyword</label>
+                <div class="entry-stack">
+                  <article class="log-entry marked">
+                    <p>Hand Trap Entry</p>
+                    <h4>Lead Knee Off Hand Trap</h4>
+                    <span>Timing · Pressure · Clinch</span>
+                  </article>
+                  <article class="log-entry">
+                    <p>Draw Guard High</p>
+                    <h4>Double Jab To Body Kick On Shell</h4>
+                    <span>Jab · Body Kick · Distance</span>
+                  </article>
+                  <article class="log-entry">
+                    <p>Check And Return</p>
+                    <h4>Inside Low Kick After Cross Check</h4>
+                    <span>Low Kick · Counters · Balance</span>
+                  </article>
+                </div>
+              </section>
+            </div>
+          </div>
+          <p class="concept-note">Most notebook-like. It feels less like an app menu and more like physical section dividers.</p>
+        </article>
+
+        <article class="concept-card">
+          <div class="concept-title">
+            <span>04</span>
+            <h2>Top Icon Strip</h2>
+          </div>
+          <div class="phone-frame">
+            <div class="phone-screen">
+              <section class="library-page full">
+                <div class="page-kicker">Training Log</div>
+                <header class="library-header">
+                  <img src="../assets/context-badges/shadowboxing-simple.svg" alt="" />
+                  <div>
+                    <h3>Shadowboxing</h3>
+                    <p>5 captured drills</p>
+                  </div>
+                </header>
+                <nav class="top-icon-strip" aria-label="Context icon strip">
+                  <button><img src="../assets/context-badges/pad-work-simple.svg" alt="Pad Work" /></button>
+                  <button><img src="../assets/context-badges/bag-work-simple.svg" alt="Bag Work" /></button>
+                  <button class="is-active"><img src="../assets/context-badges/shadowboxing-simple.svg" alt="Shadowboxing" /></button>
+                  <button><img src="../assets/context-badges/partner-drill-simple.svg" alt="Partner Drill" /></button>
+                  <button><img src="../assets/context-badges/clinch-simple.svg" alt="Clinch" /></button>
+                  <button><img src="../assets/context-badges/technical-work-simple.svg" alt="Technical Work" /></button>
+                </nav>
+                <label class="lab-search">Search for keyword</label>
+                <div class="entry-stack">
+                  <article class="log-entry marked">
+                    <p>Exit After Combination</p>
+                    <h4>Shadowbox Exit After Every Combination</h4>
+                    <span>Footwork · Angles · Defense</span>
+                  </article>
+                  <article class="log-entry">
+                    <p>Counter Rotation</p>
+                    <h4>Shadowboxing Counter Rotation Round</h4>
+                    <span>Hook · Uppercut · Balance</span>
+                  </article>
+                </div>
+              </section>
+            </div>
+          </div>
+          <p class="concept-note">Cleanest and least risky. It uses the SVGs, but feels closer to the current horizontal tabs.</p>
+        </article>
+
+        <article class="concept-card">
+          <div class="concept-title">
+            <span>05</span>
+            <h2>Header Selector</h2>
+          </div>
+          <div class="phone-frame">
+            <div class="phone-screen">
+              <section class="library-page full">
+                <div class="page-kicker">Field Log</div>
+                <button class="context-selector">
+                  <img src="../assets/context-badges/clinch-simple.svg" alt="" />
+                  <span>Clinch</span>
+                  <strong>Change</strong>
+                </button>
+                <div class="context-drawer-preview">
+                  <button><img src="../assets/context-badges/pad-work-simple.svg" alt="" /><span>Pad</span></button>
+                  <button><img src="../assets/context-badges/bag-work-simple.svg" alt="" /><span>Bag</span></button>
+                  <button><img src="../assets/context-badges/shadowboxing-simple.svg" alt="" /><span>Shadow</span></button>
+                </div>
+                <label class="lab-search">Search for keyword</label>
+                <div class="entry-stack">
+                  <article class="log-entry marked">
+                    <p>Inside Position</p>
+                    <h4>Clinch Hand Fight To Inside Knee</h4>
+                    <span>Hand Fighting · Knees · Pressure</span>
+                  </article>
+                  <article class="log-entry">
+                    <p>Shield To Turn</p>
+                    <h4>Clinch Knee Shield To Turn</h4>
+                    <span>Off Balancing · Footwork</span>
+                  </article>
+                  <article class="log-entry">
+                    <p>Posture Break</p>
+                    <h4>Wall Drill Posture Break And Turn</h4>
+                    <span>Wall Drill · Frame · Angles</span>
+                  </article>
+                </div>
+              </section>
+            </div>
+          </div>
+          <p class="concept-note">Most minimal on the page. It hides context switching, so it works best if users do not switch sections constantly.</p>
+        </article>
+
+        <article class="concept-card">
+          <div class="concept-title">
+            <span>06</span>
+            <h2>Hybrid Tab Spine</h2>
+          </div>
+          <div class="phone-frame">
+            <div class="phone-screen">
+              <nav class="hybrid-tab-spine" aria-label="Hybrid notebook tab spine">
+                <button class="hybrid-tab is-active">
+                  <img src="../assets/context-badges/pad-work-simple.svg" alt="" />
+                  <span>Pad Work</span>
+                </button>
+                <button class="hybrid-tab">
+                  <img src="../assets/context-badges/bag-work-simple.svg" alt="" />
+                  <span>Bag Work</span>
+                </button>
+                <button class="hybrid-tab">
+                  <img src="../assets/context-badges/shadowboxing-simple.svg" alt="" />
+                  <span>Shadowboxing</span>
+                </button>
+                <button class="hybrid-tab">
+                  <img src="../assets/context-badges/partner-drill-simple.svg" alt="" />
+                  <span>Partner Drill</span>
+                </button>
+                <button class="hybrid-tab">
+                  <img src="../assets/context-badges/clinch-simple.svg" alt="" />
+                  <span>Clinch</span>
+                </button>
+                <button class="hybrid-tab">
+                  <img src="../assets/context-badges/technical-work-simple.svg" alt="" />
+                  <span>Technical Work</span>
+                </button>
+              </nav>
+              <section class="library-page hybrid-page">
+                <div class="page-kicker">Lab Notebook</div>
+                <header class="library-header">
+                  <img src="../assets/context-badges/pad-work-simple.svg" alt="" />
+                  <div>
+                    <h3>Pad Work</h3>
+                    <p>8 captured drills</p>
+                  </div>
+                </header>
+                <label class="lab-search">Search for keyword</label>
+                <div class="notebook-rule"></div>
+                <div class="entry-stack">
+                  <article class="log-entry marked">
+                    <p>Counter Rotation</p>
+                    <h4>Slip Right Step-Through Uppercut Exit</h4>
+                    <span>Head Movement · Uppercut · Exit Step</span>
+                  </article>
+                  <article class="log-entry">
+                    <p>Lead-Side Disguise</p>
+                    <h4>Switch Step Lead Kick Off Jab</h4>
+                    <span>Jab · Lead Kick · Rhythm</span>
+                  </article>
+                  <article class="log-entry">
+                    <p>Parry To Knee</p>
+                    <h4>Parry Jab Cross To Rear Knee</h4>
+                    <span>Defense · Timing · Knee Entry</span>
+                  </article>
+                  <article class="log-entry">
+                    <p>Draw Guard High</p>
+                    <h4>Double Jab To Body Kick On Shell</h4>
+                    <span>Jab · Body Kick · Distance</span>
+                  </article>
+                </div>
+              </section>
+            </div>
+          </div>
+          <p class="concept-note">This is the compromise: icon-only most of the time, but the selected tab becomes a named divider. It keeps the app compact while giving the library a stronger notebook identity.</p>
+        </article>
+      </section>
+    </main>
+  </body>
+</html>

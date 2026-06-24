@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title desc">
+  <title id="title">Warmup</title>
+  <desc id="desc">Hex badge with a wrapped fist, sweat drops, and warmup motion.</desc>
+  <path d="M32 4.5 55.8 18.25v27.5L32 59.5 8.2 45.75v-27.5L32 4.5Z" fill="#F5F4EF" stroke="#D14A32" stroke-width="3" stroke-linejoin="round"/>
+  <path d="M21 34c0-4.7 3.4-8 8.1-8h6.7c3.1 0 5.6 2.5 5.6 5.6v4.7c0 4.4-3.6 8-8 8h-6.6c-3.2 0-5.8-2.6-5.8-5.8V34Z" fill="none" stroke="#171717" stroke-width="3.2" stroke-linejoin="round"/>
+  <path d="M27 26.3v7.5M32 26.3v7.5M37 27v6.8M23.8 39h13.7" fill="none" stroke="#171717" stroke-width="3.2" stroke-linecap="round"/>
+  <path d="M25 45h11" fill="none" stroke="#D14A32" stroke-width="3.2" stroke-linecap="round"/>
+  <path d="M19 24c-2.3 1.9-3.5 4.2-3.6 7M45 23.5c2.5 2 3.7 4.4 3.7 7.4" fill="none" stroke="#8A6F3D" stroke-width="2.6" stroke-linecap="round"/>
+  <path d="M43.5 18.5c0 2-1.4 3.2-2.8 3.2s-2.7-1.2-2.7-3.2c0-1.4 1.2-3 2.7-5.2 1.6 2.2 2.8 3.8 2.8 5.2Z" fill="none" stroke="#256D85" stroke-width="2.6" stroke-linejoin="round"/>
+  <path d="M51 36c0 1.7-1.2 2.8-2.5 2.8S46 37.7 46 36c0-1.2 1-2.6 2.5-4.6C50 33.4 51 34.8 51 36Z" fill="none" stroke="#256D85" stroke-width="2.4" stroke-linejoin="round"/>
+</svg>
+

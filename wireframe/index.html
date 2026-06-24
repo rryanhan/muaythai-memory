@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Muay Thai Memory Wireframe</title>
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <main class="view is-active" id="networkView" aria-label="Network view">
+        <div class="network-canvas">
+          <div class="network-mode-switch" id="networkModeSwitch" aria-label="Network mode">
+            <button class="is-active" type="button" data-network-mode="skill">Skill</button>
+            <button type="button" data-network-mode="workout">Workout</button>
+            <button type="button" data-network-mode="bridge">Bridge</button>
+          </div>
+          <div class="state-chips" id="stateChips"></div>
+          <svg id="networkSvg" class="network-svg" role="img" aria-label="Training method network"></svg>
+          <div class="action-rail" aria-label="Network actions">
+            <button class="icon-button" id="controlsButton" aria-label="Network controls" title="Network controls">
+              <i class="ph ph-sliders-horizontal" aria-hidden="true"></i>
+            </button>
+            <div class="rail-search">
+              <label class="inline-network-search" id="networkSearchInline" aria-label="Search for keyword">
+                <i class="ph ph-magnifying-glass" aria-hidden="true"></i>
+                <input id="networkSearchInput" type="search" placeholder="Search for keyword" autocomplete="off" />
+              </label>
+              <button class="icon-button" id="searchButton" aria-label="Search network" title="Search">
+                <i class="ph ph-magnifying-glass" aria-hidden="true"></i>
+              </button>
+            </div>
+            <button class="icon-button accent" id="captureButton" aria-label="Record memo" title="Record memo">
+              <span class="manual-peek">Manual</span>
+              <i class="ph ph-microphone" aria-hidden="true"></i>
+            </button>
+          </div>
+        </div>
+      </main>
+
+      <main class="view" id="libraryView" aria-label="Organized view">
+        <div class="library-workspace" id="libraryWorkspace">
+          <button
+            class="library-index-handle"
+            id="libraryIndexHandle"
+            type="button"
+            aria-label="Open training method index"
+            aria-expanded="false"
+          >
+            <i class="ph ph-list-bullets" aria-hidden="true"></i>
+            <span>Methods</span>
+          </button>
+          <div class="library-index-backdrop" id="libraryIndexBackdrop"></div>
+          <aside class="library-index-drawer" id="libraryIndexDrawer" aria-label="Training method index" aria-hidden="true">
+            <header class="library-index-header">
+              <div>
+                <p class="kicker">Training Log</p>
+                <h2>Training Methods</h2>
+              </div>
+              <button class="close-button" id="libraryIndexClose" type="button">Close</button>
+            </header>
+            <nav class="library-index-list" id="contextTabs" aria-label="Training method tabs"></nav>
+            <button class="drawer-add-drill" id="libraryCaptureButton" type="button">
+              <i class="ph ph-plus" aria-hidden="true"></i>
+              <span>Add Drill</span>
+            </button>
+          </aside>
+          <section class="library-page">
+            <div class="library-sticky-top" id="libraryStickyTop">
+              <header class="page-header">
+                <div>
+                  <p class="kicker">Training Log</p>
+                  <div class="library-title-row">
+                    <img class="library-header-icon" id="libraryHeaderIcon" alt="" />
+                    <div>
+                      <h1 id="libraryHeaderTitle">Drills</h1>
+                      <p class="library-header-count" id="libraryHeaderCount"></p>
+                    </div>
+                  </div>
+                </div>
+              </header>
+
+              <section class="library-toolbar" aria-label="Library search and filters">
+                <label class="search-field">
+                  <i class="ph ph-magnifying-glass" aria-hidden="true"></i>
+                  <input id="librarySearch" type="search" placeholder="Search for keyword" />
+                </label>
+                <button class="filter-trigger" id="tagFilterButton" type="button" aria-label="Filter by tags" title="Filter by tags">
+                  <i class="ph ph-funnel-simple" aria-hidden="true"></i>
+                </button>
+              </section>
+              <div class="library-filter-chips" id="libraryFilterChips" aria-label="Active library filters"></div>
+            </div>
+
+            <div class="drill-list" id="drillList"></div>
+          </section>
+        </div>
+        <section class="library-detail-page" id="libraryDetailPage" aria-label="Drill page" hidden></section>
+      </main>
+
+      <main class="view" id="profileView" aria-label="Profile view">
+        <section class="profile-page" id="profileMainPage">
+          <section class="profile-summary-panel" aria-label="Profile summary">
+            <header class="profile-header">
+              <div class="profile-avatar" id="profileAvatar" aria-label="Profile picture">RH</div>
+              <div>
+                <p class="kicker">Profile</p>
+                <h1 id="profileName">Ryan Han</h1>
+                <p class="profile-activity-meta"><span id="profileDrillCount">0</span> Activities</p>
+              </div>
+            </header>
+
+            <section class="profile-collections" aria-label="Saved drill collections">
+              <article class="profile-collection">
+                <div class="profile-collection-header">
+                  <div class="profile-collection-title">
+                    <i class="ph ph-star" aria-hidden="true"></i>
+                    <span>Favourite Drills</span>
+                  </div>
+                  <button class="profile-view-more" id="profileStarredMore" type="button">View all</button>
+                </div>
+                <div class="profile-drill-list profile-mini-drill-list" id="profileStarredList"></div>
+              </article>
+
+              <article class="profile-collection">
+                <div class="profile-collection-header">
+                  <div class="profile-collection-title">
+                    <i class="ph ph-target" aria-hidden="true"></i>
+                    <span>Drill Back In</span>
+                  </div>
+                  <button class="profile-view-more" id="profileReviewMore" type="button">View all</button>
+                </div>
+                <div class="profile-drill-list profile-mini-drill-list" id="profileReviewList"></div>
+              </article>
+            </section>
+          </section>
+
+          <section class="profile-section" aria-label="Progress journal">
+            <div class="profile-section-header">
+              <div>
+                <p class="section-label">Progress Journal</p>
+                <h2>Training Clips</h2>
+              </div>
+              <button class="small-action" id="profileJournalButton" type="button">
+                <i class="ph ph-upload-simple" aria-hidden="true"></i>
+                <span>Upload</span>
+              </button>
+            </div>
+            <div class="journal-list" id="profileJournalList"></div>
+          </section>
+        </section>
+        <section class="profile-collection-page" id="profileCollectionPage" aria-label="Profile drill collection" hidden>
+          <header class="profile-collection-page-header">
+            <button class="detail-back-button" type="button" id="profileCollectionBack" aria-label="Back to profile">
+              <i class="ph ph-arrow-left" aria-hidden="true"></i>
+            </button>
+            <p class="section-label" id="profileCollectionLabel">Collection</p>
+            <h1 id="profileCollectionTitle">Drills</h1>
+            <p class="profile-collection-count" id="profileCollectionCount"></p>
+          </header>
+          <div class="profile-drill-list profile-full-drill-list" id="profileCollectionList"></div>
+        </section>
+      </main>
+
+      <nav class="bottom-nav" aria-label="Main navigation">
+        <button class="nav-button is-active" data-view="networkView" aria-label="Network">
+          <i class="ph ph-graph" aria-hidden="true"></i>
+          <span>Network</span>
+        </button>
+        <button class="nav-button" data-view="libraryView" aria-label="Library">
+          <i class="ph ph-stack" aria-hidden="true"></i>
+          <span>Library</span>
+        </button>
+        <button class="nav-button" data-view="profileView" aria-label="Profile">
+          <i class="ph ph-user-circle" aria-hidden="true"></i>
+          <span>Profile</span>
+        </button>
+      </nav>
+    </div>
+
+    <div class="sheet-backdrop" id="sheetBackdrop"></div>
+
+    <aside class="bottom-sheet" id="controlsSheet" aria-label="Network controls">
+      <div class="sheet-handle"></div>
+      <header class="sheet-header">
+        <h2>Network Controls</h2>
+        <button class="close-button" data-close="controlsSheet">Close</button>
+      </header>
+      <div class="sheet-section" id="skillLayerControls">
+        <p class="section-label">Layers</p>
+        <label class="layer-toggle"><input type="checkbox" id="toggleTrainingTags" /> Show tag nodes</label>
+        <label class="layer-toggle"><input type="checkbox" id="toggleCustomTags" /> Show custom tag nodes</label>
+      </div>
+      <div class="sheet-section" id="skillTagFilterControls">
+        <p class="section-label">Tag Filter</p>
+        <div class="network-tag-filter">
+          <label class="network-filter-search">
+            <i class="ph ph-magnifying-glass" aria-hidden="true"></i>
+            <input id="networkTagSearch" type="search" placeholder="Search tags" autocomplete="off" />
+          </label>
+          <button class="select-box-trigger" id="networkTagSelectButton" type="button" aria-expanded="false" aria-controls="networkTagFilterList">
+            <span>Select tags</span>
+            <i class="ph ph-caret-down" aria-hidden="true"></i>
+          </button>
+          <div class="network-tag-select" id="networkTagFilterList" hidden></div>
+        </div>
+      </div>
+      <button class="full-button" id="resetNetworkButton">Reset view</button>
+    </aside>
+
+    <aside class="bottom-sheet tall library-filter-sheet" id="libraryFilterSheet" aria-label="Library filters">
+      <div class="sheet-handle"></div>
+      <header class="sheet-header">
+        <h2>Filter Drills</h2>
+        <button class="close-button" data-close="libraryFilterSheet">Close</button>
+      </header>
+      <div class="sheet-section">
+        <p class="section-label">Tags</p>
+        <div class="network-tag-filter">
+          <label class="network-filter-search">
+            <i class="ph ph-magnifying-glass" aria-hidden="true"></i>
+            <input id="libraryTagSearch" type="search" placeholder="Search tags" autocomplete="off" />
+          </label>
+          <div class="network-tag-select library-tag-select" id="libraryTagGroupList"></div>
+        </div>
+      </div>
+      <button class="full-button secondary-button" id="clearLibraryFiltersButton" type="button">Clear filters</button>
+    </aside>
+
+    <aside class="bottom-sheet tall" id="detailSheet" aria-label="Drill detail">
+      <div class="sheet-handle"></div>
+      <header class="sheet-header">
+        <h2 id="detailTitle">Drill</h2>
+        <button class="close-button" data-close="detailSheet">Close</button>
+      </header>
+      <div id="detailContent"></div>
+    </aside>
+
+    <aside class="bottom-sheet tall" id="captureSheet" aria-label="Capture draft">
+      <div class="sheet-handle"></div>
+      <header class="sheet-header">
+        <h2>Capture Draft</h2>
+        <button class="close-button" data-close="captureSheet">Close</button>
+      </header>
+      <form class="capture-form">
+        <label>Title<input value="Slip Right Step-Through Uppercut Exit" /></label>
+        <label>Summary<textarea>A counter drill for slipping the cross, stepping through, firing the uppercut, and exiting off-line.</textarea></label>
+        <label>Steps<textarea>1. Partner feeds jab-cross.
+2. Slip right and step through.
+3. Fire the uppercut.
+4. Exit off-line.</textarea></label>
+        <label>Training Methods<input value="Partner Drill, Pad Work" /></label>
+        <label>Tags<input value="Slip, Uppercut, Step Through, Exits" /></label>
+        <label>Core Idea<input value="Counter Rotation" /></label>
+        <label>Custom Tags<input value="southpaw-transition" /></label>
+        <button class="full-button" type="button">Save draft</button>
+      </form>
+    </aside>
+
+    <aside class="bottom-sheet tall" id="journalSheet" aria-label="Progress journal entry">
+      <div class="sheet-handle"></div>
+      <header class="sheet-header">
+        <h2>Progress Clip</h2>
+        <button class="close-button" data-close="journalSheet">Close</button>
+      </header>
+      <form class="capture-form journal-form">
+        <button class="upload-dropzone" type="button">
+          <i class="ph ph-video-camera" aria-hidden="true"></i>
+          <span>Upload training clip</span>
+          <small>Video, image, or short progress note</small>
+        </button>
+        <label>Date<input value="Jun 21" /></label>
+        <label>Caption<textarea placeholder="What changed, what felt off, or what you want to remember"></textarea></label>
+        <label>Corresponding drill<select id="journalDrillSelect"></select></label>
+        <button class="full-button" type="button">Save journal entry</button>
+      </form>
+    </aside>
+
+    <script src="./app.js"></script>
+  </body>
+</html>

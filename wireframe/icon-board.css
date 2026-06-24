@@ -1,0 +1,105 @@
+@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap");
+
+:root {
+  --bg: #f5f4ef;
+  --surface: #ffffff;
+  --text: #171717;
+  --muted: #64645f;
+  --border: #d8d6cc;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+}
+
+main {
+  width: min(1100px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 42px 0;
+}
+
+header {
+  margin-bottom: 24px;
+}
+
+header p,
+.section-heading p {
+  margin: 0 0 6px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+h1,
+h2 {
+  margin: 0;
+  letter-spacing: 0;
+}
+
+h1 {
+  font-size: clamp(32px, 6vw, 58px);
+  line-height: 1;
+}
+
+.board {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 14px;
+}
+
+.section-heading {
+  margin: 34px 0 18px;
+}
+
+.section-heading h2 {
+  font-size: 26px;
+}
+
+article {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 18px;
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+}
+
+article img {
+  width: 96px;
+  height: 96px;
+}
+
+article h2 {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.scale-check {
+  margin-top: 30px;
+  border-top: 1px solid var(--border);
+  padding-top: 22px;
+}
+
+.scale-check h2 {
+  font-size: 18px;
+  margin-bottom: 14px;
+}
+
+.scale-check div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: center;
+}
+
+.scale-check img {
+  width: 36px;
+  height: 36px;
+}

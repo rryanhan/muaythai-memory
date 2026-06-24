@@ -1,0 +1,196 @@
+{
+  "workoutTypes": [
+    "Strength",
+    "Plyometrics",
+    "Conditioning",
+    "Mobility & Stretching",
+    "Isometrics",
+    "Core & Stability"
+  ],
+  "exercises": [
+    {
+      "id": "med-ball-rotational-throw",
+      "title": "Med Ball Rotational Throw",
+      "summary": "Explosive hip and trunk rotation for punches, elbows, and kick returns.",
+      "workoutTypes": ["Plyometrics", "Core & Stability"],
+      "equipment": ["Medicine Ball"],
+      "physicalQualities": ["Rotational Power", "Explosive Power"],
+      "bodyAreas": ["Core", "Hips"],
+      "muayThaiRelevance": ["Punching", "Elbows", "Kicking"],
+      "aliases": ["Rotational Med Ball Throw", "Wall Throw"],
+      "cues": ["Load the rear hip.", "Throw through the wall.", "Reset before the next rep."]
+    },
+    {
+      "id": "landmine-punch-press",
+      "title": "Landmine Punch Press",
+      "summary": "Split-stance pressing pattern that links foot pressure, hip turn, and shoulder drive.",
+      "workoutTypes": ["Strength"],
+      "equipment": ["Landmine"],
+      "physicalQualities": ["Rotational Power", "Strength"],
+      "bodyAreas": ["Shoulders", "Core"],
+      "muayThaiRelevance": ["Punching"],
+      "aliases": ["Landmine Press With Rotation", "Punch Press"],
+      "cues": ["Push from the floor.", "Rotate without leaning.", "Finish tall."]
+    },
+    {
+      "id": "plyo-push-up",
+      "title": "Plyo Push-Up",
+      "summary": "Upper-body explosiveness and elastic stiffness for punching bursts.",
+      "workoutTypes": ["Plyometrics"],
+      "equipment": ["Bodyweight"],
+      "physicalQualities": ["Explosive Power", "Elasticity"],
+      "bodyAreas": ["Shoulders", "Core"],
+      "muayThaiRelevance": ["Punching", "Guard"],
+      "aliases": ["Explosive Push-Up", "Pop Push-Up"],
+      "cues": ["Stay braced.", "Leave the floor cleanly.", "Land quiet."]
+    },
+    {
+      "id": "lateral-bound-stick",
+      "title": "Lateral Bound And Stick",
+      "summary": "Lateral power with a controlled landing for exits, angle changes, and ring cutting.",
+      "workoutTypes": ["Plyometrics"],
+      "equipment": ["Bodyweight"],
+      "physicalQualities": ["Elasticity", "Stability"],
+      "bodyAreas": ["Legs", "Hips", "Ankles / Calves"],
+      "muayThaiRelevance": ["Footwork", "Balance", "Defense"],
+      "aliases": ["Skater Bound", "Lateral Stick Landing"],
+      "cues": ["Push the floor away.", "Stick the landing.", "Keep guard shape."]
+    },
+    {
+      "id": "kettlebell-swing",
+      "title": "Kettlebell Swing",
+      "summary": "Hip snap and posterior-chain endurance for kicks, knees, and late-round power.",
+      "workoutTypes": ["Strength", "Conditioning"],
+      "equipment": ["Kettlebell"],
+      "physicalQualities": ["Strength Endurance", "Conditioning"],
+      "bodyAreas": ["Hips", "Full Body"],
+      "muayThaiRelevance": ["Kicking", "Knees"],
+      "aliases": ["KB Swing", "Hardstyle Swing"],
+      "cues": ["Hinge, do not squat.", "Snap the hips.", "Keep the shoulders packed."]
+    },
+    {
+      "id": "band-resisted-knee-drive",
+      "title": "Band-Resisted Knee Drive",
+      "summary": "Explosive knee mechanics with hip extension and trunk posture.",
+      "workoutTypes": ["Strength", "Core & Stability"],
+      "equipment": ["Band"],
+      "physicalQualities": ["Explosive Power", "Stability"],
+      "bodyAreas": ["Hips", "Core"],
+      "muayThaiRelevance": ["Knees", "Balance"],
+      "aliases": ["Long Knee Band Drill", "Band Knee Drive"],
+      "cues": ["Drive the knee through the band.", "Keep posture stacked.", "Reset stance each rep."]
+    },
+    {
+      "id": "sled-push-interval",
+      "title": "Sled Push Interval",
+      "summary": "Forward pressure conditioning for clinch entries, ring cutting, and heavy rounds.",
+      "workoutTypes": ["Conditioning"],
+      "equipment": ["Sled"],
+      "physicalQualities": ["Conditioning", "Strength Endurance"],
+      "bodyAreas": ["Full Body", "Legs"],
+      "muayThaiRelevance": ["Clinch", "Footwork"],
+      "aliases": ["Sled Drive", "Pressure Push"],
+      "cues": ["Drive low.", "Keep steps short.", "Breathe through the effort."]
+    },
+    {
+      "id": "towel-grip-row",
+      "title": "Towel Grip Row",
+      "summary": "Grip and pulling endurance for collar ties, frames, and hand fighting.",
+      "workoutTypes": ["Strength", "Isometrics"],
+      "equipment": ["Cable", "Towel"],
+      "physicalQualities": ["Strength Endurance", "Isometric Strength"],
+      "bodyAreas": ["Grip", "Back", "Shoulders"],
+      "muayThaiRelevance": ["Clinch", "Guard"],
+      "aliases": ["Towel Row", "Grip Row"],
+      "cues": ["Crush the towel.", "Pull elbows to ribs.", "Do not shrug."]
+    },
+    {
+      "id": "copenhagen-plank",
+      "title": "Copenhagen Plank",
+      "summary": "Adductor and hip durability for checking, kicking, clinch balance, and sweeps.",
+      "workoutTypes": ["Isometrics", "Core & Stability"],
+      "equipment": ["Bench", "Bodyweight"],
+      "physicalQualities": ["Stability", "Isometric Strength"],
+      "bodyAreas": ["Hips", "Core"],
+      "muayThaiRelevance": ["Kicking", "Defense", "Balance"],
+      "aliases": ["Copenhagen Hold", "Adductor Plank"],
+      "cues": ["Keep hips high.", "Own the top leg.", "Stop before the back twists."]
+    },
+    {
+      "id": "jump-rope-sprint",
+      "title": "Jump Rope Sprint",
+      "summary": "Fast foot rhythm and repeat sprint conditioning without heavy joint cost.",
+      "workoutTypes": ["Conditioning"],
+      "equipment": ["Jump Rope"],
+      "physicalQualities": ["Conditioning", "Elasticity"],
+      "bodyAreas": ["Full Body", "Ankles / Calves"],
+      "muayThaiRelevance": ["Footwork", "Balance"],
+      "aliases": ["Rope Sprint", "Fast Rope Round"],
+      "cues": ["Stay light.", "Relax the shoulders.", "Accelerate without stomping."]
+    },
+    {
+      "id": "hip-switch-mobility-flow",
+      "title": "Hip Switch Mobility Flow",
+      "summary": "Controlled hip rotation and stance switching for kicks, checks, and angle changes.",
+      "workoutTypes": ["Mobility & Stretching"],
+      "equipment": ["Bodyweight"],
+      "physicalQualities": ["Mobility", "Stability"],
+      "bodyAreas": ["Hips", "Core"],
+      "muayThaiRelevance": ["Kicking", "Footwork", "Balance"],
+      "aliases": ["Hip Switch Flow", "Shin Box Switch"],
+      "cues": ["Move slowly.", "Keep the chest tall.", "Own the end range before switching."]
+    }
+  ],
+  "pathways": [
+    {
+      "id": "uppercut-power-circuit",
+      "title": "Uppercut Power Circuit",
+      "kind": "Circuit",
+      "summary": "A short power route for uppercuts, hooks, and counter-rotation mechanics.",
+      "exerciseIds": ["med-ball-rotational-throw", "landmine-punch-press", "plyo-push-up"],
+      "structure": ["4 rounds", "6 throws per side", "6 landmine reps per side", "5 plyo push-ups"],
+      "goal": "Build rotational snap and shoulder pop for uppercuts and hooks.",
+      "notes": "Keep every rep crisp. Stop the round if the throws slow down."
+    },
+    {
+      "id": "low-kick-spring-circuit",
+      "title": "Low Kick Spring Circuit",
+      "kind": "Circuit",
+      "summary": "Lower-body spring and hip control for low-kick return, stance recovery, and angle changes.",
+      "exerciseIds": ["kettlebell-swing", "lateral-bound-stick", "copenhagen-plank"],
+      "structure": ["3 rounds", "12 swings", "5 bounds each side", "20 second Copenhagen each side"],
+      "goal": "Build hip snap and landing control for kicking and checking.",
+      "notes": "The landing matters as much as the jump."
+    },
+    {
+      "id": "clinch-engine-round",
+      "title": "Clinch Engine Round",
+      "kind": "Conditioning Round",
+      "summary": "Grip, posture, and forward-pressure conditioning for hand fighting and clinch control.",
+      "exerciseIds": ["towel-grip-row", "sled-push-interval", "band-resisted-knee-drive"],
+      "structure": ["4 rounds", "10 towel rows", "15 meter sled push", "8 knee drives each side"],
+      "goal": "Build the grip and engine to keep posture while entering knees.",
+      "notes": "Treat the sled push like a pressure entry, not a race."
+    },
+    {
+      "id": "ring-cutting-conditioning",
+      "title": "Ring Cutting Conditioning",
+      "kind": "Conditioning Round",
+      "summary": "Footwork and pressure conditioning for cutting exits without chasing.",
+      "exerciseIds": ["jump-rope-sprint", "sled-push-interval", "lateral-bound-stick"],
+      "structure": ["5 rounds", "30 second rope sprint", "15 meter sled push", "4 lateral bounds each side"],
+      "goal": "Build repeat footwork bursts for cutting the ring.",
+      "notes": "Stay light before the push, then own the landing after the bound."
+    },
+    {
+      "id": "knee-entry-explosive-set",
+      "title": "Knee Entry Explosive Set",
+      "kind": "Strength Set",
+      "summary": "Hip drive and posture for knees off hand traps, frames, and pressure entries.",
+      "exerciseIds": ["band-resisted-knee-drive", "med-ball-rotational-throw", "lateral-bound-stick"],
+      "structure": ["3 rounds", "8 knee drives each side", "5 med ball throws each side", "5 stick landings each side"],
+      "goal": "Build knee drive with enough balance to exit or continue clinching.",
+      "notes": "Do not chase speed if posture collapses."
+    }
+  ]
+}

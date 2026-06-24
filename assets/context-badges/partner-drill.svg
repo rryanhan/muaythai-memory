@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title desc">
+  <title id="title">Partner Drill</title>
+  <desc id="desc">Hex badge with two wrapped fists meeting.</desc>
+  <path d="M32 4.5 55.8 18.25v27.5L32 59.5 8.2 45.75v-27.5L32 4.5Z" fill="#F5F4EF" stroke="#171717" stroke-width="3" stroke-linejoin="round"/>
+  <path d="M12.5 33c0-4 2.9-7 6.9-7h5.2c2.8 0 5 2.2 5 5v4c0 4-3.2 7.2-7.2 7.2h-4.9c-2.8 0-5-2.2-5-5V33Z" fill="none" stroke="#171717" stroke-width="3.2" stroke-linejoin="round"/>
+  <path d="M51.5 33c0-4-2.9-7-6.9-7h-5.2c-2.8 0-5 2.2-5 5v4c0 4 3.2 7.2 7.2 7.2h4.9c2.8 0 5-2.2 5-5V33Z" fill="none" stroke="#171717" stroke-width="3.2" stroke-linejoin="round"/>
+  <path d="M18.2 26.3v7M23.2 26.3v7M45.8 26.3v7M40.8 26.3v7" fill="none" stroke="#171717" stroke-width="3.2" stroke-linecap="round"/>
+  <path d="M16 39h10M38 39h10" fill="none" stroke="#171717" stroke-width="3.2" stroke-linecap="round"/>
+  <path d="M17 43.5h8M39 43.5h8" fill="none" stroke="#D14A32" stroke-width="3.2" stroke-linecap="round"/>
+  <path d="M30.5 31.5h3M30.5 36h3" fill="none" stroke="#256D85" stroke-width="2.6" stroke-linecap="round"/>
+</svg>
+
