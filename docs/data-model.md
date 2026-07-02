@@ -5,7 +5,7 @@
 The MVP should keep the core model small.
 
 ```txt
-Training Methods + Core Idea + Tags + Custom Tags -> Drill
+Training Methods + Tags + Custom Tags -> Drill
 ```
 
 Status and Training Plans are useful product concepts, but they do not need to be part of the initial AI capture output. Saved drills can still have user-set Status markers after capture.
@@ -28,7 +28,6 @@ Required MVP fields:
 
 Optional MVP fields:
 
-- `coreIdea`
 - `status`
 
 Optional later fields:
@@ -74,69 +73,25 @@ First-pass tag groups:
 - Defense: `Check`, `Catch`, `Parry`, `Shell`, `Long Guard`
 - Head Movement: `Slip`, `Roll`
 - Footwork: `Pivot`, `Switch Step`, `Step Through`, `Stance Switch`
-- Clinch: `Frame`, `Hand Trap`, `Hand Fighting`, `Body Lock`
-- Sweeps And Dumps: `Sweep`, `Dump`
+- Sweeps: `Sweep`
 - Training Qualities: `Entries`, `Exits`, `Angles`, `Distance`, `Timing`, `Balance`, `Pressure`, `Rhythm`
 - Practice Format: `Shadowboxing`
 
 Tags should be optional graph nodes. They should be visible through filters, search, and optional graph layers.
 
-## Core Idea
+## Parked Concept: Core Idea
 
-Core Idea is an optional single primary training pattern attached to a Drill.
+Core Idea is not part of the active MVP UI.
 
-It is more intentional than a broad Tag, but less free-form than a Custom Tag. It should capture the main training pattern the user should remember only when the drill has a clear main idea.
+We tested it as a single primary training pattern attached to a Drill, but it risks forcing users into a word-first interpretation of something that is usually visual and body-led. For now, keep the interface focused on Training Methods, concrete Tags, Custom Tags, and Status.
 
-First-pass Core Ideas:
+Existing mock data may still contain `coreIdea` values for recovery/reference, but the app should not display or filter by Core Idea in the current wireframe.
 
-- Range Finding
-- Feint To Draw
-- Jab To Enter
-- Teep To Interrupt
-- Hand Trap Entry
-- Pressure Entry
-- Slip To Counter
-- Parry To Counter
-- Check And Return
-- Catch And Return
-- Shell And Return
-- Roll And Return
-- Counter Rotation
-- Exit After Scoring
-- Angle After Strike
-- Angle After Defense
-- Ring Cutting
-- Stance Switch Attack
-- Open Stance Attack
-- Rhythm Change
-- Frame To Knee
-- Inside Control
-- Posture Break
-- Turn To Attack
-- Catch To Sweep
-
-Example:
-
-```json
-{
-  "trainingTags": ["Jab", "Teep", "Knee", "Entries"],
-  "coreIdea": "Feint To Draw"
-}
-```
-
-First-pass storage:
-
-- `coreIdea`: string or `null`
-
-Use `null` when a drill is just a sequence, general rep structure, bag round, pad combination, or note without a distinct concept.
-
-Possible later storage:
+Possible later fields if we bring this back:
 
 - `coreIdeaId`
 - `secondaryCoreIdeas`
 - `coreIdeaConfidence`
-
-Core Idea should be searchable and filterable. It can be an optional graph layer, but the default graph should remain method-first.
 
 ## Status
 
@@ -181,7 +136,6 @@ Training Method -> Drill
 Optional layers:
 
 - Tags
-- Core Ideas
 - Custom Tags
 - Status
 - Training Plans

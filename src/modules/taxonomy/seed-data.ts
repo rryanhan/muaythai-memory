@@ -1,0 +1,63 @@
+export const trainingMethodSeeds = [
+  { name: "Pad Work", slug: "pad-work", iconKey: "pad-work", sortOrder: 10 },
+  { name: "Bag Work", slug: "bag-work", iconKey: "bag-work", sortOrder: 20 },
+  { name: "Partner Drill", slug: "partner-drill", iconKey: "partner-drill", sortOrder: 30 },
+  { name: "Clinch", slug: "clinch", iconKey: "clinch", sortOrder: 40 },
+  { name: "Technical Work", slug: "technical-work", iconKey: "technical-work", sortOrder: 50 },
+] as const;
+
+export const tagCategorySeeds = [
+  { name: "Boxing", slug: "boxing", sortOrder: 10 },
+  { name: "Kicking", slug: "kicking", sortOrder: 20 },
+  { name: "Knees", slug: "knees", sortOrder: 30 },
+  { name: "Elbows", slug: "elbows", sortOrder: 40 },
+  { name: "Defense", slug: "defense", sortOrder: 50 },
+  { name: "Head Movement", slug: "head-movement", sortOrder: 60 },
+  { name: "Footwork", slug: "footwork", sortOrder: 70 },
+  { name: "Sweeps", slug: "sweeps", sortOrder: 80 },
+  { name: "Training Qualities", slug: "training-qualities", sortOrder: 90 },
+  { name: "Practice Format", slug: "practice-format", sortOrder: 100 },
+] as const;
+
+export const standardTagSeeds = [
+  { name: "Jab", slug: "jab", categorySlug: "boxing", sortOrder: 10 },
+  { name: "Cross", slug: "cross", categorySlug: "boxing", sortOrder: 20 },
+  { name: "Hook", slug: "hook", categorySlug: "boxing", sortOrder: 30 },
+  { name: "Uppercut", slug: "uppercut", categorySlug: "boxing", sortOrder: 40 },
+  { name: "Body Shot", slug: "body-shot", categorySlug: "boxing", sortOrder: 50 },
+  { name: "Teep", slug: "teep", categorySlug: "kicking", sortOrder: 10 },
+  { name: "Round Kick", slug: "round-kick", categorySlug: "kicking", sortOrder: 20 },
+  { name: "Low Kick", slug: "low-kick", categorySlug: "kicking", sortOrder: 30 },
+  { name: "Knee", slug: "knee", categorySlug: "knees", sortOrder: 10 },
+  { name: "Elbow", slug: "elbow", categorySlug: "elbows", sortOrder: 10 },
+  { name: "Check", slug: "check", categorySlug: "defense", sortOrder: 10 },
+  { name: "Catch", slug: "catch", categorySlug: "defense", sortOrder: 20 },
+  { name: "Parry", slug: "parry", categorySlug: "defense", sortOrder: 30 },
+  { name: "Shell", slug: "shell", categorySlug: "defense", sortOrder: 40 },
+  { name: "Long Guard", slug: "long-guard", categorySlug: "defense", sortOrder: 50 },
+  { name: "Slip", slug: "slip", categorySlug: "head-movement", sortOrder: 10 },
+  { name: "Roll", slug: "roll", categorySlug: "head-movement", sortOrder: 20 },
+  { name: "Pivot", slug: "pivot", categorySlug: "footwork", sortOrder: 10 },
+  { name: "Switch Step", slug: "switch-step", categorySlug: "footwork", sortOrder: 20 },
+  { name: "Step Through", slug: "step-through", categorySlug: "footwork", sortOrder: 30 },
+  { name: "Stance Switch", slug: "stance-switch", categorySlug: "footwork", sortOrder: 40 },
+  { name: "Sweep", slug: "sweep", categorySlug: "sweeps", sortOrder: 10 },
+  { name: "Entries", slug: "entries", categorySlug: "training-qualities", sortOrder: 10 },
+  { name: "Exits", slug: "exits", categorySlug: "training-qualities", sortOrder: 20 },
+  { name: "Angles", slug: "angles", categorySlug: "training-qualities", sortOrder: 30 },
+  { name: "Distance", slug: "distance", categorySlug: "training-qualities", sortOrder: 40 },
+  { name: "Timing", slug: "timing", categorySlug: "training-qualities", sortOrder: 50 },
+  { name: "Balance", slug: "balance", categorySlug: "training-qualities", sortOrder: 60 },
+  { name: "Pressure", slug: "pressure", categorySlug: "training-qualities", sortOrder: 70 },
+  { name: "Rhythm", slug: "rhythm", categorySlug: "training-qualities", sortOrder: 80 },
+  { name: "Shadowboxing", slug: "shadowboxing", categorySlug: "practice-format", sortOrder: 10 },
+] as const;
+
+export const statusTagSeeds = [
+  { name: "Starred", slug: "starred", sortOrder: 10 },
+  { name: "Drill Back In", slug: "drill-back-in", sortOrder: 20 },
+  { name: "Focus", slug: "focus", sortOrder: 30 },
+  { name: "Try in sparring", slug: "try-in-sparring", sortOrder: 40 },
+  { name: "Needs cleanup", slug: "needs-cleanup", sortOrder: 50 },
+  { name: "Archived", slug: "archived", sortOrder: 60 },
+] as const;

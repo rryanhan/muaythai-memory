@@ -190,6 +190,11 @@ button {
   stroke: rgba(37, 109, 133, 0.34);
 }
 
+.edge.workoutTag {
+  stroke: rgba(37, 109, 133, 0.34);
+  stroke-width: 1.25;
+}
+
 .edge.pathway {
   stroke-width: 3;
   stroke-linecap: round;
@@ -211,6 +216,16 @@ button {
   fill: var(--accent);
 }
 
+.node.workoutRelevance circle,
+.node.physicalQuality circle,
+.node.equipmentTag circle {
+  fill: var(--teal);
+}
+
+.node.bodyArea circle {
+  fill: var(--custom);
+}
+
 .node.exercise circle {
   fill: var(--graph-drill);
 }
@@ -221,6 +236,8 @@ button {
 
 .node.workoutType text,
 .node.relevance text,
+.node.workoutRelevance text,
+.node.physicalQuality text,
 .node.quality text,
 .node.skillLink text {
   font-weight: 700;
@@ -872,17 +889,6 @@ h2 {
   color: var(--text);
 }
 
-.drill-core-idea {
-  display: block;
-  margin-bottom: 7px;
-  color: var(--accent);
-  font-family: "IBM Plex Mono", ui-monospace, monospace;
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
 .drill-row strong {
   display: block;
   font-size: 21px;
@@ -989,6 +995,35 @@ h2 {
   color: var(--muted);
   font-size: 13px;
   line-height: 1.35;
+}
+
+.drill-tag-line {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: 7px;
+  row-gap: 4px;
+}
+
+.drill-tag-line span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--accent);
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.035em;
+  text-transform: uppercase;
+}
+
+.drill-tag-line span + span::before {
+  content: "";
+  width: 3px;
+  height: 3px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: currentColor;
+  opacity: 0.58;
 }
 
 .profile-summary-panel {
@@ -1234,9 +1269,10 @@ h2 {
 }
 
 .profile-drill-row small {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 6px;
   overflow: hidden;
-  color: var(--muted);
-  font-size: 12px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -1660,6 +1696,13 @@ h2 {
   color: var(--accent);
   border-color: rgba(209, 74, 50, 0.38);
   background: rgba(209, 74, 50, 0.09);
+}
+
+.tag-chip {
+  color: var(--accent);
+  border-color: rgba(209, 74, 50, 0.38);
+  background: rgba(209, 74, 50, 0.09);
+  font-weight: 700;
 }
 
 .detail-section {

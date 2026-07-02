@@ -33,14 +33,13 @@ Pad Work ---------------------- Slip Right Step-Through Uppercut
 
 This keeps the first view readable and gives users clear anchor nodes.
 
-Tags, Core Ideas, Custom Tags, and Status should be optional graph layers. They are useful, but they should not all appear by default.
+Tags, Custom Tags, and Status should be optional graph layers. They are useful, but they should not all appear by default.
 
 Optional expanded graph:
 
 ```txt
 Partner Drill ----------------\
 Pad Work ----------------------\
-Counter Rotation --------------\
 Uppercut ----------------------- Slip Right Step-Through Uppercut
 Slip --------------------------/
 southpaw-transition ----------/
@@ -56,7 +55,6 @@ First-pass visual ideas:
 - Largest nodes: Training Methods.
 - Drill nodes: saved drill entries, connected directly to relevant training methods by default.
 - Tag nodes: optional layer.
-- Core Idea nodes: optional layer.
 - Custom Tag nodes: optional layer.
 - Status nodes: optional layer, hidden by default.
 - Brightness: frequency or recency of use.
@@ -70,10 +68,9 @@ The graph should feel alive but not arbitrary. Avoid visual rules that imply dat
 
 Clicking a node should open the information behind that node.
 
-- Drill node: opens the full drill details, including summary, steps, notes, primary training method badge, core idea, tags, status, and related plans.
+- Drill node: opens the full drill details, including summary, steps, notes, primary training method badge, tags, status, and related plans.
 - Training Method node: focuses the graph on drills connected to that method. Connected nodes and edges stay bright while unrelated nodes dim. Tapping the same method, tapping the background, or clearing the focus chip returns to the full graph.
 - Tag node, when visible: opens a filtered view of drills connected to that tag.
-- Core Idea node, when visible: opens a filtered view of drills connected to that idea.
 - Custom Tag node, when visible: opens a filtered view of drills connected to that custom tag.
 - Status node, when visible: opens a filtered view of drills with that status.
 
@@ -84,8 +81,7 @@ The graph should not be purely decorative. Every visible node should be usable a
 Potential Network View modes:
 
 - Method View: emphasizes Pad Work, Bag Work, Partner Drill, Clinch, and Technical Work.
-- Tag View: emphasizes concrete Tags such as Jab, Teep, Slip, Pivot, Frame, and Balance. Broad labels such as Boxing or Footwork are browse groups, not stored tags.
-- Core Idea View: emphasizes the main patterns drills teach, such as Feint To Draw, Counter Rotation, Exit After Scoring, and Catch To Sweep.
+- Tag View: emphasizes concrete Tags such as Jab, Teep, Slip, Pivot, Sweep, and Balance. Broad labels such as Boxing or Footwork are browse groups, not stored tags.
 - Focus View: emphasizes starred, active, frequently accessed, or recently practiced drills.
 - Plan View: shows drills grouped into a Training Plan.
 
@@ -93,7 +89,7 @@ Current graph-mode direction:
 
 - Skill Graph: the default Muay Thai memory map. Shows Training Methods connected to Drill nodes.
 - Workout Graph: a parallel physical-prep map. Shows Workout Type anchors connected to Exercise / Movement nodes.
-- Bridge Graph: shows how Exercise / Movement nodes support Muay Thai Tags, Core Ideas, or fight-relevant categories. This is where overlap belongs, rather than making workout material normal drill nodes.
+- Bridge Graph: shows how Exercise / Movement nodes support Muay Thai Tags or fight-relevant categories. This is where overlap belongs, rather than making workout material normal drill nodes.
 
 Workout Graph should stay Muay Thai-oriented. It can include lifting, but the emphasis should be plyometrics, rotational power, full-body explosiveness, conditioning, durability, grip, and other fight-relevant physical qualities.
 
@@ -122,7 +118,6 @@ Suggested toggles:
 - Training Methods
 - Drills
 - Tags
-- Core Ideas
 - Custom Tags
 - Status
 - Training Plans
@@ -132,7 +127,6 @@ Default state:
 - Training Methods: on
 - Drills: on
 - Tags: off
-- Core Ideas: off
 - Custom Tags: off
 - Status: off
 - Training Plans: off unless viewing a plan
@@ -151,7 +145,7 @@ Action rail:
 
 Network Controls opens layer and filter settings for the graph.
 
-Search searches by keyword across drill title, summary, context, tags, and core idea. Tapping the search icon opens an inline curved search input extending from the icon. Typing previews matching nodes live. Tapping the search icon again with text in the input commits that keyword as an active search filter and retracts the input. Tapping it again with an empty input creates no filter and retracts the input. Multiple search keywords can be active at once, and the search icon should change color while the inline input is open or committed search filters exist. Search results should show matching nodes plus enough connected nodes to preserve context.
+Search searches by keyword across drill title, summary, training method, tags, custom tags, and status. Tapping the search icon opens an inline curved search input extending from the icon. Typing previews matching nodes live. Tapping the search icon again with text in the input commits that keyword as an active search filter and retracts the input. Tapping it again with an empty input creates no filter and retracts the input. Multiple search keywords can be active at once, and the search icon should change color while the inline input is open or committed search filters exist. Search results should show matching nodes plus enough connected nodes to preserve context.
 
 Capture opens the voice memo flow by default. Holding the capture icon should reveal a manual-input option, and swiping up to that icon should open manual entry.
 

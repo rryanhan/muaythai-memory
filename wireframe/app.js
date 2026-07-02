@@ -30,13 +30,18 @@ const tagGroups = [
   { label: "Defense", tags: ["Check", "Catch", "Parry", "Shell", "Long Guard"] },
   { label: "Head Movement", tags: ["Slip", "Roll"] },
   { label: "Footwork", tags: ["Pivot", "Switch Step", "Step Through", "Stance Switch"] },
-  { label: "Clinch", tags: ["Frame", "Hand Trap", "Hand Fighting", "Body Lock"] },
-  { label: "Sweeps And Dumps", tags: ["Sweep", "Dump"] },
+  { label: "Sweeps", tags: ["Sweep"] },
   { label: "Training Qualities", tags: ["Entries", "Exits", "Angles", "Distance", "Timing", "Balance", "Pressure", "Rhythm"] },
   { label: "Practice Format", tags: ["Shadowboxing"] },
 ];
 
 const standardTagNames = new Set(tagGroups.flatMap((group) => group.tags));
+const workoutTagFields = [
+  { label: "Physical Quality", field: "physicalQualities" },
+  { label: "Equipment", field: "equipment" },
+  { label: "Body Area", field: "bodyAreas" },
+  { label: "Muay Thai Relevance", field: "muayThaiRelevance" },
+];
 const legacyTagMap = {
   Boxing: [],
   Kicking: [],
@@ -48,6 +53,11 @@ const legacyTagMap = {
   Knees: ["Knee"],
   Elbows: ["Elbow"],
   "Stance Switching": ["Stance Switch"],
+  Frame: [],
+  "Hand Trap": [],
+  "Hand Fighting": [],
+  "Body Lock": [],
+  Dump: [],
 };
 
 const profileDemo = {
@@ -109,13 +119,16 @@ const state = {
   libraryTagQuery: "",
   activeTags: new Set(),
   activeNetworkTags: new Set(),
+  activeWorkoutTags: new Set(),
   networkTagQuery: "",
+  workoutTagQuery: "",
   isNetworkTagSelectOpen: false,
   networkSearchTerms: [],
   networkSearchDraft: "",
   isNetworkSearchOpen: false,
   showTrainingTags: false,
   showCustomTags: false,
+  showWorkoutTags: false,
   focusedContext: null,
   focusedGraphNode: null,
   focusedGraphLabel: null,
@@ -164,6 +177,12 @@ async function boot() {
     controlsSheet: qs("controlsSheet"),
     skillLayerControls: qs("skillLayerControls"),
     skillTagFilterControls: qs("skillTagFilterControls"),
+    networkLayerLabel: qs("networkLayerLabel"),
+    primaryLayerToggleLabel: qs("primaryLayerToggleLabel"),
+    primaryLayerToggleText: qs("primaryLayerToggleText"),
+    secondaryLayerToggleLabel: qs("secondaryLayerToggleLabel"),
+    secondaryLayerToggleText: qs("secondaryLayerToggleText"),
+    networkTagFilterLabel: qs("networkTagFilterLabel"),
     detailSheet: qs("detailSheet"),
     captureSheet: qs("captureSheet"),
     detailTitle: qs("detailTitle"),
@@ -258,6 +277,8 @@ function bindEvents() {
       state.focusedContext = null;
       state.focusedGraphNode = null;
       state.focusedGraphLabel = null;
+      syncNetworkTagInput();
+      renderNetworkTagFilters();
       renderNetwork();
     });
   });
@@ -301,7 +322,11 @@ function bindEvents() {
     renderNetworkTagFilters();
   });
   els.networkTagSearch.addEventListener("input", (event) => {
-    state.networkTagQuery = event.target.value.trim().toLowerCase();
+    if (state.networkMode === "skill") {
+      state.networkTagQuery = event.target.value.trim().toLowerCase();
+    } else {
+      state.workoutTagQuery = event.target.value.trim().toLowerCase();
+    }
     state.isNetworkTagSelectOpen = true;
     renderNetworkTagFilters();
   });
@@ -329,11 +354,16 @@ function bindEvents() {
   els.profileCollectionBack.addEventListener("click", closeProfileCollection);
 
   els.toggleTrainingTags.addEventListener("change", (event) => {
-    state.showTrainingTags = event.target.checked;
+    if (state.networkMode === "skill") {
+      state.showTrainingTags = event.target.checked;
+    } else if (state.networkMode === "workout") {
+      state.showWorkoutTags = event.target.checked;
+    }
     renderNetwork();
   });
 
   els.toggleCustomTags.addEventListener("change", (event) => {
+    if (state.networkMode !== "skill") return;
     state.showCustomTags = event.target.checked;
     renderNetwork();
   });
@@ -344,8 +374,11 @@ function bindEvents() {
     state.isNetworkSearchOpen = false;
     state.showTrainingTags = false;
     state.showCustomTags = false;
+    state.showWorkoutTags = false;
     state.activeNetworkTags.clear();
+    state.activeWorkoutTags.clear();
     state.networkTagQuery = "";
+    state.workoutTagQuery = "";
     state.isNetworkTagSelectOpen = false;
     state.focusedContext = null;
     state.focusedGraphNode = null;
@@ -400,7 +433,6 @@ function drillSearchText(drill) {
   return [
     drill.title,
     drill.summary,
-    drill.coreIdea,
     ...(drill.contexts || []),
     ...(drill.trainingTags || []),
     ...(drill.customTags || []),
@@ -451,6 +483,43 @@ function focusChipLabel(context) {
   const matching = matchingNetworkDrills(otherFilters).length;
   const hasNarrowingFilter = filters.hasSearch || filters.hasTagFilter;
   return hasNarrowingFilter ? `Focus: ${context} (${matching}/${total})` : `Focus: ${context} (${total})`;
+}
+
+function exerciseMatchesWorkoutSearch(exercise, searchTerms = activeNetworkSearchTerms()) {
+  if (!searchTerms.length) return true;
+  const text = exerciseSearchText(exercise);
+  if (searchTerms.every((term) => text.includes(term))) return true;
+  return matchingPathways(searchTerms).some((pathway) => (pathway.exerciseIds || []).includes(exercise.id));
+}
+
+function exercisesForPhysicalFocus(focusId) {
+  if (!focusId) return state.exercises;
+  if (focusId.startsWith("workoutType:")) {
+    const typeName = focusId.slice("workoutType:".length);
+    return state.exercises.filter((exercise) => (exercise.workoutTypes || []).includes(typeName));
+  }
+  if (focusId.startsWith("workoutTag:")) {
+    const tag = workoutTagNodeLabel(focusId);
+    return state.exercises.filter((exercise) => workoutTagsForExercise(exercise).includes(tag));
+  }
+  if (focusId.startsWith("relevance:")) {
+    const relevance = focusId.slice("relevance:".length);
+    return state.exercises.filter((exercise) => (exercise.muayThaiRelevance || []).includes(relevance));
+  }
+  const exercise = exerciseById(focusId);
+  return exercise ? [exercise] : [];
+}
+
+function physicalFocusChipLabel(focusId, fallbackLabel) {
+  const totalExercises = exercisesForPhysicalFocus(focusId);
+  const matching = totalExercises.filter((exercise) => (
+    exerciseMatchesWorkoutTags(exercise, [...state.activeWorkoutTags])
+    && exerciseMatchesWorkoutSearch(exercise)
+  ));
+  const hasNarrowingFilter = state.activeWorkoutTags.size > 0 || activeNetworkSearchTerms().length > 0;
+  return hasNarrowingFilter
+    ? `Focus: ${fallbackLabel} (${matching.length}/${totalExercises.length})`
+    : `Focus: ${fallbackLabel} (${totalExercises.length})`;
 }
 
 function renderSearchControls() {
@@ -546,6 +615,68 @@ function allStandardTags() {
   return [...tags].sort();
 }
 
+function allWorkoutTagsByGroup() {
+  return workoutTagFields.map((group) => ({
+    label: group.label,
+    tags: uniqueItems(state.exercises.flatMap((exercise) => exercise[group.field] || [])).sort(),
+  })).filter((group) => group.tags.length);
+}
+
+function workoutTagsForExercise(exercise) {
+  return workoutTagFields.flatMap((group) => exercise[group.field] || []);
+}
+
+function workoutTagNodeId(tag) {
+  return `workoutTag:${tag}`;
+}
+
+function workoutTagNodeType(tag) {
+  const owner = workoutTagFields.find((group) => state.exercises.some((exercise) => (exercise[group.field] || []).includes(tag)));
+  if (!owner) return "workoutTag";
+  if (owner.label === "Physical Quality") return "physicalQuality";
+  if (owner.label === "Equipment") return "equipmentTag";
+  if (owner.label === "Body Area") return "bodyArea";
+  if (owner.label === "Muay Thai Relevance") return "workoutRelevance";
+  return "workoutTag";
+}
+
+function workoutTagNodeLabel(id) {
+  return id.startsWith("workoutTag:") ? id.slice("workoutTag:".length) : id;
+}
+
+function exerciseMatchesWorkoutTags(exercise, selectedTags) {
+  if (!selectedTags.length) return true;
+  const tags = workoutTagsForExercise(exercise);
+  return selectedTags.every((tag) => tags.includes(tag));
+}
+
+function primaryVisibleWorkoutTags(exercise) {
+  return uniqueItems([
+    ...(exercise.physicalQualities || []).slice(0, 1),
+    ...(exercise.muayThaiRelevance || []).slice(0, 1),
+  ]);
+}
+
+function visibleWorkoutTagsForExercise(exercise) {
+  const visibleTags = state.showWorkoutTags ? primaryVisibleWorkoutTags(exercise) : [];
+  state.activeWorkoutTags.forEach((tag) => {
+    if (workoutTagsForExercise(exercise).includes(tag) && !visibleTags.includes(tag)) visibleTags.push(tag);
+  });
+  return visibleTags;
+}
+
+function groupedWorkoutTags(query, activeTagSet) {
+  const exactGroupMatch = workoutTagFields.some((group) => group.label.toLowerCase() === query);
+  return allWorkoutTagsByGroup().map((group) => ({
+    ...group,
+    tags: group.tags.filter((tag) => {
+      const groupMatchesQuery = query && group.label.toLowerCase().includes(query);
+      const matchesQuery = !query || groupMatchesQuery || (!exactGroupMatch && tag.toLowerCase().includes(query));
+      return matchesQuery || activeTagSet.has(tag);
+    }),
+  })).filter((group) => group.tags.length);
+}
+
 function groupedStandardTags(query, activeTagSet) {
   const usedTags = new Set(allStandardTags());
   const exactGroupMatch = tagGroups.some((group) => group.label.toLowerCase() === query);
@@ -565,7 +696,8 @@ function groupedStandardTags(query, activeTagSet) {
 }
 
 function groupedNetworkTags() {
-  return groupedStandardTags(state.networkTagQuery, state.activeNetworkTags);
+  if (state.networkMode === "skill") return groupedStandardTags(state.networkTagQuery, state.activeNetworkTags);
+  return groupedWorkoutTags(state.workoutTagQuery, state.activeWorkoutTags);
 }
 
 function groupedLibraryTags() {
@@ -573,7 +705,8 @@ function groupedLibraryTags() {
 }
 
 function toggleNetworkTag(tag) {
-  state.activeNetworkTags.has(tag) ? state.activeNetworkTags.delete(tag) : state.activeNetworkTags.add(tag);
+  const activeSet = state.networkMode === "skill" ? state.activeNetworkTags : state.activeWorkoutTags;
+  activeSet.has(tag) ? activeSet.delete(tag) : activeSet.add(tag);
   renderNetworkTagFilters();
   renderNetwork();
 }
@@ -633,14 +766,15 @@ function renderTagFilters() {
 }
 
 function renderNetworkTagFilters() {
-  const query = state.networkTagQuery;
+  syncNetworkTagInput();
   const groups = groupedNetworkTags();
+  const activeSet = state.networkMode === "skill" ? state.activeNetworkTags : state.activeWorkoutTags;
   els.networkTagFilterList.hidden = !state.isNetworkTagSelectOpen;
   els.networkTagFilterList.classList.toggle("is-open", state.isNetworkTagSelectOpen);
-  els.networkTagSelectButton.classList.toggle("is-active", state.activeNetworkTags.size > 0 || state.isNetworkTagSelectOpen);
+  els.networkTagSelectButton.classList.toggle("is-active", activeSet.size > 0 || state.isNetworkTagSelectOpen);
   els.networkTagSelectButton.setAttribute("aria-expanded", String(state.isNetworkTagSelectOpen));
-  els.networkTagSelectButton.querySelector("span").textContent = state.activeNetworkTags.size
-    ? `${state.activeNetworkTags.size} tag${state.activeNetworkTags.size === 1 ? "" : "s"} selected`
+  els.networkTagSelectButton.querySelector("span").textContent = activeSet.size
+    ? `${activeSet.size} tag${activeSet.size === 1 ? "" : "s"} selected`
     : "Select tags";
   els.networkTagFilterList.innerHTML = "";
 
@@ -659,7 +793,7 @@ function renderNetworkTagFilters() {
     body.className = "network-tag-group-body";
     group.tags.forEach((tag) => {
       const button = document.createElement("button");
-      button.className = `network-tag-option ${state.activeNetworkTags.has(tag) ? "is-active" : ""}`;
+      button.className = `network-tag-option ${activeSet.has(tag) ? "is-active" : ""}`;
       button.type = "button";
       button.textContent = tag;
       button.addEventListener("click", () => toggleNetworkTag(tag));
@@ -708,12 +842,11 @@ function renderLibrary() {
     const visibleTags = [
       ...drill.trainingTags,
       ...drill.customTags,
-    ].filter((tag) => tag !== drill.coreIdea).slice(0, 4);
+    ].slice(0, 4);
     row.className = "drill-row";
     row.innerHTML = `
-      ${drill.coreIdea ? `<span class="drill-core-idea">${drill.coreIdea}</span>` : ""}
       <strong>${drill.title}</strong>
-      <div class="meta">${visibleTags.join(" · ")}</div>
+      <div class="meta drill-tag-line">${visibleTags.map((tag) => `<span>${tag}</span>`).join(" ")}</div>
     `;
     row.addEventListener("click", () => openLibraryDrillPage(drill));
     els.drillList.append(row);
@@ -782,9 +915,8 @@ function renderProfileDrillList(container, drillsOrIds, iconName) {
     row.innerHTML = `
       <img src="${contextBadgePaths[primaryContext]}" alt="" />
       <span>
-        ${drill.coreIdea ? `<em>${drill.coreIdea}</em>` : ""}
         <strong>${drill.title}</strong>
-        <small>${drill.trainingTags.slice(0, 3).join(" · ")}</small>
+        <small class="drill-tag-line">${drill.trainingTags.slice(0, 3).map((tag) => `<span>${tag}</span>`).join(" ")}</small>
       </span>
       ${iconName ? `<i class="ph ph-${iconName}" aria-hidden="true"></i>` : ""}
     `;
@@ -859,9 +991,8 @@ function renderLibraryDetailPage(drill) {
   const primaryContext = drill.contexts[0];
   const primaryBadge = contextBadgePaths[primaryContext];
   const tags = [
-    drill.coreIdea ? `<span class="chip core-idea-chip">${drill.coreIdea}</span>` : "",
-    ...drill.trainingTags.slice(0, 8).map((tag) => `<span class="chip">${tag}</span>`),
-    ...drill.customTags.map((tag) => `<span class="chip">${tag}</span>`),
+    ...drill.trainingTags.slice(0, 8).map((tag) => `<span class="chip tag-chip">${tag}</span>`),
+    ...drill.customTags.map((tag) => `<span class="chip tag-chip">${tag}</span>`),
   ].join("");
 
   els.libraryDetailPage.innerHTML = `
@@ -956,10 +1087,26 @@ function renderNetworkModeSwitch() {
   });
 }
 
+function syncNetworkTagInput() {
+  const query = state.networkMode === "skill" ? state.networkTagQuery : state.workoutTagQuery;
+  if (els.networkTagSearch.value !== query) els.networkTagSearch.value = query;
+}
+
 function renderControlsMode() {
   const isSkillGraph = state.networkMode === "skill";
-  els.skillLayerControls.hidden = !isSkillGraph;
-  els.skillTagFilterControls.hidden = !isSkillGraph;
+  const isWorkoutGraph = state.networkMode === "workout";
+  els.skillLayerControls.hidden = state.networkMode === "bridge";
+  els.skillTagFilterControls.hidden = false;
+  els.networkLayerLabel.textContent = isSkillGraph ? "Layers" : "Workout Layers";
+  els.primaryLayerToggleText.textContent = isSkillGraph ? "Show tag nodes" : "Show workout tag nodes";
+  els.secondaryLayerToggleLabel.hidden = !isSkillGraph;
+  els.secondaryLayerToggleText.textContent = "Show custom tag nodes";
+  els.networkTagFilterLabel.textContent = isSkillGraph ? "Tag Filter" : "Workout Tag Filter";
+  els.networkTagSearch.placeholder = isSkillGraph ? "Search tags" : "Search workout tags";
+  els.toggleTrainingTags.checked = isSkillGraph ? state.showTrainingTags : state.showWorkoutTags;
+  els.toggleCustomTags.checked = state.showCustomTags;
+  els.primaryLayerToggleLabel.hidden = !isSkillGraph && !isWorkoutGraph;
+  syncNetworkTagInput();
 }
 
 function renderNetwork() {
@@ -1368,6 +1515,24 @@ function buildWorkoutGraph(width, height, previousPositions) {
     (exercise.workoutTypes || []).forEach((typeName) => {
       edges.push({ from: `workoutType:${typeName}`, to: exercise.id, type: "workoutTypeLink" });
     });
+    visibleWorkoutTagsForExercise(exercise).forEach((tag) => {
+      edges.push({ from: workoutTagNodeId(tag), to: exercise.id, type: "workoutTag" });
+    });
+  });
+
+  const tagNodeIds = new Set(edges.filter((edge) => edge.type === "workoutTag").map((edge) => edge.from));
+  [...tagNodeIds].forEach((tagId, index) => {
+    const tag = workoutTagNodeLabel(tagId);
+    const angle = -Math.PI / 2 + (index / Math.max(tagNodeIds.size, 1)) * Math.PI * 2;
+    nodes.push(createGraphNode({
+      id: tagId,
+      label: tag,
+      type: workoutTagNodeType(tag),
+      x: centerX + Math.cos(angle) * radiusX * 0.56,
+      y: centerY + Math.sin(angle) * radiusY * 0.56,
+      r: 6,
+      previousPositions,
+    }));
   });
 
   addPathwayEdges(edges);
@@ -1435,44 +1600,93 @@ function addPathwayEdges(edges) {
 function visiblePhysicalGraph(nodes, edges) {
   const searchTerms = activeNetworkSearchTerms();
   const focusId = state.focusedGraphNode;
-  const active = Boolean(searchTerms.length || focusId);
+  const selectedTags = [...state.activeWorkoutTags];
+  const active = Boolean(searchTerms.length || focusId || selectedTags.length);
   const visibleNodeIds = new Set();
   const matchNodeIds = new Set();
-  const pathwayNodeIds = new Set();
+  const exerciseIds = new Set(state.exercises.map((exercise) => exercise.id));
 
   if (!active) {
     nodes.forEach((node) => visibleNodeIds.add(node.id));
     return { active, visibleNodeIds, matchNodeIds };
   }
 
+  const connectedExerciseIds = (nodeId) => {
+    const ids = new Set();
+    edges.forEach((edge) => {
+      if (edge.from === nodeId && exerciseIds.has(edge.to)) ids.add(edge.to);
+      if (edge.to === nodeId && exerciseIds.has(edge.from)) ids.add(edge.from);
+    });
+    return ids;
+  };
+
+  const candidateExerciseIds = new Set();
+  const matchedRootIds = new Set();
+  const pathwayNodeIds = new Set();
   matchingPathways(searchTerms).forEach((pathway) => {
     (pathway.exerciseIds || []).forEach((exerciseId) => pathwayNodeIds.add(exerciseId));
   });
 
-  nodes.forEach((node) => {
-    const matchesSearch = !searchTerms.length || searchTerms.every((term) => physicalSearchText(node).includes(term));
-    if (matchesSearch || pathwayNodeIds.has(node.id)) matchNodeIds.add(node.id);
-  });
-
-  matchNodeIds.forEach((id) => {
-    visibleNodeIds.add(id);
-    edges.forEach((edge) => {
-      if (edge.from === id || edge.to === id) {
-        visibleNodeIds.add(edge.from);
-        visibleNodeIds.add(edge.to);
+  if (searchTerms.length) {
+    nodes.forEach((node) => {
+      const matchesSearch = searchTerms.every((term) => physicalSearchText(node).includes(term));
+      if (!matchesSearch) return;
+      matchedRootIds.add(node.id);
+      if (exerciseIds.has(node.id)) {
+        candidateExerciseIds.add(node.id);
+      } else {
+        connectedExerciseIds(node.id).forEach((exerciseId) => candidateExerciseIds.add(exerciseId));
       }
     });
+    pathwayNodeIds.forEach((exerciseId) => candidateExerciseIds.add(exerciseId));
+  } else {
+    exerciseIds.forEach((exerciseId) => candidateExerciseIds.add(exerciseId));
+  }
+
+  [...candidateExerciseIds].forEach((exerciseId) => {
+    const exercise = exerciseById(exerciseId);
+    if (!exercise || !exerciseMatchesWorkoutTags(exercise, selectedTags)) candidateExerciseIds.delete(exerciseId);
   });
 
   if (focusId) {
     visibleNodeIds.add(focusId);
-    edges.forEach((edge) => {
-      if (edge.from === focusId || edge.to === focusId) {
+    const focusExerciseIds = exerciseIds.has(focusId) ? new Set([focusId]) : connectedExerciseIds(focusId);
+    [...candidateExerciseIds].forEach((exerciseId) => {
+      if (!focusExerciseIds.has(exerciseId)) candidateExerciseIds.delete(exerciseId);
+    });
+  }
+
+  candidateExerciseIds.forEach((exerciseId) => {
+    visibleNodeIds.add(exerciseId);
+    matchNodeIds.add(exerciseId);
+  });
+
+  edges.forEach((edge) => {
+    const fromIsVisibleExercise = candidateExerciseIds.has(edge.from);
+    const toIsVisibleExercise = candidateExerciseIds.has(edge.to);
+    if (edge.type === "pathway") {
+      if (fromIsVisibleExercise && toIsVisibleExercise) {
         visibleNodeIds.add(edge.from);
         visibleNodeIds.add(edge.to);
       }
-    });
-  }
+      return;
+    }
+    if (fromIsVisibleExercise || toIsVisibleExercise) {
+      visibleNodeIds.add(edge.from);
+      visibleNodeIds.add(edge.to);
+    }
+  });
+
+  selectedTags.forEach((tag) => {
+    const tagId = workoutTagNodeId(tag);
+    visibleNodeIds.add(tagId);
+    matchNodeIds.add(tagId);
+  });
+  matchedRootIds.forEach((id) => {
+    visibleNodeIds.add(id);
+    matchNodeIds.add(id);
+  });
+  if (focusId) matchNodeIds.add(focusId);
 
   return { active, visibleNodeIds, matchNodeIds };
 }
@@ -1593,7 +1807,12 @@ function renderPhysicalNetwork(svg, width, height, previousPositions) {
   renderStateChips();
   renderSearchControls();
   renderControlsMode();
-  els.controlsButton.classList.toggle("is-active", Boolean(state.focusedGraphNode || activeNetworkSearchTerms().length));
+  els.controlsButton.classList.toggle("is-active", Boolean(
+    state.focusedGraphNode
+    || activeNetworkSearchTerms().length
+    || state.activeWorkoutTags.size
+    || (state.networkMode === "workout" && state.showWorkoutTags)
+  ));
 }
 
 function pathwayColor(index = 0) {
@@ -1852,13 +2071,13 @@ function renderStateChips() {
   els.stateChips.innerHTML = "";
   const chips = [];
   if (state.networkMode !== "skill") {
-    chips.push({ label: `${networkModes[state.networkMode]} Graph`, clear: () => { state.networkMode = "skill"; state.focusedGraphNode = null; state.focusedGraphLabel = null; renderNetwork(); } });
+    chips.push({ label: `${networkModes[state.networkMode]} Graph`, clear: () => { state.networkMode = "skill"; state.focusedGraphNode = null; state.focusedGraphLabel = null; syncNetworkTagInput(); renderNetworkTagFilters(); renderNetwork(); } });
   }
   if (state.networkMode === "skill" && state.focusedContext) {
     chips.push({ label: focusChipLabel(state.focusedContext), clear: () => { state.focusedContext = null; renderNetwork(); } });
   }
   if (state.networkMode !== "skill" && state.focusedGraphNode) {
-    chips.push({ label: `Focus: ${state.focusedGraphLabel}`, clear: () => { state.focusedGraphNode = null; state.focusedGraphLabel = null; renderNetwork(); } });
+    chips.push({ label: physicalFocusChipLabel(state.focusedGraphNode, state.focusedGraphLabel), clear: () => { state.focusedGraphNode = null; state.focusedGraphLabel = null; renderNetwork(); } });
   }
   state.networkSearchTerms.forEach((term) => {
     const label = pathwayChipLabel(term);
@@ -1883,6 +2102,18 @@ function renderStateChips() {
     });
     if (state.showTrainingTags) chips.push({ label: "Tags on", clear: () => { state.showTrainingTags = false; els.toggleTrainingTags.checked = false; renderNetwork(); } });
     if (state.showCustomTags) chips.push({ label: "Custom Tags on", clear: () => { state.showCustomTags = false; els.toggleCustomTags.checked = false; renderNetwork(); } });
+  } else {
+    state.activeWorkoutTags.forEach((tag) => {
+      chips.push({
+        label: `Tag: ${tag}`,
+        clear: () => {
+          state.activeWorkoutTags.delete(tag);
+          renderNetworkTagFilters();
+          renderNetwork();
+        },
+      });
+    });
+    if (state.networkMode === "workout" && state.showWorkoutTags) chips.push({ label: "Workout Tags on", clear: () => { state.showWorkoutTags = false; els.toggleTrainingTags.checked = false; renderNetwork(); } });
   }
 
   chips.forEach((chip) => {
@@ -1948,9 +2179,8 @@ function showDrillDetail(drill) {
   const primaryContext = drill.contexts[0];
   const primaryBadge = contextBadgePaths[primaryContext];
   const tagChips = [
-    drill.coreIdea ? `<span class="chip core-idea-chip">${drill.coreIdea}</span>` : "",
-    ...drill.trainingTags.slice(0, 8).map((tag) => `<span class="chip">${tag}</span>`),
-    ...drill.customTags.map((tag) => `<span class="chip">${tag}</span>`),
+    ...drill.trainingTags.slice(0, 8).map((tag) => `<span class="chip tag-chip">${tag}</span>`),
+    ...drill.customTags.map((tag) => `<span class="chip tag-chip">${tag}</span>`),
   ].join("");
 
   els.detailTitle.className = primaryBadge ? "detail-title-row" : "";

@@ -188,12 +188,18 @@
         <button class="close-button" data-close="controlsSheet">Close</button>
       </header>
       <div class="sheet-section" id="skillLayerControls">
-        <p class="section-label">Layers</p>
-        <label class="layer-toggle"><input type="checkbox" id="toggleTrainingTags" /> Show tag nodes</label>
-        <label class="layer-toggle"><input type="checkbox" id="toggleCustomTags" /> Show custom tag nodes</label>
+        <p class="section-label" id="networkLayerLabel">Layers</p>
+        <label class="layer-toggle" id="primaryLayerToggleLabel">
+          <input type="checkbox" id="toggleTrainingTags" />
+          <span id="primaryLayerToggleText">Show tag nodes</span>
+        </label>
+        <label class="layer-toggle" id="secondaryLayerToggleLabel">
+          <input type="checkbox" id="toggleCustomTags" />
+          <span id="secondaryLayerToggleText">Show custom tag nodes</span>
+        </label>
       </div>
       <div class="sheet-section" id="skillTagFilterControls">
-        <p class="section-label">Tag Filter</p>
+        <p class="section-label" id="networkTagFilterLabel">Tag Filter</p>
         <div class="network-tag-filter">
           <label class="network-filter-search">
             <i class="ph ph-magnifying-glass" aria-hidden="true"></i>

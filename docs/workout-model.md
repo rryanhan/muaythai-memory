@@ -191,6 +191,42 @@ Saved pathway overlay:
 Exercise / Movement -> Exercise / Movement -> Exercise / Movement
 ```
 
+## Workout Graph Filters
+
+Workout graph filtering should parallel the Muay Thai Skill Graph.
+
+Default graph:
+
+- Workout Type nodes are visible.
+- Exercise / Movement nodes are visible.
+- Workout tag nodes are hidden.
+
+Focus behavior:
+
+- Tapping a Workout Type node focuses the graph on connected exercises.
+- Connected exercises and edges stay bright.
+- Unrelated nodes dim.
+- The focus appears as a removable chip, such as `Focus: Strength (4)`.
+
+Workout tag filter:
+
+- Tags are grouped by Physical Quality, Equipment, Body Area, and Muay Thai Relevance.
+- Selecting multiple workout tags should use AND logic.
+- Example: `Bodyweight` + `Explosive Power` shows exercises that contain both tags.
+- Active tags appear as removable chips.
+
+Workout tag layer:
+
+- Turning on workout tag nodes should show optional tag anchors connected to exercises.
+- To avoid clutter, the default visible tag layer should stay sparse.
+- Active selected tags should always appear as tag nodes when the workout tag layer or tag filter is active.
+
+Search behavior:
+
+- Search should match exercise titles, summaries, aliases, cues, workout types, physical qualities, equipment, body areas, and Muay Thai relevance.
+- Search should also match saved pathway titles.
+- If a saved pathway matches, the graph should highlight the exercise route as a pathway overlay.
+
 ## Naming Guidance
 
 Exercise names should not have to carry the whole memory. The system should use names, tags, and visuals together.
