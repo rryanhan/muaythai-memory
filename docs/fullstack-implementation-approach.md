@@ -261,7 +261,7 @@ Examples:
 - Teep.
 - Slip.
 - Sweep.
-- Balance.
+- Feint.
 
 ## Frontend Architecture
 

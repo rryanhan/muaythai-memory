@@ -70,11 +70,11 @@ First-pass tag groups:
 - Kicking: `Teep`, `Round Kick`, `Low Kick`
 - Knees: `Knee`
 - Elbows: `Elbow`
-- Defense: `Check`, `Catch`, `Parry`, `Shell`, `Long Guard`
+- Defense: `Kick Check`, `Kick Catch`, `Parry`, `Long Guard`
 - Head Movement: `Slip`, `Roll`
 - Footwork: `Pivot`, `Switch Step`, `Step Through`, `Stance Switch`
 - Sweeps: `Sweep`
-- Training Qualities: `Entries`, `Exits`, `Angles`, `Distance`, `Timing`, `Balance`, `Pressure`, `Rhythm`
+- Movement & Timing: `Entry`, `Angle`, `Distance`, `Timing`, `Pressure`, `Feint`
 - Practice Format: `Shadowboxing`
 
 Tags should be optional graph nodes. They should be visible through filters, search, and optional graph layers.

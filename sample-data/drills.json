@@ -15,9 +15,7 @@
     ],
     "trainingTags": [
       "Hook",
-      "Low Kick",
-      "Balance",
-      "Rhythm"
+      "Low Kick"
     ],
     "coreIdea": "Rhythm Change",
     "customTags": []
@@ -39,9 +37,7 @@
     "trainingTags": [
       "Teep",
       "Distance",
-      "Angles",
-      "Exits",
-      "Balance"
+      "Angle"
     ],
     "coreIdea": "Exit After Scoring",
     "customTags": []
@@ -64,8 +60,6 @@
       "Low Kick",
       "Jab",
       "Cross",
-      "Rhythm",
-      "Balance",
       "Pressure"
     ],
     "coreIdea": "Rhythm Change",
@@ -88,10 +82,9 @@
       "Partner Drill"
     ],
     "trainingTags": [
-      "Catch",
+      "Kick Catch",
       "Sweep",
-      "Balance",
-      "Angles"
+      "Angle"
     ],
     "coreIdea": "Catch To Sweep",
     "customTags": [
@@ -117,7 +110,7 @@
       "Partner Drill"
     ],
     "trainingTags": [
-      "Check",
+      "Kick Check",
       "Low Kick",
       "Cross",
       "Timing"
@@ -142,8 +135,7 @@
       "Clinch"
     ],
     "trainingTags": [
-      "Knee",
-      "Balance"
+      "Knee"
     ],
     "coreIdea": "Turn To Attack",
     "customTags": [
@@ -166,7 +158,6 @@
     ],
     "trainingTags": [
       "Knee",
-      "Balance",
       "Pressure"
     ],
     "coreIdea": "Inside Control",
@@ -194,8 +185,7 @@
     "trainingTags": [
       "Parry",
       "Cross",
-      "Angles",
-      "Exits",
+      "Angle",
       "Shadowboxing"
     ],
     "coreIdea": "Angle After Defense",
@@ -222,7 +212,8 @@
       "Jab",
       "Round Kick",
       "Pressure",
-      "Distance"
+      "Distance",
+      "Feint"
     ],
     "coreIdea": "Feint To Draw",
     "customTags": [
@@ -245,8 +236,7 @@
     ],
     "trainingTags": [
       "Elbow",
-      "Shell",
-      "Entries",
+      "Entry",
       "Timing"
     ],
     "coreIdea": "Shell And Return",
@@ -272,7 +262,6 @@
     "trainingTags": [
       "Cross",
       "Low Kick",
-      "Balance",
       "Timing"
     ],
     "coreIdea": "Rhythm Change",
@@ -296,7 +285,6 @@
       "Jab",
       "Cross",
       "Round Kick",
-      "Balance",
       "Timing"
     ],
     "coreIdea": "Rhythm Change",
@@ -347,7 +335,7 @@
     ],
     "trainingTags": [
       "Knee",
-      "Entries",
+      "Entry",
       "Timing",
       "Pressure"
     ],
@@ -374,7 +362,7 @@
     "trainingTags": [
       "Long Guard",
       "Knee",
-      "Entries",
+      "Entry",
       "Distance"
     ],
     "coreIdea": "Frame To Knee",
@@ -400,7 +388,6 @@
       "Long Guard",
       "Teep",
       "Distance",
-      "Exits",
       "Pressure"
     ],
     "coreIdea": "Teep To Interrupt",
@@ -427,7 +414,7 @@
       "Hook",
       "Cross",
       "Knee",
-      "Entries",
+      "Entry",
       "Pressure"
     ],
     "coreIdea": "Pressure Entry",
@@ -455,7 +442,7 @@
       "Jab",
       "Cross",
       "Knee",
-      "Entries",
+      "Entry",
       "Timing"
     ],
     "coreIdea": "Parry To Counter",
@@ -479,9 +466,10 @@
     ],
     "trainingTags": [
       "Teep",
-      "Catch",
+      "Kick Catch",
       "Timing",
-      "Distance"
+      "Distance",
+      "Feint"
     ],
     "coreIdea": "Feint To Draw",
     "customTags": [
@@ -505,10 +493,11 @@
     ],
     "trainingTags": [
       "Elbow",
-      "Entries",
+      "Entry",
       "Round Kick",
       "Timing",
-      "Pressure"
+      "Pressure",
+      "Feint"
     ],
     "coreIdea": "Feint To Draw",
     "customTags": [
@@ -533,7 +522,7 @@
       "Jab",
       "Low Kick",
       "Pressure",
-      "Angles",
+      "Angle",
       "Distance"
     ],
     "coreIdea": "Ring Cutting",
@@ -562,7 +551,7 @@
     "trainingTags": [
       "Roll",
       "Round Kick",
-      "Angles"
+      "Angle"
     ],
     "coreIdea": "Roll And Return",
     "customTags": [
@@ -584,8 +573,7 @@
       "Technical Work"
     ],
     "trainingTags": [
-      "Exits",
-      "Angles",
+      "Angle",
       "Pivot",
       "Shadowboxing"
     ],
@@ -612,7 +600,6 @@
     "trainingTags": [
       "Uppercut",
       "Hook",
-      "Balance",
       "Shadowboxing"
     ],
     "coreIdea": "Counter Rotation",
@@ -639,8 +626,7 @@
       "Stance Switch",
       "Slip",
       "Uppercut",
-      "Step Through",
-      "Exits"
+      "Step Through"
     ],
     "coreIdea": "Counter Rotation",
     "customTags": [
@@ -671,7 +657,7 @@
       "Jab",
       "Round Kick",
       "Distance",
-      "Angles"
+      "Angle"
     ],
     "coreIdea": "Open Stance Attack",
     "customTags": [
@@ -697,7 +683,6 @@
       "Switch Step",
       "Round Kick",
       "Jab",
-      "Rhythm",
       "Shadowboxing"
     ],
     "coreIdea": "Stance Switch Attack",
@@ -722,7 +707,7 @@
     ],
     "trainingTags": [
       "Teep",
-      "Entries",
+      "Entry",
       "Distance",
       "Cross",
       "Timing",
@@ -753,8 +738,7 @@
       "Partner Drill"
     ],
     "trainingTags": [
-      "Balance",
-      "Angles"
+      "Angle"
     ],
     "coreIdea": "Posture Break",
     "customTags": [
@@ -780,7 +764,6 @@
       "Slip",
       "Roll",
       "Pivot",
-      "Balance",
       "Shadowboxing"
     ],
     "coreIdea": "Angle After Defense",
@@ -806,8 +789,7 @@
     "trainingTags": [
       "Teep",
       "Pivot",
-      "Distance",
-      "Balance"
+      "Distance"
     ],
     "coreIdea": "Angle After Strike",
     "customTags": []

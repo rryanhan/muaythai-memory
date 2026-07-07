@@ -89,10 +89,9 @@ Elbows:
 - Elbow
 
 Defense:
-- Check
-- Catch
+- Kick Check
+- Kick Catch
 - Parry
-- Shell
 - Long Guard
 
 Head Movement:
@@ -115,15 +114,13 @@ Sweeps And Dumps:
 - Sweep
 - Dump
 
-Training Qualities:
-- Entries
-- Exits
-- Angles
+Movement & Timing:
+- Entry
+- Angle
 - Distance
 - Timing
-- Balance
 - Pressure
-- Rhythm
+- Feint
 
 Practice Format:
 - Shadowboxing
@@ -135,9 +132,9 @@ Tag cleanup rules:
 - Do not keep singular and plural versions of the same concept. Use `Sweep`, not both `Sweep` and `Sweeps`.
 - Do not duplicate Core Ideas as Tags. For example, `Counter Rotation`, `Ring Cutting`, and `Frame To Knee` belong in Core Ideas, not Tags.
 - Do not save group labels as tags. Use `Jab`, `Cross`, or `Hook`, not `Boxing`; use `Check` or `Parry`, not `Defense`.
-- Do not create strike-specific entry tags when existing tags already cover the idea. Use `Entries` + `Elbow` instead of `Elbow Entry`; use `Entries` + `Knee` instead of `Knee Entry`.
+- Do not create strike-specific entry tags when existing tags already cover the idea. Use `Entry` + `Elbow` instead of `Elbow Entry`; use `Entry` + `Knee` instead of `Knee Entry`.
 - Do not create method tags. Use Training Method for `Pad Work`, `Bag Work`, `Partner Drill`, `Clinch`, and `Technical Work`.
-- Prefer concrete leaf tags over broad family labels. Example: `Low Kick` + `Balance`, not `Kicking` + `Low Kick`.
+- Prefer concrete leaf tags over broad family labels. Example: `Low Kick` + `Timing`, not `Kicking` + `Low Kick`.
 
 ## Core Idea
 
@@ -192,7 +189,7 @@ Example:
 {
   "title": "Jab Teep Feint To Shift Knee",
   "trainingMethods": ["Partner Drill", "Technical Work"],
-  "trainingTags": ["Jab", "Teep", "Knee", "Entries", "Timing", "Stance Switch"],
+  "trainingTags": ["Jab", "Teep", "Knee", "Entry", "Timing", "Stance Switch", "Feint"],
   "coreIdea": "Feint To Draw",
   "customTags": ["sparring-focus"]
 }
@@ -204,7 +201,7 @@ No Core Idea example:
 {
   "title": "Jab Cross Rear Kick Pad Return",
   "trainingMethods": ["Pad Work"],
-  "trainingTags": ["Jab", "Cross", "Round Kick", "Balance"],
+  "trainingTags": ["Jab", "Cross", "Round Kick", "Distance"],
   "coreIdea": null,
   "customTags": []
 }

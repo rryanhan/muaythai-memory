@@ -28,7 +28,7 @@ Preferred capture control:
     "Exit off-line with a small pivot or angle step instead of backing straight out."
   ],
   "trainingMethods": ["Partner Drill", "Pad Work"],
-  "trainingTags": ["Slip", "Uppercut", "Step Through", "Stance Switch", "Exits"],
+  "trainingTags": ["Slip", "Uppercut", "Step Through", "Stance Switch", "Angle"],
   "coreIdea": "Counter Rotation",
   "customTags": ["southpaw-transition", "sparring-focus"]
 }
@@ -60,12 +60,12 @@ Allowed first-pass Tags are leaf tags inside these browse groups:
 - Kicking: `Teep`, `Round Kick`, `Low Kick`
 - Knees: `Knee`
 - Elbows: `Elbow`
-- Defense: `Check`, `Catch`, `Parry`, `Shell`, `Long Guard`
+- Defense: `Kick Check`, `Kick Catch`, `Parry`, `Long Guard`
 - Head Movement: `Slip`, `Roll`
 - Footwork: `Pivot`, `Switch Step`, `Step Through`, `Stance Switch`
 - Clinch: `Frame`, `Hand Trap`, `Hand Fighting`, `Body Lock`
 - Sweeps And Dumps: `Sweep`, `Dump`
-- Training Qualities: `Entries`, `Exits`, `Angles`, `Distance`, `Timing`, `Balance`, `Pressure`, `Rhythm`
+- Movement & Timing: `Entry`, `Angle`, `Distance`, `Timing`, `Pressure`, `Feint`
 - Practice Format: `Shadowboxing`
 
 ## Capture Rules
@@ -79,7 +79,7 @@ Allowed first-pass Tags are leaf tags inside these browse groups:
 - Do not duplicate the chosen Core Idea as a Tag. For example, if `coreIdea` is `Counter Rotation`, do not also add `Counter Rotation` to `trainingTags`.
 - Do not use Training Methods as Tags.
 - Do not use tag group labels as Tags. `Boxing`, `Kicking`, `Defense`, `Head Movement`, and `Footwork` are browse categories, not stored tags.
-- Choose concrete leaf tags. Example: use `Jab`, `Cross`, and `Hook`, not `Boxing`; use `Check` or `Parry`, not `Defense`.
+- Choose concrete leaf tags. Example: use `Jab`, `Cross`, and `Hook`, not `Boxing`; use `Kick Check` or `Parry`, not `Defense`.
 - Use Custom Tags only when they capture useful personal meaning or something outside the standard taxonomy.
 - Keep steps practical and coach-like, not textbook-like.
 - Do not force confidence scores, status markers, review dates, or training plans into the capture output.
@@ -119,7 +119,7 @@ Example distinction:
 {
   "title": "Jab Teep Feint To Shift Knee",
   "trainingMethods": ["Partner Drill", "Technical Work"],
-  "trainingTags": ["Jab", "Teep", "Knee", "Entries", "Timing"],
+  "trainingTags": ["Jab", "Teep", "Knee", "Entry", "Timing", "Feint"],
   "coreIdea": "Feint To Draw",
   "customTags": ["sparring-focus"]
 }
@@ -131,7 +131,7 @@ No Core Idea example:
 {
   "title": "Jab Cross Rear Kick Pad Return",
   "trainingMethods": ["Pad Work"],
-  "trainingTags": ["Jab", "Cross", "Round Kick", "Balance"],
+  "trainingTags": ["Jab", "Cross", "Round Kick", "Distance"],
   "coreIdea": null,
   "customTags": []
 }

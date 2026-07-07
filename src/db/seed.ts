@@ -1,4 +1,4 @@
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, isNull, notInArray } from "drizzle-orm";
 import { postgresClient, db } from "./client";
 import { statusTags, tagCategories, tags, trainingMethods } from "./schema";
 import {
@@ -41,6 +41,16 @@ async function seedTagCategories() {
         },
       });
   }
+
+  const activeCategorySlugs = tagCategorySeeds.map((category) => category.slug);
+
+  await db
+    .update(tagCategories)
+    .set({
+      active: false,
+      updatedAt: new Date(),
+    })
+    .where(notInArray(tagCategories.slug, activeCategorySlugs));
 }
 
 async function seedStandardTags() {
@@ -79,6 +89,16 @@ async function seedStandardTags() {
       });
     }
   }
+
+  const activeStandardTagSlugs = standardTagSeeds.map((tag) => tag.slug);
+
+  await db
+    .update(tags)
+    .set({
+      active: false,
+      updatedAt: new Date(),
+    })
+    .where(and(eq(tags.kind, "standard"), isNull(tags.userId), notInArray(tags.slug, activeStandardTagSlugs)));
 }
 
 async function seedStatusTags() {
@@ -100,14 +120,17 @@ async function seedStatusTags() {
 
 async function assertSeedCounts() {
   const [methodCount, categoryCount, tagCount, statusCount] = await Promise.all([
-    db.select().from(trainingMethods),
-    db.select().from(tagCategories),
-    db.select().from(tags).where(eq(tags.kind, "standard")),
-    db.select().from(statusTags),
+    db.select().from(trainingMethods).where(eq(trainingMethods.active, true)),
+    db.select().from(tagCategories).where(eq(tagCategories.active, true)),
+    db
+      .select()
+      .from(tags)
+      .where(and(eq(tags.kind, "standard"), isNull(tags.userId), eq(tags.active, true))),
+    db.select().from(statusTags).where(eq(statusTags.active, true)),
   ]);
 
   console.log(
-    `Seed complete: ${methodCount.length} training methods, ${categoryCount.length} tag categories, ${tagCount.length} standard tags, ${statusCount.length} status tags.`,
+    `Seed complete: ${methodCount.length} active training methods, ${categoryCount.length} active tag categories, ${tagCount.length} active standard tags, ${statusCount.length} active status tags.`,
   );
 }
 

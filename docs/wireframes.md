@@ -160,7 +160,7 @@ Low-fidelity layout:
 │                                      │
 │ Jab Cross Rear Kick Pad Return       │
 │ Pad Work                             │
-│ Cross · Round Kick · Balance         │
+│ Cross · Round Kick · Distance        │
 └──────────────────────────────────────┘
 ```
 

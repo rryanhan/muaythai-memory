@@ -17,19 +17,26 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:seed": "tsx src/db/seed.ts",
-    "db:verify-taxonomy": "tsx src/db/verify-taxonomy.ts"
+    "db:seed-drills": "tsx src/db/seed-dev-drills.ts",
+    "db:verify-taxonomy": "tsx src/db/verify-taxonomy.ts",
+    "db:verify-step3": "tsx src/db/verify-step3.ts",
+    "api:verify": "tsx src/data/verify-api.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "latest",
+    "@tanstack/react-query": "^5.101.2",
+    "d3": "^7.9.0",
     "dotenv": "latest",
     "drizzle-orm": "latest",
     "next": "latest",
     "postgres": "latest",
     "react": "latest",
     "react-dom": "latest",
+    "vaul": "^1.1.2",
     "zod": "latest"
   },
   "devDependencies": {
+    "@types/d3": "^7.4.3",
     "@types/node": "latest",
     "@types/react": "latest",
     "@types/react-dom": "latest",

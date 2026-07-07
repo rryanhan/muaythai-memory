@@ -17,6 +17,8 @@ const timestamps = {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 };
 
+// Local app users. Supabase Auth can own authentication later; this table owns
+// the profile data the product needs to render.
 export const users = pgTable(
   "users",
   {
@@ -30,6 +32,8 @@ export const users = pgTable(
   }),
 );
 
+// Training Methods are the graph anchors: Pad Work, Bag Work, Partner Drill,
+// Clinch, and Technical Work. They describe where/how a drill is practiced.
 export const trainingMethods = pgTable(
   "training_methods",
   {
@@ -46,6 +50,8 @@ export const trainingMethods = pgTable(
   }),
 );
 
+// Tag categories are browse groups only. They are not stored on drills because
+// categories such as Boxing and Kicking overlap with more precise leaf tags.
 export const tagCategories = pgTable(
   "tag_categories",
   {
@@ -61,6 +67,8 @@ export const tagCategories = pgTable(
   }),
 );
 
+// Tags hold both standard taxonomy tags and user-created custom tags. Custom
+// tags are scoped to a user; standard tags have no user_id.
 export const tags = pgTable(
   "tags",
   {
@@ -86,6 +94,8 @@ export const tags = pgTable(
   }),
 );
 
+// Status Tags are separate from normal tags because they drive product states
+// such as Starred, Drill Back In, Needs Cleanup, and Archived.
 export const statusTags = pgTable(
   "status_tags",
   {
@@ -101,6 +111,8 @@ export const statusTags = pgTable(
   }),
 );
 
+// Drills are the saved Muay Thai memory objects. Relationships below attach
+// methods, tags, status markers, and ordered steps without hardcoded columns.
 export const drills = pgTable(
   "drills",
   {

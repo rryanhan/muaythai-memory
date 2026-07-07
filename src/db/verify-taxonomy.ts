@@ -17,10 +17,10 @@ function expect(condition: boolean, message: string) {
 
 async function main() {
   const [methods, categories, standardTags, statuses] = await Promise.all([
-    db.select().from(trainingMethods),
-    db.select().from(tagCategories),
-    db.select().from(tags).where(and(eq(tags.kind, "standard"), isNull(tags.userId))),
-    db.select().from(statusTags),
+    db.select().from(trainingMethods).where(eq(trainingMethods.active, true)),
+    db.select().from(tagCategories).where(eq(tagCategories.active, true)),
+    db.select().from(tags).where(and(eq(tags.kind, "standard"), isNull(tags.userId), eq(tags.active, true))),
+    db.select().from(statusTags).where(eq(statusTags.active, true)),
   ]);
 
   const methodNames = new Set(methods.map((method) => method.name));
@@ -36,6 +36,15 @@ async function main() {
   expect(methodNames.has("Technical Work"), "Expected Technical Work to exist as a Training Method");
   expect(!methodNames.has("Shadowboxing"), "Shadowboxing should not be a Training Method");
   expect(standardTagNames.has("Shadowboxing"), "Expected Shadowboxing to exist as a standard tag");
+  expect(standardTagNames.has("Kick Check"), "Expected Kick Check to exist as a standard tag");
+  expect(standardTagNames.has("Kick Catch"), "Expected Kick Catch to exist as a standard tag");
+  expect(standardTagNames.has("Feint"), "Expected Feint to exist as a standard tag");
+  expect(!standardTagNames.has("Check"), "Check should be replaced by Kick Check");
+  expect(!standardTagNames.has("Catch"), "Catch should be replaced by Kick Catch");
+  expect(!standardTagNames.has("Shell"), "Shell should not be active in the MVP taxonomy");
+  expect(!standardTagNames.has("Balance"), "Balance should not be active in the MVP taxonomy");
+  expect(!standardTagNames.has("Rhythm"), "Rhythm should not be active in the MVP taxonomy");
+  expect(!standardTagNames.has("Exits"), "Exits should not be active in the MVP taxonomy");
 
   const sweepTags = standardTags.filter((tag) => tag.name.toLowerCase().includes("sweep"));
   expect(sweepTags.length === 1 && sweepTags[0]?.name === "Sweep", "Sweep should be the only sweep standard tag");

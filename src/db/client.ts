@@ -11,8 +11,11 @@ if (!connectionString) {
   throw new Error("DATABASE_POOLER_URL or DATABASE_URL is required.");
 }
 
+// Prefer Supabase's pooler in development and serverless-style runtimes. Keep
+// this cap deliberately low because session-pooler projects can reject bursts
+// once multiple Next workers/dev servers are alive.
 const client = postgres(connectionString, {
-  max: 10,
+  max: Number(process.env.DATABASE_POOL_MAX ?? 3),
 });
 
 export const db = drizzle(client, { schema });
