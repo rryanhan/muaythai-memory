@@ -1,0 +1,170 @@
+.root {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  overflow: hidden;
+  touch-action: none;
+}
+
+.root :global(.network-force-svg) {
+  display: block;
+  width: 100%;
+  height: 100%;
+  user-select: none;
+  touch-action: none;
+}
+
+.root :global(.network-force-camera) {
+  transform-origin: 0 0;
+}
+
+.root :global(.network-force-edge) {
+  vector-effect: non-scaling-stroke;
+  stroke: rgba(36, 39, 41, 0.28);
+  stroke-linecap: round;
+  stroke-width: 1.6;
+}
+
+.root :global(.network-force-edge[data-active="true"]) {
+  stroke: rgba(209, 74, 50, 0.82);
+  stroke-width: 2.2;
+}
+
+.root :global(.network-force-edge[data-active="false"]) {
+  opacity: 0.15;
+}
+
+.root :global(.network-force-edge[data-focus-active="true"]) {
+  stroke: rgba(209, 74, 50, 0.86);
+  stroke-width: 2.8;
+}
+
+.root :global(.network-force-node) {
+  cursor: grab;
+}
+
+.root :global(.network-force-node:active) {
+  cursor: grabbing;
+}
+
+.root :global(.network-force-hit-area) {
+  fill: transparent;
+  pointer-events: all;
+}
+
+.root :global(.network-force-method-node) {
+  color: var(--accent);
+  transition: opacity 160ms ease;
+}
+
+.root :global(.network-force-method-node image) {
+  filter: drop-shadow(0 3px 7px rgba(23, 23, 23, 0.08));
+}
+
+.root :global(.network-force-method-node text),
+.root :global(.network-force-drill-node text),
+.root :global(.network-force-label-node text) {
+  fill: var(--text);
+  paint-order: stroke;
+  stroke: rgba(245, 244, 239, 0.92);
+  stroke-linejoin: round;
+  stroke-width: 4px;
+}
+
+.root :global(.network-force-method-node[data-active="false"]),
+.root :global(.network-force-drill-node[data-active="false"]),
+.root :global(.network-force-label-node[data-active="false"]) {
+  opacity: 0.16;
+}
+
+.root :global(.network-force-method-node[data-focused="true"]) {
+  opacity: 1;
+}
+
+.root :global(.network-force-method-node[data-focused="true"] image),
+.root :global(.network-force-method-node[data-focused="true"] .network-force-method-fallback) {
+  filter: drop-shadow(0 0 14px rgba(209, 74, 50, 0.34));
+}
+
+.root :global(.network-force-method-fallback) {
+  fill: rgba(245, 244, 239, 0.94);
+  stroke: var(--accent);
+  stroke-width: 2;
+}
+
+.root :global(.network-force-drill-node) {
+  transition: opacity 160ms ease;
+}
+
+.root :global(.network-force-drill-node circle) {
+  fill: var(--graphite);
+  opacity: 0.72;
+  stroke: rgba(36, 39, 41, 0.09);
+  stroke-width: 6;
+}
+
+.root :global(.network-force-drill-node[data-highlighted="true"] circle) {
+  fill: var(--accent);
+  opacity: 1;
+  stroke: rgba(209, 74, 50, 0.2);
+  stroke-width: 10;
+}
+
+.root :global(.network-force-drill-node text) {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.root :global(.network-force-drill-node[data-highlighted="true"] text) {
+  font-weight: 650;
+}
+
+.root :global(.network-force-svg[data-zoom-level="far"] .network-force-drill-node:not([data-far-visible="true"]) text) {
+  opacity: 0;
+}
+
+.root :global(.network-force-label-node) {
+  pointer-events: none;
+}
+
+.root :global(.network-force-svg[data-zoom-level="far"] .network-force-label-node) {
+  opacity: 0;
+}
+
+.root :global(.network-force-svg[data-zoom-level="far"] .network-force-label-node[data-far-visible="true"]) {
+  opacity: 1;
+}
+
+.root :global(.network-force-label-node[data-highlighted="true"]) {
+  opacity: 1;
+}
+
+.root :global(.network-force-label-node text) {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.root :global(.network-force-label-node[data-highlighted="true"] text) {
+  font-weight: 650;
+}
+
+.root :global(.network-recenter-button) {
+  position: absolute;
+  left: 20px;
+  bottom: 24px;
+  z-index: 4;
+  min-height: 44px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0 15px;
+  background: rgba(255, 255, 255, 0.78);
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 800;
+  box-shadow: 0 10px 28px rgba(23, 23, 23, 0.08);
+  cursor: pointer;
+}
+
+.root :global(.network-recenter-button:active) {
+  transform: translateY(1px);
+}

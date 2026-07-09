@@ -1,0 +1,115 @@
+.root {
+  position: relative;
+  min-height: calc(100dvh - var(--nav-height));
+  padding: 28px 20px 32px;
+  background-image: linear-gradient(rgba(36, 39, 41, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(36, 39, 41, 0.05) 1px, transparent 1px);
+  background-size: 42px 42px;
+}
+
+.header {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 18px;
+  align-items: center;
+  padding-bottom: 22px;
+  border-bottom: 1px solid var(--border);
+}
+
+.avatar {
+  display: grid;
+  place-items: center;
+  width: 86px;
+  height: 86px;
+  border: 2px solid var(--accent);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--accent);
+  font-weight: 800;
+}
+
+.header h1 {
+  margin: 0;
+  font-size: 38px;
+  line-height: 0.95;
+}
+
+.header p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 18px;
+}
+
+.collections {
+  display: grid;
+  gap: 18px;
+  margin-top: 22px;
+}
+
+.collection {
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 12px;
+}
+
+.collectionHeading {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  color: var(--accent);
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.collectionHeading p,
+.collectionHeading span {
+  margin: 0 0 10px;
+}
+
+.miniRow {
+  overflow: hidden;
+  padding: 10px 0;
+  border-top: 1px solid var(--border);
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.collection button {
+  margin-top: 8px;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.journal {
+  display: grid;
+  min-height: 180px;
+  margin-top: 28px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 20px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.journal h2,
+.journal p {
+  margin: 0;
+}
+
+.journal h2 {
+  margin-top: 8px;
+  font-size: 28px;
+  line-height: 1;
+}
+
+.journal p:not(:global(.eyebrow)) {
+  margin-top: 12px;
+  color: var(--muted);
+  font-size: 17px;
+  line-height: 1.35;
+}

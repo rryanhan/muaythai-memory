@@ -1,0 +1,56 @@
+/* Copied from the wireframe navbar so fullstack navigation stays visually identical. */
+.root {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 10;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  height: var(--nav-height);
+  border-top: 1px solid var(--border);
+  padding: 10px 12px 12px;
+  background: rgba(245, 244, 239, 0.92);
+  backdrop-filter: blur(14px);
+}
+
+.button {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  border: 0;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.button[data-active="true"] {
+  background: transparent;
+  color: var(--accent);
+}
+
+.button[data-active="true"]::after {
+  position: absolute;
+  bottom: 8px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--accent);
+  content: "";
+}
+
+.button:focus-visible {
+  outline: 1px solid rgba(209, 74, 50, 0.5);
+  outline-offset: -10px;
+}
+
+.glyph {
+  display: block;
+  width: 28px;
+  height: 28px;
+  color: currentColor;
+}

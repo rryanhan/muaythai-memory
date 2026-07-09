@@ -2,9 +2,10 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { cache } from "react";
 import { z } from "zod";
-import { badgeByIconKey } from "@/components/context-badges";
-import { DrillDetailBackButton } from "@/components/drills/DrillDetailBackButton";
-import { DrillDetailContent } from "@/components/drills/DrillDetailContent";
+import { badgeByIconKey } from "@/components/shared/context-badges";
+import { DrillDetailBackButton } from "@/features/drills/DrillDetailBackButton";
+import { DrillDetailContent } from "@/features/drills/DrillDetailContent";
+import { RoutedBottomNav } from "@/components/navigation/RoutedBottomNav";
 import { getDrillById } from "@/modules/drills";
 
 export const dynamic = "force-dynamic";
@@ -57,6 +58,7 @@ export default async function DrillDetailPage({ params }: DrillDetailPageProps) 
         <p className="eyebrow">Drill Record</p>
       </header>
       <DrillDetailContent drill={drill} badgeByIconKey={badgeByIconKey} />
+      <RoutedBottomNav activeView="library" />
     </main>
   );
 }

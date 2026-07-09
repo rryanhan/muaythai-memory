@@ -79,6 +79,12 @@ Use restrained, utilitarian shapes:
 - No decorative gradients.
 - No large marketing-style cards.
 
+Shape lock:
+
+- Default UI controls should use 6-8px radius.
+- Inputs, tag buttons, action buttons, chips, panels, and sheets should not use pill radii by default.
+- Circular shapes are reserved for icon-only buttons, graph dots, the record button, nav glyph geometry, context badge SVGs, and tiny drawer handles.
+
 ## TasteSkill Usage
 
 TasteSkill can be used as a design-quality helper for the local wireframe and later frontend prototype.

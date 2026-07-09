@@ -7,6 +7,7 @@ type QueryProviderProps = {
   children: ReactNode;
 };
 
+// Shared client cache for API-backed views; keeps Library responsive when returning from drill pages.
 export function QueryProvider({ children }: QueryProviderProps) {
   const [queryClient] = useState(
     () =>

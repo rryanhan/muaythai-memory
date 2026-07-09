@@ -1,0 +1,12 @@
+.shell {
+  min-height: 100dvh;
+  max-width: 480px;
+  margin: 0 auto;
+  background: var(--bg);
+  box-shadow: 0 0 0 1px rgba(36, 39, 41, 0.06);
+}
+
+.screen {
+  min-height: 100dvh;
+  padding-bottom: var(--nav-height);
+}

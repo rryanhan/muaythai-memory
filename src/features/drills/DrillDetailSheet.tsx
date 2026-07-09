@@ -3,7 +3,7 @@
 import { useRef, type PointerEvent } from "react";
 import { Drawer } from "vaul";
 import type { DrillDetail } from "@/data";
-import { DrillDetailContent } from "@/components/drills/DrillDetailContent";
+import { DrillDetailContent } from "@/features/drills/DrillDetailContent";
 
 type DrillDetailLoadState =
   | { status: "loading"; drillId: string }

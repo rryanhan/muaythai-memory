@@ -1,157 +1,23 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { getDrill, type GraphResponse } from "@/data";
+import { badgeByIconKey } from "@/components/shared/context-badges";
+import { DrillDetailSheet } from "@/features/drills/DrillDetailSheet";
+import { NetworkForceGraph } from "./NetworkForceGraph";
 import {
-  ApiError,
-  ApiResponseValidationError,
-  getDrill,
-  getGraph,
-  type DrillDetail,
-  type DrillFilterInput,
-  type GraphNode,
-  type GraphResponse,
-} from "@/data";
-import { badgeByIconKey } from "@/components/context-badges";
-import { DrillDetailSheet } from "@/components/drills/DrillDetailSheet";
-import { NetworkForceGraph } from "@/components/network/NetworkForceGraph";
+  getDrillDetailErrorMessage,
+  graphFiltersMatchNetworkFilters,
+  hasActiveFilters,
+  hasGraphFilters,
+  isAbortError,
+  normalizeKeyword,
+  sortMethods,
+} from "./network-helpers";
+import { emptyNetworkFilters, type DrillDetailLoadState, type NetworkFilters } from "./types";
+import { NetworkStatePanel } from "./NetworkStates";
 
-type NetworkLoadState =
-  | { status: "loading" }
-  | { status: "loaded"; graph: GraphResponse; refreshing: boolean; errorMessage?: string }
-  | { status: "error"; message: string };
-
-type NetworkViewProps = {
-  initialGraph?: GraphResponse;
-};
-
-type NetworkFilters = {
-  methodSlug: string | null;
-  keywords: string[];
-};
-
-type DrillDetailLoadState =
-  | { status: "idle" }
-  | { status: "loading"; drillId: string }
-  | { status: "loaded"; drill: DrillDetail }
-  | { status: "error"; drillId: string; message: string };
-
-const methodOrder = ["pad-work", "bag-work", "partner-drill", "clinch", "technical-work"];
-
-const emptyFilters: NetworkFilters = {
-  methodSlug: null,
-  keywords: [],
-};
-
-const graphLayerOptions = {
-  showTags: false,
-  showCustomTags: false,
-  showStatusTags: false,
-};
-
-export function NetworkView({ initialGraph }: NetworkViewProps) {
-  const [filters, setFilters] = useState<NetworkFilters>(emptyFilters);
-  const [searchOpen, setSearchOpen] = useState(false);
-  const [searchDraft, setSearchDraft] = useState("");
-  const [retryNonce, setRetryNonce] = useState(0);
-  const [loadState, setLoadState] = useState<NetworkLoadState>(() =>
-    initialGraph ? { status: "loaded", graph: initialGraph, refreshing: false } : { status: "loading" },
-  );
-  const previewKeyword = searchOpen ? normalizeKeyword(searchDraft) : "";
-  const effectiveFilters = useMemo(
-    () => addPreviewKeyword(filters, previewKeyword),
-    [filters, previewKeyword],
-  );
-  const filterKey = useMemo(() => buildFilterKey(effectiveFilters), [effectiveFilters]);
-
-  const retryGraph = useCallback(() => {
-    setRetryNonce((current) => current + 1);
-  }, []);
-
-  const updateFilters = useCallback((updater: (current: NetworkFilters) => NetworkFilters) => {
-    setFilters((current) => normalizeNetworkFilters(updater(current)));
-  }, []);
-
-  useEffect(() => {
-    if (isEmptyFilterSet(effectiveFilters) && initialGraph) {
-      setLoadState({ status: "loaded", graph: initialGraph, refreshing: false });
-      return;
-    }
-
-    const controller = new AbortController();
-
-    setLoadState((current) => {
-      if (current.status === "loaded") {
-        return { ...current, refreshing: true, errorMessage: undefined };
-      }
-
-      return { status: "loading" };
-    });
-
-    getGraph(toDrillFilters(effectiveFilters), graphLayerOptions, { requestInit: { signal: controller.signal } })
-      .then((graph) => setLoadState({ status: "loaded", graph, refreshing: false }))
-      .catch((error: unknown) => {
-        if (isAbortError(error)) return;
-        const message = getNetworkErrorMessage(error);
-        setLoadState((current) => {
-          if (current.status === "loaded") {
-            return { ...current, refreshing: false, errorMessage: message };
-          }
-
-          return { status: "error", message };
-        });
-      });
-
-    return () => controller.abort();
-  }, [filterKey, initialGraph, retryNonce]);
-
-  return (
-    <section className="network-view" aria-label="Network view">
-      {loadState.status === "loading" && (
-        <NetworkStatePanel title="Loading network" body="Building the drill map from the graph API." />
-      )}
-
-      {loadState.status === "error" && (
-        <NetworkStatePanel title="Network unavailable" body={loadState.message}>
-          <button type="button" onClick={retryGraph}>
-            Retry
-          </button>
-        </NetworkStatePanel>
-      )}
-
-      {loadState.status === "loaded" && (
-        <NetworkGraph
-          graph={loadState.graph}
-          filters={filters}
-          effectiveFilters={effectiveFilters}
-          previewKeyword={previewKeyword}
-          searchOpen={searchOpen}
-          searchDraft={searchDraft}
-          refreshing={loadState.refreshing}
-          errorMessage={loadState.errorMessage}
-          onRetry={retryGraph}
-          onSearchOpenChange={setSearchOpen}
-          onSearchDraftChange={setSearchDraft}
-          onUpdateFilters={updateFilters}
-        />
-      )}
-    </section>
-  );
-}
-
-function NetworkGraph({
-  graph,
-  filters,
-  effectiveFilters,
-  previewKeyword,
-  searchOpen,
-  searchDraft,
-  refreshing,
-  errorMessage,
-  onRetry,
-  onSearchOpenChange,
-  onSearchDraftChange,
-  onUpdateFilters,
-}: {
+type NetworkGraphPanelProps = {
   graph: GraphResponse;
   filters: NetworkFilters;
   effectiveFilters: NetworkFilters;
@@ -164,7 +30,23 @@ function NetworkGraph({
   onSearchOpenChange: (open: boolean) => void;
   onSearchDraftChange: (value: string) => void;
   onUpdateFilters: (updater: (current: NetworkFilters) => NetworkFilters) => void;
-}) {
+};
+
+// Owns graph-local UI state that should not reset the outer graph fetch loop.
+export function NetworkGraphPanel({
+  graph,
+  filters,
+  effectiveFilters,
+  previewKeyword,
+  searchOpen,
+  searchDraft,
+  refreshing,
+  errorMessage,
+  onRetry,
+  onSearchOpenChange,
+  onSearchDraftChange,
+  onUpdateFilters,
+}: NetworkGraphPanelProps) {
   const [controlsOpen, setControlsOpen] = useState(false);
   const [selectedDrillId, setSelectedDrillId] = useState<string | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
@@ -174,7 +56,6 @@ function NetworkGraph({
   const drills = useMemo(() => graph.nodes.filter((node) => node.type === "drill"), [graph]);
   const drillCount = drills.length;
   const activeDrillCount = drills.filter((node) => node.active).length;
-  const hasFilters = hasActiveFilters(filters);
   const hasVisibleFilters = hasActiveFilters(effectiveFilters);
   const previewIsCommitted = Boolean(previewKeyword && filters.keywords.includes(previewKeyword));
   const graphHasFilters = hasGraphFilters(graph);
@@ -255,16 +136,12 @@ function NetworkGraph({
   function clearAllFilters() {
     onSearchDraftChange("");
     onSearchOpenChange(false);
-    onUpdateFilters(() => emptyFilters);
+    onUpdateFilters(() => emptyNetworkFilters);
   }
 
   function openDrillDetail(drillId: string) {
     setSelectedDrillId(drillId);
     setDetailOpen(true);
-  }
-
-  function handleDetailOpenChange(open: boolean) {
-    setDetailOpen(open);
   }
 
   function handleDetailAnimationEnd(open: boolean) {
@@ -434,151 +311,11 @@ function NetworkGraph({
           state={visibleDetailState}
           badgeByIconKey={badgeByIconKey}
           open={detailOpen}
-          onOpenChange={handleDetailOpenChange}
+          onOpenChange={setDetailOpen}
           onAnimationEnd={handleDetailAnimationEnd}
           onRetry={() => setDetailRetryNonce((current) => current + 1)}
         />
       )}
     </>
   );
-}
-
-function NetworkStatePanel({
-  title,
-  body,
-  children,
-}: {
-  title: string;
-  body: string;
-  children?: ReactNode;
-}) {
-  return (
-    <>
-      <div className="network-grid" aria-hidden="true" />
-      <div className="network-state-panel">
-        <p className="eyebrow">Network</p>
-        <h1>{title}</h1>
-        <p>{body}</p>
-        {children}
-      </div>
-    </>
-  );
-}
-
-function sortMethods(nodes: GraphNode[]): GraphNode[] {
-  return [...nodes].sort((a, b) => getMethodRank(a.slug) - getMethodRank(b.slug));
-}
-
-function getMethodRank(slug: string | undefined): number {
-  if (!slug) return Number.MAX_SAFE_INTEGER;
-  const rank = methodOrder.indexOf(slug);
-  return rank === -1 ? Number.MAX_SAFE_INTEGER : rank;
-}
-
-function buildFilterKey(filters: NetworkFilters): string {
-  return JSON.stringify(normalizeNetworkFilters(filters));
-}
-
-function normalizeNetworkFilters(filters: NetworkFilters): NetworkFilters {
-  return {
-    methodSlug: filters.methodSlug,
-    keywords: [...new Set(filters.keywords.map(normalizeKeyword).filter(Boolean))],
-  };
-}
-
-function addPreviewKeyword(filters: NetworkFilters, previewKeyword: string): NetworkFilters {
-  if (!previewKeyword) {
-    return normalizeNetworkFilters(filters);
-  }
-
-  return normalizeNetworkFilters({
-    ...filters,
-    keywords: [...filters.keywords, previewKeyword],
-  });
-}
-
-function normalizeKeyword(value: string): string {
-  return value.trim().replace(/\s+/g, " ").toLowerCase();
-}
-
-function hasActiveFilters(filters: NetworkFilters): boolean {
-  return Boolean(filters.methodSlug) || filters.keywords.length > 0;
-}
-
-function hasGraphFilters(graph: GraphResponse): boolean {
-  const filters = graph.filters;
-
-  return (
-    filters.keywords.length > 0 ||
-    filters.methodSlugs.length > 0 ||
-    filters.tagSlugs.length > 0 ||
-    filters.statusTagSlugs.length > 0
-  );
-}
-
-function graphFiltersMatchNetworkFilters(graphFilters: GraphResponse["filters"], filters: NetworkFilters): boolean {
-  const normalizedFilters = normalizeNetworkFilters(filters);
-  const graphMethodSlug = graphFilters.methodSlugs.length === 1 ? graphFilters.methodSlugs[0] : null;
-
-  return (
-    graphMethodSlug === normalizedFilters.methodSlug &&
-    listsMatch(graphFilters.keywords.map(normalizeKeyword), normalizedFilters.keywords)
-  );
-}
-
-function listsMatch(left: string[], right: string[]): boolean {
-  if (left.length !== right.length) return false;
-  const rightValues = new Set(right);
-  return left.every((value) => rightValues.has(value));
-}
-
-function isEmptyFilterSet(filters: NetworkFilters): boolean {
-  return !hasActiveFilters(filters);
-}
-
-function toDrillFilters(filters: NetworkFilters): DrillFilterInput {
-  return {
-    keywords: filters.keywords,
-    methodSlugs: filters.methodSlug ? [filters.methodSlug] : [],
-  };
-}
-
-function getNetworkErrorMessage(error: unknown): string {
-  if (error instanceof ApiError) {
-    return `The graph API returned ${error.status}.`;
-  }
-
-  if (error instanceof ApiResponseValidationError) {
-    return "The graph API response no longer matches the frontend contract.";
-  }
-
-  if (error instanceof Error) {
-    return error.message;
-  }
-
-  return "The graph could not be loaded.";
-}
-
-function getDrillDetailErrorMessage(error: unknown): string {
-  if (error instanceof ApiError) {
-    if (error.status === 404) {
-      return "That drill could not be found.";
-    }
-
-    return `The drill API returned ${error.status}.`;
-  }
-
-  if (error instanceof ApiResponseValidationError) {
-    return "The drill detail response no longer matches the frontend contract.";
-  }
-
-  if (error instanceof Error) {
-    return error.message;
-  }
-
-  return "The drill could not be loaded.";
-}
-
-function isAbortError(error: unknown): boolean {
-  return error instanceof DOMException && error.name === "AbortError";
 }

@@ -1,5 +1,5 @@
-import { AppShell } from "@/components/AppShell";
-import type { AppView } from "@/components/BottomNav";
+import { AppShell } from "@/components/app/AppShell";
+import type { AppView } from "@/components/navigation/BottomNav";
 import { getMuayThaiGraph } from "@/modules/graph";
 import type { GraphResponse } from "@/data";
 

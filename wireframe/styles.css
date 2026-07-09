@@ -1534,9 +1534,9 @@ h2 {
   max-height: min(52vh, 420px);
   overflow: auto;
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: 8px;
   background: var(--surface);
-  padding: 10px;
+  padding: 6px 12px;
 }
 
 [hidden].network-tag-select {
@@ -1545,74 +1545,90 @@ h2 {
 
 .network-tag-select {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  grid-template-columns: 1fr;
+  gap: 0;
 }
 
 .network-tag-group {
   display: grid;
-  gap: 3px;
+  gap: 8px;
   align-content: start;
   min-width: 0;
-  border: 1px solid rgba(214, 209, 198, 0.78);
-  border-radius: 10px;
-  background: rgba(248, 250, 245, 0.78);
-  padding: 6px;
+  border-top: 1px solid rgba(214, 209, 198, 0.78);
+  padding: 12px 0;
+}
+
+.network-tag-group:first-child {
+  border-top: 0;
 }
 
 .network-tag-group.is-wide {
-  grid-column: 1 / -1;
+  grid-column: auto;
 }
 
 .network-tag-group-heading {
   display: flex;
   align-items: center;
-  min-height: 34px;
+  min-height: 16px;
   color: var(--muted);
   margin: 0;
-  padding: 0 6px;
+  padding: 0;
   font-family: "IBM Plex Mono", ui-monospace, monospace;
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
 .network-tag-group-body {
-  display: grid;
-  gap: 2px;
-  padding: 2px 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0;
+  padding: 0;
 }
 
 .network-tag-group.is-wide .network-tag-group-body {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  column-gap: 6px;
+  grid-template-columns: none;
 }
 
 .network-tag-option {
-  min-height: 34px;
-  border: 1px solid transparent;
-  border-radius: 7px;
+  position: relative;
+  min-height: 28px;
+  border: 0;
+  border-radius: 5px;
   background: transparent;
-  color: var(--muted);
-  padding: 0 8px;
+  color: var(--text);
+  padding: 0 7px;
   text-align: left;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 700;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+.network-tag-option:not(:last-child) {
+  margin-right: 11px;
+}
+
+.network-tag-option:not(:last-child)::after {
+  position: absolute;
+  right: -8px;
+  top: 50%;
+  color: rgba(100, 100, 95, 0.42);
+  content: "|";
+  font-weight: 700;
+  transform: translateY(-52%);
+}
+
 .network-tag-option:hover {
-  background: rgba(37, 109, 133, 0.05);
+  background: rgba(37, 109, 133, 0.055);
 }
 
 .network-tag-option.is-active {
-  background: rgba(37, 109, 133, 0.08);
-  border-color: transparent;
-  color: var(--teal);
-  font-weight: 700;
+  background: rgba(244, 216, 208, 0.72);
+  color: var(--accent);
+  font-weight: 800;
 }
 
 .network-tag-empty {

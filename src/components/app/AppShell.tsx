@@ -2,11 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { BottomNav, type AppView } from "@/components/BottomNav";
-import { LibraryView } from "@/components/LibraryView";
-import { NetworkView } from "@/components/NetworkView";
-import { ProfileViewPlaceholder } from "@/components/ViewPlaceholders";
+import { BottomNav, type AppView } from "@/components/navigation/BottomNav";
+import { LibraryView } from "@/features/library/LibraryView";
+import { NetworkView } from "@/features/network/NetworkView";
+import { ProfileViewPlaceholder } from "@/features/profile/ProfileViewPlaceholder";
 import type { GraphResponse } from "@/data";
+import styles from "./AppShell.module.css";
 
 const viewLabels: Record<AppView, string> = {
   network: "Network",
@@ -44,8 +45,8 @@ export function AppShell({ initialGraph, initialView = "network" }: AppShellProp
   }
 
   return (
-    <main className="app-shell">
-      <div className="app-screen" aria-label={`${viewLabels[activeView]} view`}>
+    <main className={styles.shell}>
+      <div className={styles.screen} aria-label={`${viewLabels[activeView]} view`}>
         {/* Keep mounted views alive so returning to Network does not refetch or reset local graph state. */}
         {networkHasMounted && (
           <div className="app-view-pane" hidden={activeView !== "network"}>
