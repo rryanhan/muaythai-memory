@@ -8,6 +8,7 @@ type DrillDetailContentProps = {
 export function DrillDetailContent({ drill, badgeByIconKey }: DrillDetailContentProps) {
   const primaryMethod = drill.trainingMethods[0];
   const primaryBadge = primaryMethod ? badgeByIconKey[primaryMethod.iconKey] : undefined;
+  const summary = drill.summary.trim();
   const notes = drill.notes?.trim();
 
   return (
@@ -22,7 +23,7 @@ export function DrillDetailContent({ drill, badgeByIconKey }: DrillDetailContent
         </div>
       </div>
 
-      <p className="drill-detail-summary">{drill.summary}</p>
+      {summary && <p className="drill-detail-summary">{summary}</p>}
 
       <div className="drill-detail-tags" aria-label="Drill tags">
         {drill.tags.map((tag) => (

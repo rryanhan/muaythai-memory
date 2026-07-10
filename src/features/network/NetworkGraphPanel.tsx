@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { getDrill, type GraphResponse } from "@/data";
 import { badgeByIconKey } from "@/components/shared/context-badges";
 import { DrillDetailSheet } from "@/features/drills/DrillDetailSheet";
@@ -52,6 +52,8 @@ export function NetworkGraphPanel({
   const [detailOpen, setDetailOpen] = useState(false);
   const [detailRetryNonce, setDetailRetryNonce] = useState(0);
   const [detailLoadState, setDetailLoadState] = useState<DrillDetailLoadState>({ status: "idle" });
+  const [keyboardInset, setKeyboardInset] = useState(0);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const methods = useMemo(() => sortMethods(graph.nodes.filter((node) => node.type === "trainingMethod")), [graph]);
   const drills = useMemo(() => graph.nodes.filter((node) => node.type === "drill"), [graph]);
   const drillCount = drills.length;
@@ -94,6 +96,64 @@ export function NetworkGraphPanel({
 
     return () => controller.abort();
   }, [detailRetryNonce, selectedDrillId]);
+
+  useEffect(() => {
+    if (!searchOpen) return;
+
+    const frame = window.requestAnimationFrame(() => {
+      searchInputRef.current?.focus({ preventScroll: true });
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [searchOpen]);
+
+  useEffect(() => {
+    if (!searchOpen) return;
+
+    const html = document.documentElement;
+    const body = document.body;
+    const previousHtmlOverflow = html.style.overflow;
+    const previousBodyOverflow = body.style.overflow;
+
+    html.style.overflow = "hidden";
+    body.style.overflow = "hidden";
+
+    return () => {
+      html.style.overflow = previousHtmlOverflow;
+      body.style.overflow = previousBodyOverflow;
+    };
+  }, [searchOpen]);
+
+  useEffect(() => {
+    if (!searchOpen) {
+      setKeyboardInset(0);
+      return;
+    }
+
+    const viewport = window.visualViewport;
+
+    function updateKeyboardInset() {
+      if (!viewport) {
+        setKeyboardInset(0);
+        return;
+      }
+
+      const nextInset = Math.max(0, Math.round(window.innerHeight - viewport.height - viewport.offsetTop));
+      setKeyboardInset(nextInset);
+    }
+
+    updateKeyboardInset();
+
+    if (!viewport) return;
+
+    viewport.addEventListener("resize", updateKeyboardInset);
+    viewport.addEventListener("scroll", updateKeyboardInset);
+
+    return () => {
+      viewport.removeEventListener("resize", updateKeyboardInset);
+      viewport.removeEventListener("scroll", updateKeyboardInset);
+    };
+  }, [searchOpen]);
 
   if (methods.length === 0 && drillCount === 0) {
     return <NetworkStatePanel title="No graph data" body="No Training Method or drill nodes were returned." />;
@@ -155,6 +215,9 @@ export function NetworkGraphPanel({
     selectedDrillId && detailLoadState.status === "idle"
       ? ({ status: "loading", drillId: selectedDrillId } as const)
       : detailLoadState;
+  const searchPopoverStyle = {
+    "--network-keyboard-inset": `${keyboardInset}px`,
+  } as CSSProperties;
 
   return (
     <>
@@ -223,6 +286,7 @@ export function NetworkGraphPanel({
       {searchOpen && (
         <form
           className="network-search-popover"
+          style={searchPopoverStyle}
           onSubmit={(event) => {
             event.preventDefault();
             applySearchDraft();
@@ -230,8 +294,8 @@ export function NetworkGraphPanel({
         >
           <span className="search-mark" aria-hidden="true" />
           <input
+            ref={searchInputRef}
             aria-label="Search keyword"
-            autoFocus
             placeholder="Search for keyword"
             value={searchDraft}
             onChange={(event) => onSearchDraftChange(event.target.value)}

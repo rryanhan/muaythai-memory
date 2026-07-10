@@ -1,10 +1,18 @@
-import type { DrillDetail, DrillFilters, DrillListResponse, DrillSummary, FilterMode } from "@/modules/drills/contracts";
+import type {
+  CreateDrillInput,
+  DrillDetail,
+  DrillFilters,
+  DrillListResponse,
+  DrillSummary,
+  FilterMode,
+} from "@/modules/drills/contracts";
 import type { GraphEdge, GraphNode, GraphOptions, GraphResponse } from "@/modules/graph/contracts";
 import type { StatusTagDto, TagCategoryDto, TagDto, TaxonomyResponse, TrainingMethodDto } from "@/modules/taxonomy/contracts";
 
 // This file is the frontend import surface for API data types. It reuses the
 // pure contract types from backend modules without importing database code.
 export type {
+  CreateDrillInput,
   DrillDetail,
   DrillFilters,
   DrillListResponse,

@@ -6,9 +6,10 @@ import { badgeByIconKey } from "@/components/shared/context-badges";
 import { DrillDetailBackButton } from "@/features/drills/DrillDetailBackButton";
 import { DrillDetailContent } from "@/features/drills/DrillDetailContent";
 import { RoutedBottomNav } from "@/components/navigation/RoutedBottomNav";
-import { getDrillById } from "@/modules/drills";
+import { getDrillById } from "@/modules/drills/queries";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 const paramsSchema = z.object({
   id: z.string().uuid(),
@@ -33,7 +34,7 @@ export async function generateMetadata({ params }: DrillDetailPageProps): Promis
 
   return {
     title: drill ? `${drill.title} | Muay Thai Memory` : "Drill not found | Muay Thai Memory",
-    description: drill?.summary ?? "A saved Muay Thai drill.",
+    description: drill?.summary.trim() || "A saved Muay Thai drill.",
   };
 }
 

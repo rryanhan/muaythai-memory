@@ -1,3 +1,9 @@
+"use client";
+
+import { ListBullets, Plus } from "@phosphor-icons/react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useEffect } from "react";
 import type { TrainingMethodDto } from "@/data";
 import { badgeByIconKey } from "@/components/shared/context-badges";
 import type { TaxonomyLoadState } from "./types";
@@ -19,6 +25,16 @@ export function LibraryIndexPanel({
   onClose,
   onRetry,
 }: LibraryIndexPanelProps) {
+  const router = useRouter();
+
+  function prefetchAddDrill() {
+    router.prefetch("/drills/new");
+  }
+
+  useEffect(() => {
+    prefetchAddDrill();
+  }, []);
+
   return (
     <aside className="library-index-panel" aria-label="Training Method index">
       <header>
@@ -38,23 +54,51 @@ export function LibraryIndexPanel({
         </div>
       )}
       {taxonomyState.status === "loaded" && (
-        <div className="library-method-list">
-          <button type="button" data-selected={!selectedMethodSlug} onClick={() => onSelectMethod(null)}>
-            <span className="library-method-all-mark" aria-hidden="true" />
-            <span>All Drills</span>
-          </button>
-          {methods.map((method) => (
-            <button
-              key={method.id}
-              type="button"
-              data-selected={selectedMethodSlug === method.slug}
-              onClick={() => onSelectMethod(method.slug)}
+        <>
+          <div className="library-index-action-block">
+            <Link
+              className="library-add-drill-link"
+              href="/drills/new"
+              prefetch
+              onFocus={prefetchAddDrill}
+              onPointerEnter={prefetchAddDrill}
+              onTouchStart={prefetchAddDrill}
             >
-              <img src={badgeByIconKey[method.iconKey]} alt="" aria-hidden="true" />
-              <span>{method.name}</span>
-            </button>
-          ))}
-        </div>
+              <span className="library-index-action-icon" aria-hidden="true">
+                <Plus size={22} weight="bold" />
+              </span>
+              <span>Add Drill</span>
+            </Link>
+          </div>
+
+          <section className="library-index-section" aria-label="Training Method filters">
+            <p className="library-index-section-label">Training Methods</p>
+            <div className="library-method-list">
+              <button
+                type="button"
+                data-kind="all"
+                data-selected={!selectedMethodSlug}
+                onClick={() => onSelectMethod(null)}
+              >
+                <span className="library-index-utility-icon" aria-hidden="true">
+                  <ListBullets size={24} weight="regular" />
+                </span>
+                <span>All Drills</span>
+              </button>
+              {methods.map((method) => (
+                <button
+                  key={method.id}
+                  type="button"
+                  data-selected={selectedMethodSlug === method.slug}
+                  onClick={() => onSelectMethod(method.slug)}
+                >
+                  <img src={badgeByIconKey[method.iconKey]} alt="" aria-hidden="true" />
+                  <span>{method.name}</span>
+                </button>
+              ))}
+            </div>
+          </section>
+        </>
       )}
     </aside>
   );

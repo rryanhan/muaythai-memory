@@ -53,12 +53,33 @@ export const drillDetailResponseSchema = z.object({
   drill: drillDetailSchema,
 });
 
+export const createDrillInputSchema = z.object({
+  title: z.string().trim().min(1),
+  summary: z
+    .string()
+    .trim()
+    .optional()
+    .nullable()
+    .transform((value) => value ?? ""),
+  notes: z
+    .string()
+    .trim()
+    .optional()
+    .nullable()
+    .transform((value) => value || null),
+  steps: z.array(z.string().trim().min(1)).min(1),
+  trainingMethodSlugs: z.array(slugSchema).min(1),
+  tagSlugs: z.array(slugSchema).default([]),
+  statusTagSlugs: z.array(slugSchema).default([]),
+});
+
 export type FilterMode = z.infer<typeof filterModeSchema>;
 export type DrillFilters = z.infer<typeof drillFiltersSchema>;
 export type DrillSummary = z.infer<typeof drillSummarySchema>;
 export type DrillDetail = z.infer<typeof drillDetailSchema>;
 export type DrillListResponse = z.infer<typeof drillListResponseSchema>;
 export type DrillDetailResponse = z.infer<typeof drillDetailResponseSchema>;
+export type CreateDrillInput = z.input<typeof createDrillInputSchema>;
 
 // Route handlers accept a few alias names so the frontend can evolve without
 // forcing a backend rewrite for every query-string naming change.

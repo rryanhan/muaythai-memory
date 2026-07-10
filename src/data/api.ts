@@ -4,6 +4,7 @@ import { graphResponseSchema } from "@/modules/graph/contracts";
 import { taxonomyResponseSchema } from "@/modules/taxonomy/contracts";
 import type {
   ApiClientOptions,
+  CreateDrillInput,
   DrillDetail,
   DrillFilterInput,
   DrillListResponse,
@@ -65,6 +66,18 @@ export async function getDrill(id: string, options: ApiClientOptions = {}): Prom
   return response.drill;
 }
 
+export async function createDrill(input: CreateDrillInput, options: ApiClientOptions = {}): Promise<DrillDetail> {
+  const response = await fetchJson("/api/drills", drillDetailResponseSchema, options, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(input),
+  });
+
+  return response.drill;
+}
+
 // Graph data is lightweight node/edge data, not full drill records.
 export async function getGraph(
   filters: DrillFilterInput = {},
@@ -109,15 +122,22 @@ export function buildDrillSearchParams(filters: DrillFilterInput = {}): URLSearc
   return searchParams;
 }
 
-async function fetchJson<T>(path: string, schema: ZodType<T>, options: ApiClientOptions): Promise<T> {
+async function fetchJson<T>(
+  path: string,
+  schema: ZodType<T>,
+  options: ApiClientOptions,
+  requestInit: RequestInit = {},
+): Promise<T> {
   const url = resolveApiUrl(path, options.baseUrl);
   const fetcher = options.fetcher ?? fetch;
   const response = await fetcher(url, {
     ...options.requestInit,
-    method: "GET",
+    ...requestInit,
+    method: requestInit.method ?? "GET",
     headers: {
       Accept: "application/json",
       ...options.headers,
+      ...requestInit.headers,
     },
   });
 

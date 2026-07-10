@@ -18,7 +18,6 @@ Required MVP fields:
 
 - `id`
 - `title`
-- `summary`
 - `steps`
 - `trainingMethods`
 - `trainingTags`
@@ -28,11 +27,12 @@ Required MVP fields:
 
 Optional MVP fields:
 
+- `summary`
 - `status`
+- `notes`
 
 Optional later fields:
 
-- `notes`
 - `lastPracticedAt`
 - `practiceCount`
 - `sourceTranscript`
