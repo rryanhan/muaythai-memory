@@ -76,6 +76,7 @@ export function buildGraphModel(
   const methodNodeIds = new Set(methodNodes.map((node) => node.id));
   const methodsById = new Map<string, GraphNode>(methodNodes.map((node) => [node.id, node]));
   const methodSlugsByDrillId = collectMethodSlugsByDrillId(graph.edges, methodsById, methodNodeIds);
+  const drillNodesById = new Map(graph.nodes.filter((node) => node.type === "drill").map((node) => [node.id, node]));
   const nodes: PhysicsNode[] = [];
 
   for (const [index, graphNode] of methodNodes.entries()) {
@@ -135,10 +136,15 @@ export function buildGraphModel(
   for (const [index, graphNode] of graph.nodes
     .filter((node) => node.type !== "trainingMethod" && node.type !== "drill")
     .entries()) {
+    const connectedDrillIds = collectConnectedDrillIds(graph.edges, graphNode.id, drillNodesById);
+    const connectedDrillPositions = connectedDrillIds
+      .map((id) => nodes.find((node) => node.id === id))
+      .filter((node): node is PhysicsNode => Boolean(node));
+    const centroid = getNodeCentroid(connectedDrillPositions) ?? center;
     const angle = -Math.PI / 2 + (index / Math.max(graph.nodes.length, 1)) * Math.PI * 2;
     const previous = previousPositions.get(graphNode.id);
-    const x = center.x + Math.cos(angle) * layoutSize.width * 0.22;
-    const y = center.y + Math.sin(angle) * layoutSize.height * 0.22;
+    const x = centroid.x + Math.cos(angle) * 72;
+    const y = centroid.y + Math.sin(angle) * 72;
 
     nodes.push(
       createPhysicsNode(graphNode, {
@@ -146,7 +152,7 @@ export function buildGraphModel(
         y: previous?.y ?? y,
         anchorX: previous?.anchorX ?? x,
         anchorY: previous?.anchorY ?? y,
-        r: 6,
+        r: graphNode.type === "statusTag" ? 6.8 : 5.8,
         connectedMethodSlugs: [],
         displayLabel: truncateLabel(graphNode.label, 22),
       }),
@@ -273,8 +279,9 @@ function tickNetwork(simulation: PhysicsSimulation) {
     const dy = to.y - from.y || 0.01;
     const distance = Math.hypot(dx, dy);
     const hasAnchor = from.type === "trainingMethod" || to.type === "trainingMethod";
-    const desired = hasAnchor ? 148 : 108;
-    const strength = hasAnchor ? 0.012 : 0.015;
+    const hasLayer = isLayerNode(from) || isLayerNode(to);
+    const desired = hasAnchor ? 148 : hasLayer ? 76 : 108;
+    const strength = hasAnchor ? 0.012 : hasLayer ? 0.01 : 0.015;
     const force = ((distance - desired) / distance) * strength * alpha;
     const fx = dx * force;
     const fy = dy * force;
@@ -413,7 +420,7 @@ function measureNodeBox(node: PhysicsNode): NodeBox {
 }
 
 function estimatedTextWidth(label: string, type: GraphNode["type"]): number {
-  const charWidth = type === "trainingMethod" ? 7.5 : 6.4;
+  const charWidth = type === "trainingMethod" ? 7.5 : isLayerType(type) ? 5.9 : 6.4;
   return label.length * charWidth;
 }
 
@@ -470,6 +477,29 @@ function collectMethodSlugsByDrillId(
   return methodSlugsByDrillId;
 }
 
+function collectConnectedDrillIds(
+  edges: GraphEdge[],
+  nodeId: string,
+  drillNodesById: Map<string, GraphNode>,
+): string[] {
+  return edges
+    .map((edge) => {
+      if (edge.from === nodeId && drillNodesById.has(edge.to)) return edge.to;
+      if (edge.to === nodeId && drillNodesById.has(edge.from)) return edge.from;
+      return undefined;
+    })
+    .filter((id): id is string => Boolean(id));
+}
+
+function getNodeCentroid(nodes: PhysicsNode[]): Point | undefined {
+  if (nodes.length === 0) return undefined;
+
+  return {
+    x: nodes.reduce((total, node) => total + node.x, 0) / nodes.length,
+    y: nodes.reduce((total, node) => total + node.y, 0) / nodes.length,
+  };
+}
+
 function pickPrimaryMethodSlug(methodSlugs: string[]): string | undefined {
   return [...methodSlugs].sort((a, b) => getMethodRank(a) - getMethodRank(b))[0];
 }
@@ -483,6 +513,14 @@ function getMethodRank(slug: string | undefined): number {
 function truncateLabel(label: string, maxLength: number): string {
   if (label.length <= maxLength) return label;
   return `${label.slice(0, Math.max(maxLength - 3, 1))}...`;
+}
+
+function isLayerNode(node: PhysicsNode): boolean {
+  return isLayerType(node.type);
+}
+
+function isLayerType(type: GraphNode["type"]): boolean {
+  return type === "tag" || type === "customTag" || type === "statusTag";
 }
 
 function clamp(value: number, min: number, max: number): number {

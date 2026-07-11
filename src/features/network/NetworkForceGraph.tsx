@@ -17,6 +17,7 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from "react";
 import type { GraphResponse } from "@/data";
+import type { NetworkGraphVisualState } from "./types";
 import {
   buildGraphModel,
   getInitialZoomTransform,
@@ -35,8 +36,8 @@ import styles from "./NetworkForceGraph.module.css";
 type NetworkForceGraphProps = {
   graph: GraphResponse;
   badgeByIconKey: Record<string, string>;
-  focusedMethodSlug: string | null;
-  graphCanHighlight: boolean;
+  focusedMethodSlugs: string[];
+  visualState: NetworkGraphVisualState;
   onMethodSelect: (slug: string | undefined) => void;
   onDrillSelect: (drillId: string) => void;
 };
@@ -57,8 +58,8 @@ const farZoomThreshold = 0.62;
 export function NetworkForceGraph({
   graph,
   badgeByIconKey,
-  focusedMethodSlug,
-  graphCanHighlight,
+  focusedMethodSlugs,
+  visualState,
   onMethodSelect,
   onDrillSelect,
 }: NetworkForceGraphProps) {
@@ -86,6 +87,11 @@ export function NetworkForceGraph({
     () => physicsNodes.filter((node) => node.type === "trainingMethod"),
     [physicsNodes],
   );
+  const layerNodes = useMemo(
+    () => physicsNodes.filter((node) => node.type === "tag" || node.type === "customTag" || node.type === "statusTag"),
+    [physicsNodes],
+  );
+  const focusedMethodSet = useMemo(() => new Set(focusedMethodSlugs), [focusedMethodSlugs]);
 
   const applyZoomTransform = useCallback((transform: ZoomTransform) => {
     setCameraTransform(transform);
@@ -302,7 +308,9 @@ export function NetworkForceGraph({
         <g ref={cameraRef} className="network-force-camera" transform={cameraTransform.toString()}>
           <g className="network-force-edges">
             {physicsLinks.map((link) => {
-              const active = !graphCanHighlight || link.active;
+              const active = visualState.activeEdgeIds.has(link.id);
+              const highlighted = Boolean(visualState.canHighlight && active);
+              const muted = Boolean(visualState.canHighlight && !active);
 
               return (
                 <line
@@ -312,81 +320,124 @@ export function NetworkForceGraph({
                   y1={link.source.y}
                   x2={link.target.x}
                   y2={link.target.y}
-                  data-active={active}
-                  data-focus-active={Boolean(graphCanHighlight && link.active)}
+                  data-active={highlighted}
+                  data-muted={muted}
+                  data-focus-active={highlighted}
                 />
               );
             })}
           </g>
 
           <g className="network-force-nodes">
-            {drillNodes.map((node) => (
-              <g
-                key={node.id}
-                className="network-force-node network-force-drill-node"
-                data-node-id={node.id}
-                data-active={!graphCanHighlight || node.active}
-                data-highlighted={Boolean(graphCanHighlight && node.active)}
-                data-far-visible={Boolean(graphCanHighlight && node.active)}
-                transform={`translate(${node.x}, ${node.y})`}
-                onPointerDown={(event) => handleNodePointerDown(node, event)}
-                onPointerMove={handleNodePointerMove}
-                onPointerUp={finishNodeDrag}
-                onPointerCancel={finishNodeDrag}
-              >
-                <rect
-                  className="network-force-hit-area"
-                  x="-18"
-                  y="-18"
-                  width="36"
-                  height="36"
-                  rx="18"
-                />
-                <circle r="7.5" />
-                <text className="network-force-drill-label" x={node.r + 7} y="4">
-                  {node.displayLabel}
-                </text>
-              </g>
-            ))}
+            {drillNodes.map((node) => {
+              const active = visualState.activeNodeIds.has(node.id);
 
-            {methodNodes.map((node) => (
-              <g
-                key={node.id}
-                className="network-force-node network-force-method-node"
-                data-node-id={node.id}
-                data-active={!graphCanHighlight || node.active}
-                data-focused={node.slug === focusedMethodSlug}
-                transform={`translate(${node.x}, ${node.y})`}
-                onPointerDown={(event) => handleNodePointerDown(node, event)}
-                onPointerMove={handleNodePointerMove}
-                onPointerUp={finishNodeDrag}
-                onPointerCancel={finishNodeDrag}
-              >
-                <rect
-                  className="network-force-hit-area"
-                  x={node.box.left - 8}
-                  y={node.box.top - 8}
-                  width={node.box.right - node.box.left + 16}
-                  height={node.box.bottom - node.box.top + 16}
-                  rx="12"
-                />
-                {node.badgeSrc ? (
-                  <image
-                    href={node.badgeSrc}
-                    x="-31"
-                    y="-37"
-                    width="62"
-                    height="62"
-                    preserveAspectRatio="xMidYMid meet"
+              return (
+                <g
+                  key={node.id}
+                  className="network-force-node network-force-drill-node"
+                  data-node-id={node.id}
+                  data-active={!visualState.canHighlight || active}
+                  data-highlighted={Boolean(visualState.canHighlight && active)}
+                  data-far-visible={Boolean(visualState.canHighlight && active)}
+                  transform={`translate(${node.x}, ${node.y})`}
+                  onPointerDown={(event) => handleNodePointerDown(node, event)}
+                  onPointerMove={handleNodePointerMove}
+                  onPointerUp={finishNodeDrag}
+                  onPointerCancel={finishNodeDrag}
+                >
+                  <rect
+                    className="network-force-hit-area"
+                    x="-18"
+                    y="-18"
+                    width="36"
+                    height="36"
+                    rx="18"
                   />
-                ) : (
-                  <path className="network-force-method-fallback" d="M0,-33 L29,-16 L29,16 L0,33 L-29,16 L-29,-16 Z" />
-                )}
-                <text textAnchor="middle" y="40">
-                  {node.label}
-                </text>
-              </g>
-            ))}
+                  <circle r="7.5" />
+                  <text className="network-force-drill-label" x={node.r + 7} y="4">
+                    {node.displayLabel}
+                  </text>
+                </g>
+              );
+            })}
+
+            {methodNodes.map((node) => {
+              const active = visualState.activeNodeIds.has(node.id);
+
+              return (
+                <g
+                  key={node.id}
+                  className="network-force-node network-force-method-node"
+                  data-node-id={node.id}
+                  data-active={!visualState.canHighlight || active}
+                  data-focused={Boolean(node.slug && focusedMethodSet.has(node.slug))}
+                  transform={`translate(${node.x}, ${node.y})`}
+                  onPointerDown={(event) => handleNodePointerDown(node, event)}
+                  onPointerMove={handleNodePointerMove}
+                  onPointerUp={finishNodeDrag}
+                  onPointerCancel={finishNodeDrag}
+                >
+                  <rect
+                    className="network-force-hit-area"
+                    x={node.box.left - 8}
+                    y={node.box.top - 8}
+                    width={node.box.right - node.box.left + 16}
+                    height={node.box.bottom - node.box.top + 16}
+                    rx="12"
+                  />
+                  {node.badgeSrc ? (
+                    <image
+                      href={node.badgeSrc}
+                      x="-31"
+                      y="-37"
+                      width="62"
+                      height="62"
+                      preserveAspectRatio="xMidYMid meet"
+                    />
+                  ) : (
+                    <path className="network-force-method-fallback" d="M0,-33 L29,-16 L29,16 L0,33 L-29,16 L-29,-16 Z" />
+                  )}
+                  <text textAnchor="middle" y="40">
+                    {node.label}
+                  </text>
+                </g>
+              );
+            })}
+
+            {layerNodes.map((node) => {
+              const active = visualState.activeNodeIds.has(node.id);
+
+              return (
+                <g
+                  key={node.id}
+                  className="network-force-node network-force-label-node"
+                  data-node-id={node.id}
+                  data-node-type={node.type}
+                  data-active={!visualState.canHighlight || active}
+                  data-highlighted={Boolean(visualState.canHighlight && active)}
+                  data-far-visible={Boolean(visualState.canHighlight && active)}
+                  transform={`translate(${node.x}, ${node.y})`}
+                  onPointerDown={(event) => handleNodePointerDown(node, event)}
+                  onPointerMove={handleNodePointerMove}
+                  onPointerUp={finishNodeDrag}
+                  onPointerCancel={finishNodeDrag}
+                >
+                  <rect
+                    className="network-force-hit-area"
+                    x={node.box.left - 5}
+                    y={node.box.top - 5}
+                    width={node.box.right - node.box.left + 10}
+                    height={node.box.bottom - node.box.top + 10}
+                    rx="8"
+                  />
+                  <circle r={node.r} />
+                  <text x={node.r + 7} y="4">
+                    {node.displayLabel}
+                  </text>
+                </g>
+              );
+            })}
           </g>
         </g>
       </svg>

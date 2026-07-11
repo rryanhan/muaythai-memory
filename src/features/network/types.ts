@@ -1,4 +1,4 @@
-import type { DrillDetail, GraphResponse } from "@/data";
+import type { DrillDetail, FilterMode, GraphOptions, GraphResponse } from "@/data";
 
 export type NetworkLoadState =
   | { status: "loading" }
@@ -6,8 +6,18 @@ export type NetworkLoadState =
   | { status: "error"; message: string };
 
 export type NetworkFilters = {
-  methodSlug: string | null;
+  methodSlugs: string[];
   keywords: string[];
+  tagSlugs: string[];
+  statusTagSlugs: string[];
+  tagMode: FilterMode;
+  statusMode: FilterMode;
+};
+
+export type NetworkGraphVisualState = {
+  canHighlight: boolean;
+  activeNodeIds: Set<string>;
+  activeEdgeIds: Set<string>;
 };
 
 export type DrillDetailLoadState =
@@ -17,11 +27,15 @@ export type DrillDetailLoadState =
   | { status: "error"; drillId: string; message: string };
 
 export const emptyNetworkFilters: NetworkFilters = {
-  methodSlug: null,
+  methodSlugs: [],
   keywords: [],
+  tagSlugs: [],
+  statusTagSlugs: [],
+  tagMode: "all",
+  statusMode: "all",
 };
 
-export const graphLayerOptions = {
+export const defaultNetworkLayerOptions: GraphOptions = {
   showTags: false,
   showCustomTags: false,
   showStatusTags: false,

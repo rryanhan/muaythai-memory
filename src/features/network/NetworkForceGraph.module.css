@@ -30,7 +30,7 @@
   stroke-width: 2.2;
 }
 
-.root :global(.network-force-edge[data-active="false"]) {
+.root :global(.network-force-edge[data-muted="true"]) {
   opacity: 0.15;
 }
 
@@ -123,10 +123,6 @@
   opacity: 0;
 }
 
-.root :global(.network-force-label-node) {
-  pointer-events: none;
-}
-
 .root :global(.network-force-svg[data-zoom-level="far"] .network-force-label-node) {
   opacity: 0;
 }
@@ -139,13 +135,35 @@
   opacity: 1;
 }
 
+.root :global(.network-force-label-node circle) {
+  fill: rgba(37, 109, 133, 0.92);
+  stroke: rgba(37, 109, 133, 0.14);
+  stroke-width: 5;
+}
+
+.root :global(.network-force-label-node[data-node-type="customTag"] circle) {
+  fill: rgba(91, 98, 97, 0.82);
+  stroke: rgba(91, 98, 97, 0.12);
+}
+
+.root :global(.network-force-label-node[data-node-type="statusTag"] circle) {
+  fill: var(--accent);
+  stroke: rgba(209, 74, 50, 0.18);
+}
+
+.root :global(.network-force-label-node[data-highlighted="true"] circle) {
+  fill: var(--accent);
+  stroke: rgba(209, 74, 50, 0.24);
+  stroke-width: 8;
+}
+
 .root :global(.network-force-label-node text) {
-  font-size: 13px;
-  font-weight: 500;
+  font-size: 12.5px;
+  font-weight: 600;
 }
 
 .root :global(.network-force-label-node[data-highlighted="true"] text) {
-  font-weight: 650;
+  font-weight: 750;
 }
 
 .root :global(.network-recenter-button) {

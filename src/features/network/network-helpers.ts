@@ -2,10 +2,17 @@ import {
   ApiError,
   ApiResponseValidationError,
   type DrillFilterInput,
+  type GraphEdge,
+  type GraphOptionsInput,
   type GraphNode,
   type GraphResponse,
 } from "@/data";
-import { emptyNetworkFilters, type NetworkFilters } from "./types";
+import {
+  defaultNetworkLayerOptions,
+  emptyNetworkFilters,
+  type NetworkFilters,
+  type NetworkGraphVisualState,
+} from "./types";
 
 const methodOrder = ["pad-work", "bag-work", "partner-drill", "clinch", "technical-work"];
 
@@ -13,14 +20,29 @@ export function sortMethods(nodes: GraphNode[]): GraphNode[] {
   return [...nodes].sort((a, b) => getMethodRank(a.slug) - getMethodRank(b.slug));
 }
 
-export function buildFilterKey(filters: NetworkFilters): string {
-  return JSON.stringify(normalizeNetworkFilters(filters));
+export function buildGraphRequestKey(filters: NetworkFilters, layerOptions: GraphOptionsInput): string {
+  return JSON.stringify({
+    filters: normalizeNetworkFilters(filters),
+    layerOptions: normalizeLayerOptions(layerOptions),
+  });
 }
 
 export function normalizeNetworkFilters(filters: NetworkFilters): NetworkFilters {
   return {
-    methodSlug: filters.methodSlug,
+    methodSlugs: normalizeSlugList(filters.methodSlugs),
     keywords: [...new Set(filters.keywords.map(normalizeKeyword).filter(Boolean))],
+    tagSlugs: normalizeSlugList(filters.tagSlugs),
+    statusTagSlugs: normalizeSlugList(filters.statusTagSlugs),
+    tagMode: filters.tagMode ?? "all",
+    statusMode: filters.statusMode ?? "all",
+  };
+}
+
+export function normalizeLayerOptions(layerOptions: GraphOptionsInput): Required<GraphOptionsInput> {
+  return {
+    showTags: layerOptions.showTags ?? false,
+    showCustomTags: layerOptions.showCustomTags ?? false,
+    showStatusTags: layerOptions.showStatusTags ?? false,
   };
 }
 
@@ -40,7 +62,12 @@ export function normalizeKeyword(value: string): string {
 }
 
 export function hasActiveFilters(filters: NetworkFilters): boolean {
-  return Boolean(filters.methodSlug) || filters.keywords.length > 0;
+  return (
+    filters.methodSlugs.length > 0 ||
+    filters.keywords.length > 0 ||
+    filters.tagSlugs.length > 0 ||
+    filters.statusTagSlugs.length > 0
+  );
 }
 
 export function hasGraphFilters(graph: GraphResponse): boolean {
@@ -59,11 +86,14 @@ export function graphFiltersMatchNetworkFilters(
   filters: NetworkFilters,
 ): boolean {
   const normalizedFilters = normalizeNetworkFilters(filters);
-  const graphMethodSlug = graphFilters.methodSlugs.length === 1 ? graphFilters.methodSlugs[0] : null;
 
   return (
-    graphMethodSlug === normalizedFilters.methodSlug &&
-    listsMatch(graphFilters.keywords.map(normalizeKeyword), normalizedFilters.keywords)
+    listsMatch(graphFilters.methodSlugs, normalizedFilters.methodSlugs) &&
+    listsMatch(graphFilters.keywords.map(normalizeKeyword), normalizedFilters.keywords) &&
+    listsMatch(graphFilters.tagSlugs, normalizedFilters.tagSlugs) &&
+    listsMatch(graphFilters.statusTagSlugs, normalizedFilters.statusTagSlugs) &&
+    graphFilters.tagMode === normalizedFilters.tagMode &&
+    graphFilters.statusMode === normalizedFilters.statusMode
   );
 }
 
@@ -71,11 +101,85 @@ export function isEmptyFilterSet(filters: NetworkFilters): boolean {
   return !hasActiveFilters(filters);
 }
 
+export function isDefaultLayerSet(layerOptions: GraphOptionsInput): boolean {
+  const normalizedOptions = normalizeLayerOptions(layerOptions);
+
+  return (
+    normalizedOptions.showTags === defaultNetworkLayerOptions.showTags &&
+    normalizedOptions.showCustomTags === defaultNetworkLayerOptions.showCustomTags &&
+    normalizedOptions.showStatusTags === defaultNetworkLayerOptions.showStatusTags
+  );
+}
+
 export function toDrillFilters(filters: NetworkFilters): DrillFilterInput {
   return {
     keywords: filters.keywords,
-    methodSlugs: filters.methodSlug ? [filters.methodSlug] : [],
+    methodSlugs: filters.methodSlugs,
+    tagSlugs: filters.tagSlugs,
+    statusTagSlugs: filters.statusTagSlugs,
+    tagMode: filters.tagMode,
+    statusMode: filters.statusMode,
   };
+}
+
+export function buildNetworkGraphVisualState(graph: GraphResponse, filters: NetworkFilters): NetworkGraphVisualState {
+  if (graphFiltersMatchNetworkFilters(graph.filters, filters)) {
+    return {
+      canHighlight: hasGraphFilters(graph),
+      activeNodeIds: new Set(graph.nodes.filter((node) => node.active).map((node) => node.id)),
+      activeEdgeIds: new Set(graph.edges.filter((edge) => edge.active).map((edge) => edge.id)),
+    };
+  }
+
+  const pendingMethodHighlight = buildPendingMethodHighlight(graph, filters);
+  if (pendingMethodHighlight) {
+    return {
+      canHighlight: true,
+      activeNodeIds: pendingMethodHighlight.activeNodeIds,
+      activeEdgeIds: pendingMethodHighlight.activeEdgeIds,
+    };
+  }
+
+  return {
+    canHighlight: false,
+    activeNodeIds: new Set(),
+    activeEdgeIds: new Set(),
+  };
+}
+
+function buildPendingMethodHighlight(
+  graph: GraphResponse,
+  filters: NetworkFilters,
+): Omit<NetworkGraphVisualState, "canHighlight"> | null {
+  const normalizedFilters = normalizeNetworkFilters(filters);
+  const selectedMethodSlugs = new Set(normalizedFilters.methodSlugs);
+
+  if (selectedMethodSlugs.size === 0 || hasNonMethodFilters(normalizedFilters)) {
+    return null;
+  }
+
+  const selectedMethodNodeIds = new Set(
+    graph.nodes
+      .filter((node) => node.type === "trainingMethod" && node.slug && selectedMethodSlugs.has(node.slug))
+      .map((node) => node.id),
+  );
+
+  if (selectedMethodNodeIds.size === 0) return null;
+
+  const activeNodeIds = new Set(selectedMethodNodeIds);
+  const activeEdgeIds = new Set<string>();
+
+  for (const edge of graph.edges) {
+    if (edge.type !== "method") continue;
+
+    const connectedDrillNodeId = getDrillNodeConnectedToSelectedMethod(edge, selectedMethodNodeIds);
+    if (!connectedDrillNodeId) continue;
+
+    activeEdgeIds.add(edge.id);
+    activeNodeIds.add(connectedDrillNodeId);
+  }
+
+  return { activeNodeIds, activeEdgeIds };
 }
 
 export function getNetworkErrorMessage(error: unknown): string {
@@ -130,4 +234,27 @@ function listsMatch(left: string[], right: string[]): boolean {
   if (left.length !== right.length) return false;
   const rightValues = new Set(right);
   return left.every((value) => rightValues.has(value));
+}
+
+function hasNonMethodFilters(filters: NetworkFilters): boolean {
+  return filters.keywords.length > 0 || filters.tagSlugs.length > 0 || filters.statusTagSlugs.length > 0;
+}
+
+function getDrillNodeConnectedToSelectedMethod(
+  edge: GraphEdge,
+  selectedMethodNodeIds: Set<string>,
+): string | null {
+  if (selectedMethodNodeIds.has(edge.from) && edge.to.startsWith("drill:")) {
+    return edge.to;
+  }
+
+  if (selectedMethodNodeIds.has(edge.to) && edge.from.startsWith("drill:")) {
+    return edge.from;
+  }
+
+  return null;
+}
+
+function normalizeSlugList(values: string[]): string[] {
+  return [...new Set(values.map((value) => value.trim().toLowerCase()).filter(Boolean))];
 }

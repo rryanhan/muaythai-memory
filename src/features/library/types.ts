@@ -1,4 +1,7 @@
-import type { DrillListResponse, StatusTagDto, TaxonomyResponse } from "@/data";
+import type { DrillListResponse, TaxonomyResponse } from "@/data";
+import type { BuiltInStatusFilter, BuiltInStatusSource } from "@/features/shared/tag-filter-helpers";
+
+export type { BuiltInStatusFilter, BuiltInStatusSource };
 
 export type LibraryFilters = {
   keyword: string;
@@ -23,19 +26,9 @@ export type FilterPreviewState =
   | { status: "loaded"; total: number }
   | { status: "error"; message: string };
 
-export type BuiltInStatusFilter = {
-  id: string;
-  icon: "star" | "target";
-  label: string;
-  slug: string;
-  sortOrder: number;
-};
-
 export const emptyLibraryFilters: LibraryFilters = {
   keyword: "",
   methodSlug: null,
   tagSlugs: [],
   statusTagSlugs: [],
 };
-
-export type BuiltInStatusSource = Pick<StatusTagDto, "id" | "name" | "slug" | "sortOrder">;

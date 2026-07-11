@@ -1,12 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { getGraph, type GraphResponse } from "@/data";
+import { useQuery } from "@tanstack/react-query";
+import { getGraph, getTaxonomy, type GraphResponse } from "@/data";
 import {
   addPreviewKeyword,
-  buildFilterKey,
+  buildGraphRequestKey,
   getNetworkErrorMessage,
   isAbortError,
+  isDefaultLayerSet,
   isEmptyFilterSet,
   normalizeKeyword,
   normalizeNetworkFilters,
@@ -14,7 +16,12 @@ import {
 } from "./network-helpers";
 import { NetworkGraphPanel } from "./NetworkGraphPanel";
 import { NetworkGraphLoading, NetworkStatePanel } from "./NetworkStates";
-import { emptyNetworkFilters, graphLayerOptions, type NetworkFilters, type NetworkLoadState } from "./types";
+import {
+  defaultNetworkLayerOptions,
+  emptyNetworkFilters,
+  type NetworkFilters,
+  type NetworkLoadState,
+} from "./types";
 
 type NetworkViewProps = {
   initialGraph?: GraphResponse;
@@ -23,6 +30,7 @@ type NetworkViewProps = {
 // Owns graph API loading. Graph-local interactions live in NetworkGraphPanel.
 export function NetworkView({ initialGraph }: NetworkViewProps) {
   const [filters, setFilters] = useState<NetworkFilters>(emptyNetworkFilters);
+  const [layerOptions, setLayerOptions] = useState(defaultNetworkLayerOptions);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchDraft, setSearchDraft] = useState("");
   const [retryNonce, setRetryNonce] = useState(0);
@@ -34,7 +42,15 @@ export function NetworkView({ initialGraph }: NetworkViewProps) {
     () => addPreviewKeyword(filters, previewKeyword),
     [filters, previewKeyword],
   );
-  const filterKey = useMemo(() => buildFilterKey(effectiveFilters), [effectiveFilters]);
+  const graphRequestKey = useMemo(
+    () => buildGraphRequestKey(effectiveFilters, layerOptions),
+    [effectiveFilters, layerOptions],
+  );
+  const taxonomyQuery = useQuery({
+    queryKey: ["taxonomy"],
+    queryFn: ({ signal }) => getTaxonomy({ requestInit: { signal } }),
+    staleTime: 10 * 60 * 1000,
+  });
 
   const retryGraph = useCallback(() => {
     setRetryNonce((current) => current + 1);
@@ -45,7 +61,7 @@ export function NetworkView({ initialGraph }: NetworkViewProps) {
   }, []);
 
   useEffect(() => {
-    if (isEmptyFilterSet(effectiveFilters) && initialGraph) {
+    if (isEmptyFilterSet(effectiveFilters) && isDefaultLayerSet(layerOptions) && initialGraph) {
       setLoadState({ status: "loaded", graph: initialGraph, refreshing: false });
       return;
     }
@@ -60,7 +76,7 @@ export function NetworkView({ initialGraph }: NetworkViewProps) {
       return { status: "loading" };
     });
 
-    getGraph(toDrillFilters(effectiveFilters), graphLayerOptions, { requestInit: { signal: controller.signal } })
+    getGraph(toDrillFilters(effectiveFilters), layerOptions, { requestInit: { signal: controller.signal } })
       .then((graph) => setLoadState({ status: "loaded", graph, refreshing: false }))
       .catch((error: unknown) => {
         if (isAbortError(error)) return;
@@ -75,7 +91,7 @@ export function NetworkView({ initialGraph }: NetworkViewProps) {
       });
 
     return () => controller.abort();
-  }, [filterKey, initialGraph, retryNonce]);
+  }, [graphRequestKey, initialGraph, layerOptions, retryNonce]);
 
   return (
     <section className="network-view" aria-label="Network view">
@@ -94,6 +110,10 @@ export function NetworkView({ initialGraph }: NetworkViewProps) {
           graph={loadState.graph}
           filters={filters}
           effectiveFilters={effectiveFilters}
+          layerOptions={layerOptions}
+          taxonomy={taxonomyQuery.data}
+          taxonomyLoading={taxonomyQuery.isLoading}
+          taxonomyErrorMessage={taxonomyQuery.error ? getNetworkErrorMessage(taxonomyQuery.error) : undefined}
           previewKeyword={previewKeyword}
           searchOpen={searchOpen}
           searchDraft={searchDraft}
@@ -103,6 +123,8 @@ export function NetworkView({ initialGraph }: NetworkViewProps) {
           onSearchOpenChange={setSearchOpen}
           onSearchDraftChange={setSearchDraft}
           onUpdateFilters={updateFilters}
+          onLayerOptionsChange={setLayerOptions}
+          onRetryTaxonomy={() => void taxonomyQuery.refetch()}
         />
       )}
     </section>

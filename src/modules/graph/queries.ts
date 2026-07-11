@@ -22,10 +22,18 @@ export async function getMuayThaiGraph(
   const allDrills = drillList.drills;
   const matchedDrills = allDrills.filter((drill) => drillMatchesFilters(drill, normalizedFilters));
   const hasActiveFilters = hasFilters(normalizedFilters);
+  const hasMethodFilters = normalizedFilters.methodSlugs.length > 0;
   const matchedDrillIds = new Set(matchedDrills.map((drill) => drill.id));
-  const activeMethodSlugs = collectMethodSlugs(matchedDrills, normalizedFilters.methodSlugs);
-  const activeTagSlugs = collectTagSlugs(matchedDrills, normalizedFilters.tagSlugs);
-  const activeStatusSlugs = collectStatusSlugs(matchedDrills, normalizedFilters.statusTagSlugs);
+  const layerDrills = hasActiveFilters ? matchedDrills : allDrills;
+  const layerDrillIds = new Set(layerDrills.map((drill) => drill.id));
+  const selectedMethodSlugs = new Set(normalizedFilters.methodSlugs);
+  const activeMethodSlugs = hasMethodFilters ? selectedMethodSlugs : collectMethodSlugs(matchedDrills, []);
+  const visibleTagSlugs = collectTagSlugs(layerDrills, normalizedFilters.tagSlugs);
+  const visibleStatusSlugs = collectStatusSlugs(layerDrills, normalizedFilters.statusTagSlugs);
+  const activeTagSlugs = hasActiveFilters ? collectTagSlugs(matchedDrills, normalizedFilters.tagSlugs) : new Set<string>();
+  const activeStatusSlugs = hasActiveFilters
+    ? collectStatusSlugs(matchedDrills, normalizedFilters.statusTagSlugs)
+    : new Set<string>();
   const nodes: GraphNode[] = [];
   const edges: GraphEdge[] = [];
 
@@ -40,7 +48,7 @@ export async function getMuayThaiGraph(
       label: method.name,
       slug: method.slug,
       iconKey: method.iconKey,
-      active: !hasActiveFilters || activeMethodSlugs.has(method.slug) || selected,
+      active: hasMethodFilters ? selected : !hasActiveFilters || activeMethodSlugs.has(method.slug),
       matched: selected,
       selected,
     });
@@ -74,6 +82,8 @@ export async function getMuayThaiGraph(
   if (normalizedOptions.showTags) {
     for (const tag of taxonomy.standardTags) {
       const selected = normalizedFilters.tagSlugs.includes(tag.slug);
+      if (!visibleTagSlugs.has(tag.slug) && !selected) continue;
+
       nodes.push({
         id: tagNodeId(tag.slug),
         entityId: tag.id,
@@ -86,11 +96,17 @@ export async function getMuayThaiGraph(
       });
     }
 
-    addTagEdges(edges, allDrills, "tag", hasActiveFilters, matchedDrillIds, activeTagSlugs);
+    addTagEdges(edges, layerDrills, "tag", hasActiveFilters, matchedDrillIds, activeTagSlugs);
   }
 
   if (normalizedOptions.showCustomTags) {
-    const customTagsBySlug = new Map(allDrills.flatMap((drill) => drill.customTags).map((tag) => [tag.slug, tag]));
+    const customTagsBySlug = new Map(layerDrills.flatMap((drill) => drill.customTags).map((tag) => [tag.slug, tag]));
+
+    for (const tag of taxonomy.customTags) {
+      if (normalizedFilters.tagSlugs.includes(tag.slug)) {
+        customTagsBySlug.set(tag.slug, tag);
+      }
+    }
 
     for (const tag of customTagsBySlug.values()) {
       const selected = normalizedFilters.tagSlugs.includes(tag.slug);
@@ -106,12 +122,14 @@ export async function getMuayThaiGraph(
       });
     }
 
-    addTagEdges(edges, allDrills, "customTag", hasActiveFilters, matchedDrillIds, activeTagSlugs);
+    addTagEdges(edges, layerDrills, "customTag", hasActiveFilters, matchedDrillIds, activeTagSlugs);
   }
 
   if (normalizedOptions.showStatusTags) {
     for (const status of taxonomy.statusTags) {
       const selected = normalizedFilters.statusTagSlugs.includes(status.slug);
+      if (!visibleStatusSlugs.has(status.slug) && !selected) continue;
+
       nodes.push({
         id: statusNodeId(status.slug),
         entityId: status.id,
@@ -124,10 +142,12 @@ export async function getMuayThaiGraph(
       });
     }
 
-    for (const drill of allDrills) {
+    for (const drill of layerDrills) {
       const drillActive = !hasActiveFilters || matchedDrillIds.has(drill.id);
 
       for (const status of drill.statusTags) {
+        if (!visibleStatusSlugs.has(status.slug) && !normalizedFilters.statusTagSlugs.includes(status.slug)) continue;
+
         edges.push({
           id: edgeId(statusNodeId(status.slug), drillNodeId(drill.id), "statusTag"),
           from: statusNodeId(status.slug),

@@ -588,86 +588,282 @@ button {
   color: var(--muted);
 }
 
-.network-controls-panel {
-  position: absolute;
-  z-index: 19;
-  right: 20px;
-  bottom: 250px;
-  left: 20px;
-  display: grid;
-  gap: 12px;
-  border: 1px solid rgba(216, 214, 204, 0.92);
-  border-radius: 8px;
-  padding: 16px;
-  background: rgba(255, 255, 255, 0.94);
-  box-shadow: 0 18px 44px rgba(23, 23, 23, 0.1);
+.network-controls-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  background: rgba(23, 23, 23, 0.28);
 }
 
-.network-controls-panel header,
-.network-control-row {
+.network-controls-sheet {
+  position: fixed;
+  z-index: 100;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: grid;
+  grid-template-rows: auto auto auto minmax(0, 1fr) auto;
+  gap: 14px;
+  width: min(100%, 480px);
+  max-height: min(78dvh, 650px);
+  margin: 0 auto;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 8px 8px 0 0;
+  padding: 10px 18px 22px;
+  background: var(--surface);
+  box-shadow: 0 -18px 48px rgba(23, 23, 23, 0.14);
+  outline: none;
+}
+
+.network-controls-sheet-header {
   display: flex;
-  align-items: center;
+  align-items: start;
   justify-content: space-between;
   gap: 16px;
 }
 
-.network-controls-panel p {
+.network-controls-sheet-header h2 {
   margin: 0;
+  font-size: 23px;
+  line-height: 1;
 }
 
-.network-controls-panel header button,
-.network-clear-focus {
+.network-controls-sheet-header button,
+.network-filter-state button {
   border: 0;
-  padding: 0;
+  padding: 2px 0;
   background: transparent;
   color: var(--muted);
+  font-size: 16px;
   font-weight: 700;
   cursor: pointer;
 }
 
-.network-control-row {
-  border-top: 1px solid var(--border);
-  padding-top: 12px;
+.network-controls-section {
+  display: grid;
+  gap: 10px;
+  min-height: 0;
+}
+
+.network-controls-tag-section {
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.section-label {
+  margin: 0;
   color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.network-layer-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 30px;
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 650;
+}
+
+.network-layer-toggle input {
+  width: 17px;
+  height: 17px;
+  accent-color: var(--accent);
+}
+
+.network-tag-filter {
+  display: grid;
+  gap: 10px;
+  min-height: 0;
+}
+
+.network-filter-search {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0 14px;
+  background: var(--bg);
+}
+
+.network-filter-search .search-mark {
+  width: 18px;
+  height: 18px;
+}
+
+.network-filter-search .search-mark::after {
+  right: -5px;
+  width: 8px;
+}
+
+.network-filter-search input {
+  min-width: 0;
+  width: 100%;
+  height: 40px;
+  border: 0;
+  outline: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
   font-size: 16px;
 }
 
-.network-control-row strong {
-  color: var(--text);
-}
-
-.network-method-filter-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.network-method-filter-list button {
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  padding: 8px 11px;
-  background: rgba(245, 244, 239, 0.75);
+.network-filter-search input::placeholder {
   color: var(--muted);
-  font-size: 14px;
-  font-weight: 750;
+}
+
+.network-select-box-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0 14px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 800;
+  text-align: left;
   cursor: pointer;
 }
 
-.network-method-filter-list button[data-selected="true"] {
-  border-color: rgba(209, 74, 50, 0.45);
-  background: rgba(244, 216, 208, 0.7);
+.network-select-box-trigger[data-active="true"] {
+  border-color: rgba(209, 74, 50, 0.36);
   color: var(--accent);
+  background: rgba(244, 216, 208, 0.2);
 }
 
-.network-clear-focus {
-  justify-self: start;
-  color: var(--accent);
+.network-select-box-trigger svg {
+  transition: transform 160ms ease;
 }
 
-.network-clear-focus:disabled {
+.network-select-box-trigger[aria-expanded="true"] svg {
+  transform: rotate(180deg);
+}
+
+.network-tag-select {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+  min-height: 0;
+  max-height: min(42dvh, 370px);
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 12px;
+  background: var(--surface);
+}
+
+.network-tag-group {
+  border-top: 1px solid rgba(214, 209, 198, 0.78);
+  padding: 12px 0;
+  background: transparent;
+}
+
+.network-tag-group:first-child {
+  border-top: 0;
+}
+
+.network-tag-group h3 {
+  margin: 0 0 7px;
   color: var(--muted);
-  cursor: not-allowed;
-  opacity: 0.5;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.network-tag-group div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0;
+}
+
+.network-tag-group button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 28px;
+  border: 0;
+  border-radius: 5px;
+  padding: 0 7px;
+  background: transparent;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.network-saved-list-icon {
+  flex: 0 0 auto;
+  color: var(--accent);
+}
+
+.network-tag-group button:not(:last-child) {
+  margin-right: 11px;
+}
+
+.network-tag-group button:not(:last-child)::after {
+  position: absolute;
+  top: 50%;
+  right: -8px;
+  color: rgba(100, 100, 95, 0.42);
+  font-weight: 700;
+  content: "|";
+  transform: translateY(-52%);
+}
+
+.network-tag-group button:hover {
+  background: rgba(37, 109, 133, 0.055);
+}
+
+.network-tag-group button[data-selected="true"] {
+  background: rgba(244, 216, 208, 0.72);
+  color: var(--accent);
+  font-weight: 800;
+}
+
+.network-filter-state {
+  display: grid;
+  gap: 10px;
+  padding: 12px 0;
+}
+
+.network-filter-state p,
+.network-tag-empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.network-controls-reset {
+  min-height: 42px;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  background: var(--accent);
+  color: white;
+  font-size: 15px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.network-controls-reset:disabled {
+  border-color: var(--border);
+  background: var(--surface);
+  color: var(--muted);
+  cursor: default;
+  opacity: 0.56;
 }
 
 .drill-detail-backdrop {

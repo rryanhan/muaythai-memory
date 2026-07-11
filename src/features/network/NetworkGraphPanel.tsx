@@ -1,26 +1,32 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import { getDrill, type GraphResponse } from "@/data";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type Dispatch, type SetStateAction } from "react";
+import { getDrill, type GraphOptions, type GraphResponse, type TagDto, type TaxonomyResponse } from "@/data";
 import { badgeByIconKey } from "@/components/shared/context-badges";
 import { DrillDetailSheet } from "@/features/drills/DrillDetailSheet";
+import { getBuiltInStatusFilters, type BuiltInStatusFilter } from "@/features/shared/tag-filter-helpers";
+import { NetworkControlsSheet } from "./NetworkControlsSheet";
 import { NetworkForceGraph } from "./NetworkForceGraph";
 import {
+  buildNetworkGraphVisualState,
   getDrillDetailErrorMessage,
   graphFiltersMatchNetworkFilters,
   hasActiveFilters,
-  hasGraphFilters,
   isAbortError,
   normalizeKeyword,
   sortMethods,
 } from "./network-helpers";
-import { emptyNetworkFilters, type DrillDetailLoadState, type NetworkFilters } from "./types";
+import { type DrillDetailLoadState, type NetworkFilters } from "./types";
 import { NetworkStatePanel } from "./NetworkStates";
 
 type NetworkGraphPanelProps = {
   graph: GraphResponse;
   filters: NetworkFilters;
   effectiveFilters: NetworkFilters;
+  layerOptions: GraphOptions;
+  taxonomy?: TaxonomyResponse;
+  taxonomyLoading: boolean;
+  taxonomyErrorMessage?: string;
   previewKeyword: string;
   searchOpen: boolean;
   searchDraft: string;
@@ -30,6 +36,8 @@ type NetworkGraphPanelProps = {
   onSearchOpenChange: (open: boolean) => void;
   onSearchDraftChange: (value: string) => void;
   onUpdateFilters: (updater: (current: NetworkFilters) => NetworkFilters) => void;
+  onLayerOptionsChange: Dispatch<SetStateAction<GraphOptions>>;
+  onRetryTaxonomy: () => void;
 };
 
 // Owns graph-local UI state that should not reset the outer graph fetch loop.
@@ -37,6 +45,10 @@ export function NetworkGraphPanel({
   graph,
   filters,
   effectiveFilters,
+  layerOptions,
+  taxonomy,
+  taxonomyLoading,
+  taxonomyErrorMessage,
   previewKeyword,
   searchOpen,
   searchDraft,
@@ -46,8 +58,12 @@ export function NetworkGraphPanel({
   onSearchOpenChange,
   onSearchDraftChange,
   onUpdateFilters,
+  onLayerOptionsChange,
+  onRetryTaxonomy,
 }: NetworkGraphPanelProps) {
   const [controlsOpen, setControlsOpen] = useState(false);
+  const [tagSearch, setTagSearch] = useState("");
+  const [tagSelectOpen, setTagSelectOpen] = useState(false);
   const [selectedDrillId, setSelectedDrillId] = useState<string | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const [detailRetryNonce, setDetailRetryNonce] = useState(0);
@@ -60,13 +76,26 @@ export function NetworkGraphPanel({
   const activeDrillCount = drills.filter((node) => node.active).length;
   const hasVisibleFilters = hasActiveFilters(effectiveFilters);
   const previewIsCommitted = Boolean(previewKeyword && filters.keywords.includes(previewKeyword));
-  const graphHasFilters = hasGraphFilters(graph);
   const graphMatchesFilters = graphFiltersMatchNetworkFilters(graph.filters, effectiveFilters);
-  const graphCanHighlight = graphHasFilters && graphMatchesFilters;
-  const selectedMethod = filters.methodSlug
-    ? methods.find((method) => method.slug === filters.methodSlug)
-    : undefined;
-  const selectedMethodCount = graphMatchesFilters ? ` (${activeDrillCount})` : "";
+  const graphVisualState = useMemo(
+    () => buildNetworkGraphVisualState(graph, effectiveFilters),
+    [effectiveFilters, graph],
+  );
+  const selectedMethods = filters.methodSlugs
+    .map((slug) => methods.find((method) => method.slug === slug))
+    .filter((method): method is (typeof methods)[number] => Boolean(method));
+  const selectedTags = useMemo(() => {
+    const allTags = [...(taxonomy?.standardTags ?? []), ...(taxonomy?.customTags ?? [])];
+    return filters.tagSlugs
+      .map((slug) => allTags.find((tag) => tag.slug === slug) ?? toFallbackTag(slug))
+      .filter((tag): tag is TagDto => Boolean(tag));
+  }, [filters.tagSlugs, taxonomy]);
+  const builtInStatuses = useMemo(() => getBuiltInStatusFilters(taxonomy?.statusTags ?? []), [taxonomy]);
+  const selectedStatuses = useMemo(() => {
+    return filters.statusTagSlugs
+      .map((slug) => builtInStatuses.find((status) => status.slug === slug) ?? toFallbackStatus(slug))
+      .filter((status): status is BuiltInStatusFilter => Boolean(status));
+  }, [builtInStatuses, filters.statusTagSlugs]);
 
   useEffect(() => {
     if (!selectedDrillId) {
@@ -189,14 +218,10 @@ export function NetworkGraphPanel({
 
     onUpdateFilters((current) => ({
       ...current,
-      methodSlug: current.methodSlug === slug ? null : slug,
+      methodSlugs: current.methodSlugs.includes(slug)
+        ? current.methodSlugs.filter((methodSlug) => methodSlug !== slug)
+        : [...current.methodSlugs, slug],
     }));
-  }
-
-  function clearAllFilters() {
-    onSearchDraftChange("");
-    onSearchOpenChange(false);
-    onUpdateFilters(() => emptyNetworkFilters);
   }
 
   function openDrillDetail(drillId: string) {
@@ -227,17 +252,22 @@ export function NetworkGraphPanel({
           <div className="network-chip-row">
             {hasVisibleFilters ? (
               <>
-                {selectedMethod && (
+                {selectedMethods.map((method) => (
                   <button
+                    key={method.slug}
                     type="button"
                     className="network-filter-chip"
-                    onClick={() => onUpdateFilters((current) => ({ ...current, methodSlug: null }))}
+                    onClick={() =>
+                      onUpdateFilters((current) => ({
+                        ...current,
+                        methodSlugs: current.methodSlugs.filter((slug) => slug !== method.slug),
+                      }))
+                    }
                   >
-                    Method: {selectedMethod.label}
-                    {selectedMethodCount}
+                    Method: {method.label}
                     <span aria-hidden="true">x</span>
                   </button>
-                )}
+                ))}
                 {filters.keywords.map((keyword) => (
                   <button
                     key={keyword}
@@ -251,6 +281,38 @@ export function NetworkGraphPanel({
                     }
                   >
                     Search: {keyword}
+                    <span aria-hidden="true">x</span>
+                  </button>
+                ))}
+                {selectedTags.map((tag) => (
+                  <button
+                    key={tag.slug}
+                    type="button"
+                    className="network-filter-chip"
+                    onClick={() =>
+                      onUpdateFilters((current) => ({
+                        ...current,
+                        tagSlugs: current.tagSlugs.filter((slug) => slug !== tag.slug),
+                      }))
+                    }
+                  >
+                    Tag: {tag.name}
+                    <span aria-hidden="true">x</span>
+                  </button>
+                ))}
+                {selectedStatuses.map((status) => (
+                  <button
+                    key={status.slug}
+                    type="button"
+                    className="network-filter-chip"
+                    onClick={() =>
+                      onUpdateFilters((current) => ({
+                        ...current,
+                        statusTagSlugs: current.statusTagSlugs.filter((slug) => slug !== status.slug),
+                      }))
+                    }
+                  >
+                    Saved: {status.label}
                     <span aria-hidden="true">x</span>
                   </button>
                 ))}
@@ -275,8 +337,8 @@ export function NetworkGraphPanel({
           <NetworkForceGraph
             graph={graph}
             badgeByIconKey={badgeByIconKey}
-            focusedMethodSlug={filters.methodSlug}
-            graphCanHighlight={graphCanHighlight}
+            focusedMethodSlugs={filters.methodSlugs}
+            visualState={graphVisualState}
             onMethodSelect={toggleMethod}
             onDrillSelect={openDrillDetail}
           />
@@ -303,48 +365,28 @@ export function NetworkGraphPanel({
         </form>
       )}
 
-      {controlsOpen && (
-        <div className="network-controls-panel" role="dialog" aria-label="Network controls">
-          <header>
-            <p className="eyebrow">Network Controls</p>
-            <button type="button" onClick={() => setControlsOpen(false)}>
-              Close
-            </button>
-          </header>
-          <div className="network-control-row">
-            <span>Training Method</span>
-            <strong>{selectedMethod?.label ?? "None"}</strong>
-          </div>
-          <div className="network-method-filter-list" aria-label="Training Method filters">
-            {methods.map((method) => (
-              <button
-                key={method.id}
-                type="button"
-                data-selected={method.slug === filters.methodSlug}
-                onClick={() => toggleMethod(method.slug)}
-              >
-                {method.label}
-              </button>
-            ))}
-          </div>
-          <button
-            type="button"
-            className="network-clear-focus"
-            disabled={!hasVisibleFilters}
-            onClick={clearAllFilters}
-          >
-            Clear filters
-          </button>
-          <div className="network-control-row">
-            <span>Tags</span>
-            <strong>Off</strong>
-          </div>
-          <div className="network-control-row">
-            <span>Status</span>
-            <strong>Off</strong>
-          </div>
-        </div>
-      )}
+      <NetworkControlsSheet
+        open={controlsOpen}
+        onOpenChange={(open) => {
+          setControlsOpen(open);
+          if (!open) {
+            setTagSearch("");
+            setTagSelectOpen(false);
+          }
+        }}
+        filters={filters}
+        layerOptions={layerOptions}
+        taxonomy={taxonomy}
+        taxonomyLoading={taxonomyLoading}
+        taxonomyErrorMessage={taxonomyErrorMessage}
+        tagSearch={tagSearch}
+        tagSelectOpen={tagSelectOpen}
+        onTagSearchChange={setTagSearch}
+        onTagSelectOpenChange={setTagSelectOpen}
+        onUpdateFilters={onUpdateFilters}
+        onLayerOptionsChange={onLayerOptionsChange}
+        onRetryTaxonomy={onRetryTaxonomy}
+      />
 
       <div className="network-action-rail" aria-label="Network actions">
         <button
@@ -382,4 +424,29 @@ export function NetworkGraphPanel({
       )}
     </>
   );
+}
+
+function toFallbackTag(slug: string): TagDto {
+  return {
+    id: slug,
+    name: slug
+      .split("-")
+      .filter(Boolean)
+      .map((part) => part[0]?.toUpperCase() + part.slice(1))
+      .join(" "),
+    slug,
+    kind: "standard",
+    sortOrder: 0,
+    category: null,
+  };
+}
+
+function toFallbackStatus(slug: string): BuiltInStatusFilter {
+  return {
+    id: slug,
+    icon: slug === "drill-back-in" ? "target" : "star",
+    label: slug === "drill-back-in" ? "Drill Back In" : "Favourite",
+    slug,
+    sortOrder: 0,
+  };
 }
