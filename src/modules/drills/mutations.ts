@@ -11,7 +11,13 @@ import {
   trainingMethods,
 } from "@/db/schema";
 import { getCurrentUserForWrite } from "@/modules/users";
-import { createDrillInputSchema, type CreateDrillInput, type DrillDetail } from "./contracts";
+import {
+  createDrillInputSchema,
+  updateDrillInputSchema,
+  type CreateDrillInput,
+  type DrillDetail,
+  type UpdateDrillInput,
+} from "./contracts";
 import { getDrillById } from "./queries";
 
 export class CreateDrillValidationError extends Error {
@@ -21,6 +27,18 @@ export class CreateDrillValidationError extends Error {
     super("Drill could not be created.");
     this.name = "CreateDrillValidationError";
     this.issues = issues;
+  }
+}
+
+export class UpdateDrillValidationError extends Error {
+  readonly issues: string[];
+  readonly status: 400 | 404;
+
+  constructor(issues: string[], status: 400 | 404 = 400) {
+    super("Drill could not be updated.");
+    this.name = "UpdateDrillValidationError";
+    this.issues = issues;
+    this.status = status;
   }
 }
 
@@ -97,6 +115,88 @@ export async function createDrill(rawInput: CreateDrillInput): Promise<DrillDeta
 
   const drillDetail = await getDrillById(createdDrillId);
   if (!drillDetail) throw new Error("Created drill could not be loaded.");
+  return drillDetail;
+}
+
+export async function updateDrill(id: string, rawInput: UpdateDrillInput): Promise<DrillDetail> {
+  const input = updateDrillInputSchema.parse(rawInput);
+  const trainingMethodSlugs = unique(input.trainingMethodSlugs);
+  const tagSlugs = unique(input.tagSlugs);
+  const statusSlugs = unique(input.statusTagSlugs);
+  const [methodRows, tagRows, statusRows] = await Promise.all([
+    getActiveTrainingMethodsBySlug(trainingMethodSlugs),
+    getActiveTagsBySlug(tagSlugs),
+    getActiveStatusTagsBySlug(statusSlugs),
+  ]);
+  const issues = [
+    ...getMissingSlugIssues("Training Method", trainingMethodSlugs, methodRows.map((method) => method.slug)),
+    ...getMissingSlugIssues("Tag", tagSlugs, tagRows.map((tag) => tag.slug)),
+    ...getMissingSlugIssues("Status", statusSlugs, statusRows.map((status) => status.slug)),
+  ];
+
+  if (issues.length > 0) {
+    throw new UpdateDrillValidationError(issues);
+  }
+
+  const user = await getCurrentUserForWrite();
+
+  await db.transaction(async (tx) => {
+    const [updatedDrill] = await tx
+      .update(drills)
+      .set({
+        title: input.title,
+        summary: input.summary ?? "",
+        notes: input.notes,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(drills.id, id), eq(drills.userId, user.id)))
+      .returning({ id: drills.id });
+
+    if (!updatedDrill) {
+      throw new UpdateDrillValidationError(["Drill not found."], 404);
+    }
+
+    await tx.delete(drillSteps).where(eq(drillSteps.drillId, id));
+    await tx.delete(drillTrainingMethods).where(eq(drillTrainingMethods.drillId, id));
+    await tx.delete(drillTags).where(eq(drillTags.drillId, id));
+    await tx.delete(drillStatusTags).where(eq(drillStatusTags.drillId, id));
+
+    await tx.insert(drillSteps).values(
+      input.steps.map((body, index) => ({
+        drillId: id,
+        position: index + 1,
+        body,
+      })),
+    );
+
+    await tx.insert(drillTrainingMethods).values(
+      methodRows.map((method) => ({
+        drillId: id,
+        trainingMethodId: method.id,
+      })),
+    );
+
+    if (tagRows.length > 0) {
+      await tx.insert(drillTags).values(
+        tagRows.map((tag) => ({
+          drillId: id,
+          tagId: tag.id,
+        })),
+      );
+    }
+
+    if (statusRows.length > 0) {
+      await tx.insert(drillStatusTags).values(
+        statusRows.map((status) => ({
+          drillId: id,
+          statusTagId: status.id,
+        })),
+      );
+    }
+  });
+
+  const drillDetail = await getDrillById(id);
+  if (!drillDetail) throw new UpdateDrillValidationError(["Updated drill could not be loaded."], 404);
   return drillDetail;
 }
 

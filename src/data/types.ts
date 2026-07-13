@@ -5,6 +5,7 @@ import type {
   DrillListResponse,
   DrillSummary,
   FilterMode,
+  UpdateDrillInput,
 } from "@/modules/drills/contracts";
 import type { GraphEdge, GraphNode, GraphOptions, GraphResponse } from "@/modules/graph/contracts";
 import type { StatusTagDto, TagCategoryDto, TagDto, TaxonomyResponse, TrainingMethodDto } from "@/modules/taxonomy/contracts";
@@ -27,6 +28,7 @@ export type {
   TagDto,
   TaxonomyResponse,
   TrainingMethodDto,
+  UpdateDrillInput,
 };
 
 // UI controls may separate standard and custom tags even though the backend

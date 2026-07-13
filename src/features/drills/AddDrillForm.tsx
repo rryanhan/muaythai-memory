@@ -7,36 +7,62 @@ import { badgeByIconKey } from "@/components/shared/context-badges";
 import {
   createDrill,
   getTaxonomy,
+  updateDrill,
   type ApiError,
+  type DrillDetail,
   type StatusTagDto,
   type TrainingMethodDto,
 } from "@/data";
 import { AddDrillSkeleton } from "./AddDrillSkeleton";
 
-export function AddDrillForm() {
+type AddDrillFormProps = {
+  mode?: "create" | "edit";
+  initialDrill?: DrillDetail;
+};
+
+export function AddDrillForm({ mode = "create", initialDrill }: AddDrillFormProps) {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const [title, setTitle] = useState("");
-  const [summary, setSummary] = useState("");
-  const [notes, setNotes] = useState("");
-  const [steps, setSteps] = useState([""]);
-  const [trainingMethodSlugs, setTrainingMethodSlugs] = useState<string[]>([]);
-  const [tagSlugs, setTagSlugs] = useState<string[]>([]);
-  const [statusTagSlugs, setStatusTagSlugs] = useState<string[]>([]);
+  const isEditMode = mode === "edit";
+  const [title, setTitle] = useState(initialDrill?.title ?? "");
+  const [summary, setSummary] = useState(initialDrill?.summary ?? "");
+  const [notes, setNotes] = useState(initialDrill?.notes ?? "");
+  const [steps, setSteps] = useState(() => {
+    const initialSteps = initialDrill?.steps.map((step) => step.body).filter(Boolean) ?? [];
+    return initialSteps.length > 0 ? initialSteps : [""];
+  });
+  const [trainingMethodSlugs, setTrainingMethodSlugs] = useState<string[]>(
+    () => initialDrill?.trainingMethods.map((method) => method.slug) ?? [],
+  );
+  const [tagSlugs, setTagSlugs] = useState<string[]>(
+    () => [...(initialDrill?.tags ?? []), ...(initialDrill?.customTags ?? [])].map((tag) => tag.slug),
+  );
+  const [statusTagSlugs, setStatusTagSlugs] = useState<string[]>(
+    () => initialDrill?.statusTags.map((status) => status.slug) ?? [],
+  );
   const [formMessage, setFormMessage] = useState<string | null>(null);
   const taxonomyQuery = useQuery({
     queryKey: ["taxonomy"],
     queryFn: ({ signal }) => getTaxonomy({ requestInit: { signal } }),
     staleTime: 10 * 60 * 1000,
   });
-  const createMutation = useMutation({
-    mutationFn: (input: Parameters<typeof createDrill>[0]) => createDrill(input),
+  const saveMutation = useMutation({
+    mutationFn: (input: Parameters<typeof createDrill>[0]) => {
+      if (isEditMode) {
+        if (!initialDrill) throw new Error("Missing drill to update.");
+        return updateDrill(initialDrill.id, input);
+      }
+
+      return createDrill(input);
+    },
     onSuccess: async (drill) => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["drills"] }),
         queryClient.invalidateQueries({ queryKey: ["graph"] }),
+        queryClient.invalidateQueries({ queryKey: ["drill", drill.id] }),
       ]);
       router.push(`/drills/${drill.id}`);
+      router.refresh();
     },
   });
   const taxonomy = taxonomyQuery.data;
@@ -74,7 +100,7 @@ export function AddDrillForm() {
     }
 
     setFormMessage(null);
-    createMutation.mutate({
+    saveMutation.mutate({
       title,
       summary,
       notes,
@@ -213,16 +239,16 @@ export function AddDrillForm() {
         </div>
       </section>
 
-      {(formMessage || createMutation.isError) && (
-        <p className="add-drill-error">{formMessage ?? getMutationErrorMessage(createMutation.error)}</p>
+      {(formMessage || saveMutation.isError) && (
+        <p className="add-drill-error">{formMessage ?? getMutationErrorMessage(saveMutation.error)}</p>
       )}
 
       <div className="add-drill-actions">
         <button type="button" onClick={() => router.back()}>
           Cancel
         </button>
-        <button type="submit" disabled={createMutation.isPending}>
-          {createMutation.isPending ? "Saving" : "Save drill"}
+        <button type="submit" disabled={saveMutation.isPending}>
+          {saveMutation.isPending ? (isEditMode ? "Updating" : "Saving") : isEditMode ? "Update drill" : "Save drill"}
         </button>
       </div>
     </form>

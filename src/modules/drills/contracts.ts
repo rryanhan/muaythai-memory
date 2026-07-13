@@ -73,6 +73,10 @@ export const createDrillInputSchema = z.object({
   statusTagSlugs: z.array(slugSchema).default([]),
 });
 
+// Edit Drill v1 uses the same editable fields as manual creation. The API
+// treats updates as a full replacement of relationships and ordered steps.
+export const updateDrillInputSchema = createDrillInputSchema;
+
 export type FilterMode = z.infer<typeof filterModeSchema>;
 export type DrillFilters = z.infer<typeof drillFiltersSchema>;
 export type DrillSummary = z.infer<typeof drillSummarySchema>;
@@ -80,6 +84,7 @@ export type DrillDetail = z.infer<typeof drillDetailSchema>;
 export type DrillListResponse = z.infer<typeof drillListResponseSchema>;
 export type DrillDetailResponse = z.infer<typeof drillDetailResponseSchema>;
 export type CreateDrillInput = z.input<typeof createDrillInputSchema>;
+export type UpdateDrillInput = z.input<typeof updateDrillInputSchema>;
 
 // Route handlers accept a few alias names so the frontend can evolve without
 // forcing a backend rewrite for every query-string naming change.

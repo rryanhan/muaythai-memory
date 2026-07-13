@@ -1,12 +1,10 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { cache } from "react";
 import { z } from "zod";
-import { badgeByIconKey } from "@/components/shared/context-badges";
-import { DrillDetailBackButton } from "@/features/drills/DrillDetailBackButton";
-import { DrillDetailContent } from "@/features/drills/DrillDetailContent";
 import { RoutedBottomNav } from "@/components/navigation/RoutedBottomNav";
+import { DrillDetailBackButton } from "@/features/drills/DrillDetailBackButton";
+import { AddDrillForm } from "@/features/drills/AddDrillForm";
 import { getDrillById } from "@/modules/drills/queries";
 
 export const dynamic = "force-dynamic";
@@ -18,28 +16,28 @@ const paramsSchema = z.object({
 
 const getCachedDrillById = cache(getDrillById);
 
-type DrillDetailPageProps = {
+type EditDrillPageProps = {
   params: Promise<{ id: string }>;
 };
 
-export async function generateMetadata({ params }: DrillDetailPageProps): Promise<Metadata> {
+export async function generateMetadata({ params }: EditDrillPageProps): Promise<Metadata> {
   const parsedParams = paramsSchema.safeParse(await params);
 
   if (!parsedParams.success) {
     return {
-      title: "Drill not found | Muay Thai Memory",
+      title: "Edit drill | Muay Thai Memory",
     };
   }
 
   const drill = await getCachedDrillById(parsedParams.data.id);
 
   return {
-    title: drill ? `${drill.title} | Muay Thai Memory` : "Drill not found | Muay Thai Memory",
-    description: drill?.summary.trim() || "A saved Muay Thai drill.",
+    title: drill ? `Edit ${drill.title} | Muay Thai Memory` : "Edit drill | Muay Thai Memory",
+    description: "Update a saved Muay Thai drill.",
   };
 }
 
-export default async function DrillDetailPage({ params }: DrillDetailPageProps) {
+export default async function EditDrillPage({ params }: EditDrillPageProps) {
   const parsedParams = paramsSchema.safeParse(await params);
 
   if (!parsedParams.success) {
@@ -53,16 +51,17 @@ export default async function DrillDetailPage({ params }: DrillDetailPageProps) 
   }
 
   return (
-    <main className="drill-detail-page">
+    <main className="add-drill-page">
       <div className="drill-detail-page-grid" aria-hidden="true" />
       <header className="drill-detail-page-header">
         <DrillDetailBackButton />
-        <p className="eyebrow">Drill Record</p>
-        <Link className="drill-detail-page-edit" href={`/drills/${drill.id}/edit`} prefetch>
-          Edit
-        </Link>
+        <p className="eyebrow">Edit Drill</p>
       </header>
-      <DrillDetailContent drill={drill} badgeByIconKey={badgeByIconKey} />
+      <section className="add-drill-heading">
+        <h1>Edit Drill</h1>
+        <p>Adjust the steps, notes, tags, and saved-list markers.</p>
+      </section>
+      <AddDrillForm mode="edit" initialDrill={drill} />
       <RoutedBottomNav activeView="library" />
     </main>
   );

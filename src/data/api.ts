@@ -11,6 +11,7 @@ import type {
   GraphOptionsInput,
   GraphResponse,
   TaxonomyResponse,
+  UpdateDrillInput,
 } from "./types";
 
 // Frontend-facing API client for the Muay Thai drill app. These functions are
@@ -69,6 +70,23 @@ export async function getDrill(id: string, options: ApiClientOptions = {}): Prom
 export async function createDrill(input: CreateDrillInput, options: ApiClientOptions = {}): Promise<DrillDetail> {
   const response = await fetchJson("/api/drills", drillDetailResponseSchema, options, {
     method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(input),
+  });
+
+  return response.drill;
+}
+
+export async function updateDrill(
+  id: string,
+  input: UpdateDrillInput,
+  options: ApiClientOptions = {},
+): Promise<DrillDetail> {
+  const drillId = z.string().uuid().parse(id);
+  const response = await fetchJson(`/api/drills/${encodeURIComponent(drillId)}`, drillDetailResponseSchema, options, {
+    method: "PATCH",
     headers: {
       "Content-Type": "application/json",
     },

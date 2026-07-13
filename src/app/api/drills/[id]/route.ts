@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z, ZodError } from "zod";
-import { drillDetailResponseSchema } from "@/modules/drills/contracts";
+import { drillDetailResponseSchema, updateDrillInputSchema } from "@/modules/drills/contracts";
+import { UpdateDrillValidationError, updateDrill } from "@/modules/drills/mutations";
 import { getDrillById } from "@/modules/drills/queries";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 const routeParamsSchema = z.object({
   id: z.string().uuid(),
@@ -27,9 +29,24 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ id
   }
 }
 
+export async function PATCH(request: NextRequest, context: { params: Promise<{ id: string }> }) {
+  try {
+    const { id } = routeParamsSchema.parse(await context.params);
+    const input = updateDrillInputSchema.parse(await request.json());
+    const response = drillDetailResponseSchema.parse({ drill: await updateDrill(id, input) });
+    return NextResponse.json(response);
+  } catch (error) {
+    return handleRouteError(error, "Failed to update drill.");
+  }
+}
+
 function handleRouteError(error: unknown, fallbackMessage: string) {
   if (error instanceof ZodError) {
     return NextResponse.json({ error: "Invalid drill id or response shape.", issues: error.issues }, { status: 400 });
+  }
+
+  if (error instanceof UpdateDrillValidationError) {
+    return NextResponse.json({ error: "Invalid drill update.", issues: error.issues }, { status: error.status });
   }
 
   console.error(fallbackMessage, error);
