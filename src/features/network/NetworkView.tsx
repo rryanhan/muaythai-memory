@@ -22,6 +22,7 @@ import {
   type NetworkFilters,
   type NetworkLoadState,
 } from "./types";
+import styles from "./Network.module.css";
 
 type NetworkViewProps = {
   initialGraph?: GraphResponse;
@@ -94,7 +95,7 @@ export function NetworkView({ initialGraph }: NetworkViewProps) {
   }, [graphRequestKey, initialGraph, layerOptions, retryNonce]);
 
   return (
-    <section className="network-view" aria-label="Network view">
+    <section className={styles.view} aria-label="Network view">
       {loadState.status === "loading" && <NetworkGraphLoading />}
 
       {loadState.status === "error" && (

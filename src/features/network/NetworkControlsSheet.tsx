@@ -13,6 +13,7 @@ import {
 } from "@/features/shared/tag-filter-helpers";
 import { normalizeKeyword } from "./network-helpers";
 import { defaultNetworkLayerOptions, emptyNetworkFilters, type NetworkFilters } from "./types";
+import styles from "./Network.module.css";
 
 type NetworkControlsSheetProps = {
   open: boolean;
@@ -99,8 +100,8 @@ export function NetworkControlsSheet({
   return (
     <Drawer.Root open={open} onOpenChange={onOpenChange} direction="bottom" modal dismissible autoFocus={false}>
       <Drawer.Portal>
-        <Drawer.Overlay className="network-controls-backdrop" />
-        <Drawer.Content className="network-controls-sheet" aria-label="Network controls">
+        <Drawer.Overlay className={styles.controlsBackdrop} />
+        <Drawer.Content className={styles.controlsSheet} aria-label="Network controls">
           <Drawer.Handle className="sheet-handle" />
           <header className="network-controls-sheet-header">
             <Drawer.Title asChild>

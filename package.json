@@ -20,7 +20,8 @@
     "db:seed-drills": "tsx src/db/seed-dev-drills.ts",
     "db:verify-taxonomy": "tsx src/db/verify-taxonomy.ts",
     "db:verify-step3": "tsx src/db/verify-step3.ts",
-    "api:verify": "tsx src/data/verify-api.ts"
+    "api:verify": "tsx src/data/verify-api.ts",
+    "capture:verify": "tsx src/modules/capture/verify-capture.ts"
   },
   "dependencies": {
     "@phosphor-icons/react": "^2.1.10",
@@ -30,6 +31,7 @@
     "dotenv": "latest",
     "drizzle-orm": "latest",
     "next": "latest",
+    "openai": "^6.46.0",
     "postgres": "latest",
     "react": "latest",
     "react-dom": "latest",

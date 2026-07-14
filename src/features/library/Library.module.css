@@ -1,0 +1,832 @@
+/* Training Log styles; the filter drawer is scoped through its portal root. */
+.view {
+  position: relative;
+  min-height: calc(100dvh - var(--nav-height));
+  padding: 28px 20px 32px;
+  background-image: linear-gradient(rgba(36, 39, 41, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(36, 39, 41, 0.05) 1px, transparent 1px);
+  background-size: 42px 42px;
+}
+
+.view :global(.index-spine) {
+  position: fixed;
+  z-index: 35;
+  left: max(0px, calc(50% - 240px));
+  top: 178px;
+  width: 16px;
+  height: 96px;
+  border: 0;
+  border-radius: 0 12px 12px 0;
+  background: var(--accent);
+  box-shadow: 12px 0 32px rgba(209, 74, 50, 0.22);
+  cursor: pointer;
+}
+
+.view :global(.index-spine) span {
+  display: block;
+  width: 2px;
+  height: 48px;
+  margin: 24px auto;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.52);
+}
+
+.view :global(.library-header) {
+  position: sticky;
+  z-index: 10;
+  top: 0;
+  display: grid;
+  gap: 8px;
+  padding: 0 0 20px;
+  background: linear-gradient(var(--bg) 78%, rgba(245, 244, 239, 0));
+}
+
+.view :global(.library-title-row) {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+}
+
+.view :global(.library-title-row) img {
+  width: 62px;
+  height: 62px;
+}
+
+.view :global(.library-title-row):not(:has(img)) {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.view :global(.library-title-row) h1 {
+  margin: 0;
+  font-size: 44px;
+  line-height: 0.95;
+}
+
+.view :global(.library-title-row) p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 18px;
+}
+
+.view :global(.library-search-row) {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 12px;
+  align-items: center;
+  margin-top: 16px;
+}
+
+.view :global(.library-search) {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 54px;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0 16px;
+  background: rgba(255, 255, 255, 0.86);
+  color: var(--muted);
+  font-size: 17px;
+}
+
+.view :global(.library-search) input {
+  min-width: 0;
+  width: 100%;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+}
+
+.view :global(.library-search) input::placeholder {
+  color: var(--muted);
+}
+
+.view :global(.library-search-row) button {
+  transition: border-color 150ms ease, background 150ms ease, color 150ms ease;
+}
+
+.view :global(.library-search-row) button[data-active="true"] {
+  border-color: rgba(209, 74, 50, 0.45);
+  background: rgba(244, 216, 208, 0.64);
+  color: var(--accent);
+}
+
+.view :global(.search-mark) {
+  position: relative;
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  border: 2px solid var(--text);
+  border-radius: 999px;
+}
+
+.view :global(.search-mark)::after {
+  position: absolute;
+  right: -6px;
+  bottom: 0;
+  width: 10px;
+  height: 2px;
+  border-radius: 999px;
+  background: var(--text);
+  transform: rotate(45deg);
+  content: "";
+}
+
+.view :global(.library-list) {
+  border-top: 1px dashed var(--border);
+}
+
+.view :global(.library-row) {
+  border-bottom: 1px solid var(--border);
+}
+
+.view :global(.library-row) a,
+.view :global(.library-row) button {
+  display: block;
+  width: 100%;
+  border: 0;
+  padding: 17px 0;
+  background: transparent;
+  color: inherit;
+  text-decoration: none;
+  text-align: left;
+  cursor: pointer;
+}
+
+.view :global(.library-row) a:focus-visible,
+.view :global(.library-row) button:focus-visible {
+  outline: 1px solid rgba(209, 74, 50, 0.38);
+  outline-offset: 3px;
+}
+
+.view :global(.library-row) a:active,
+.view :global(.library-row) button:active {
+  opacity: 0.76;
+  transform: translateY(1px);
+}
+
+.view :global(.library-row) h2 {
+  margin: 0;
+  font-size: 20px;
+  line-height: 1.1;
+}
+
+.view :global(.library-row-tags) {
+  display: flex;
+  flex-wrap: wrap;
+  margin-top: 8px;
+  color: var(--accent);
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  line-height: 1.35;
+  text-transform: uppercase;
+}
+
+.view :global(.library-row-tag):not(:last-child)::after {
+  margin: 0 8px;
+  color: rgba(209, 74, 50, 0.46);
+  content: "•";
+}
+
+.view :global(.library-row-tag) {
+  white-space: nowrap;
+}
+
+.view :global(.library-list)[data-refreshing="true"] {
+  opacity: 0.66;
+}
+
+.view :global(.library-loading-list) {
+  pointer-events: none;
+}
+
+.view :global(.library-loading-row) {
+  display: grid;
+  gap: 9px;
+  border-bottom: 1px solid var(--border);
+  padding: 17px 0;
+}
+
+.view :global(.library-skeleton) {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  border-radius: 8px;
+  background: rgba(216, 214, 204, 0.58);
+}
+
+.view :global(.library-skeleton)::after {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.56), transparent);
+  content: "";
+  transform: translateX(-100%);
+  animation: library-skeleton-shimmer 1.15s ease-in-out infinite;
+}
+
+.view :global(.library-skeleton-title) {
+  width: min(420px, 78vw);
+  height: 23px;
+}
+
+.view :global(.library-skeleton-tags) {
+  width: min(260px, 52vw);
+  height: 15px;
+  border-radius: 7px;
+}
+
+.view :global(.library-loading-row):nth-child(3n) :global(.library-skeleton-title) {
+  width: min(360px, 68vw);
+}
+
+.view :global(.library-loading-row):nth-child(4n) :global(.library-skeleton-tags) {
+  width: min(320px, 62vw);
+}
+
+.view :global(.library-active-filters) {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.view :global(.library-active-filters) button,
+.view :global(.library-inline-error),
+.view :global(.library-state-panel) button,
+.filterSheet :global(.library-filter-state) button {
+  border: 1px solid rgba(209, 74, 50, 0.35);
+  border-radius: 8px;
+  padding: 8px 12px;
+  background: rgba(244, 216, 208, 0.5);
+  color: var(--accent);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.view :global(.library-active-filters) button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.view :global(.library-active-filters) span {
+  color: var(--muted);
+}
+
+.view :global(.library-active-filters) :global(.library-clear-filters) {
+  border-color: var(--border);
+  background: rgba(245, 244, 239, 0.8);
+  color: var(--muted);
+}
+
+.view :global(.library-inline-error) {
+  margin: 4px 0 14px;
+}
+
+.view :global(.library-state-panel) {
+  display: grid;
+  gap: 10px;
+  margin-top: 28px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 20px;
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.view :global(.library-state-panel) h2,
+.view :global(.library-state-panel) p {
+  margin: 0;
+}
+
+.view :global(.library-state-panel) h2 {
+  font-size: 30px;
+  line-height: 1;
+}
+
+.view :global(.library-state-panel) p:not(:global(.eyebrow)),
+.view :global(.library-muted),
+.filterSheet :global(.library-filter-state) p {
+  color: var(--muted);
+  font-size: 16px;
+  line-height: 1.35;
+}
+
+.view :global(.library-index-panel) {
+  position: fixed;
+  z-index: 80;
+  left: max(0px, calc(50% - 240px));
+  top: 118px;
+  bottom: 92px;
+  width: min(82vw, 312px);
+  border: 1px solid rgba(216, 214, 204, 0.9);
+  border-left: 0;
+  border-radius: 0 18px 18px 0;
+  padding: 18px 16px;
+  overflow-y: auto;
+  background: rgba(245, 244, 239, 0.96);
+  box-shadow: 18px 0 44px rgba(23, 23, 23, 0.12);
+}
+
+.view :global(.library-index-panel) header,
+.filterSheet :global(.library-tag-panel-header) {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+.view :global(.library-index-panel) header p,
+.filterSheet :global(.library-tag-panel-header) p,
+.filterSheet :global(.library-tag-panel-header) span {
+  margin: 0;
+}
+
+.view :global(.library-index-panel) header button {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.view :global(.library-index-action-block) {
+  display: grid;
+  gap: 8px;
+  border-bottom: 1px solid rgba(216, 214, 204, 0.78);
+  padding-bottom: 14px;
+}
+
+.view :global(.library-index-section) {
+  display: grid;
+  gap: 8px;
+  padding-top: 14px;
+}
+
+.view :global(.library-index-section-label) {
+  margin: 0;
+  color: var(--muted);
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.view :global(.library-method-list) {
+  display: grid;
+  gap: 8px;
+}
+
+.view :global(.library-method-list) button,
+.view :global(.library-add-drill-link) {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  min-height: 58px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, 0.58);
+  color: var(--text);
+  font-size: 17px;
+  font-weight: 800;
+  text-decoration: none;
+  text-align: left;
+  cursor: pointer;
+}
+
+.view :global(.library-add-drill-link) {
+  border-color: rgba(209, 74, 50, 0.3);
+  background: rgba(255, 255, 255, 0.58);
+  color: var(--accent);
+}
+
+.view :global(.library-index-action-icon),
+.view :global(.library-index-utility-icon) {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+}
+
+.view :global(.library-index-action-icon) {
+  border: 1px solid rgba(209, 74, 50, 0.5);
+  border-radius: 8px;
+  color: var(--accent);
+  background: rgba(244, 216, 208, 0.28);
+}
+
+.view :global(.library-index-utility-icon) {
+  border: 1px solid rgba(216, 214, 204, 0.9);
+  border-radius: 8px;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.62);
+}
+
+.view :global(.library-method-list) button[data-selected="true"] {
+  border-color: rgba(209, 74, 50, 0.4);
+  background: rgba(244, 216, 208, 0.58);
+  color: var(--accent);
+}
+
+.view :global(.library-method-list) button[data-kind="all"][data-selected="true"] {
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.view :global(.library-method-list) button[data-kind="all"][data-selected="true"] :global(.library-index-utility-icon) {
+  border-color: rgba(209, 74, 50, 0.45);
+  color: var(--accent);
+  background: rgba(244, 216, 208, 0.24);
+}
+
+.view :global(.library-method-list) img {
+  width: 42px;
+  height: 42px;
+}
+
+.filterBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  background: rgba(23, 23, 23, 0.28);
+}
+
+.filterSheet {
+  position: fixed;
+  z-index: 100;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  gap: 14px;
+  width: min(100%, 480px);
+  height: min(68dvh, 560px);
+  margin: 0 auto;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 8px 8px 0 0;
+  padding: 10px 18px 22px;
+  background: var(--surface);
+  box-shadow: 0 -18px 48px rgba(23, 23, 23, 0.14);
+  outline: none;
+}
+
+.filterSheet :global(.library-filter-sheet-header) {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.filterSheet :global(.library-filter-sheet-header) h2,
+.filterSheet :global(.library-filter-sheet-header) p,
+.filterSheet :global(.library-filter-sheet-section) p {
+  margin: 0;
+}
+
+.filterSheet :global(.library-filter-sheet-header) h2 {
+  font-size: 23px;
+  line-height: 1;
+}
+
+.filterSheet :global(.library-filter-sheet-header) p {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.filterSheet :global(.library-filter-sheet-header) button {
+  border: 0;
+  padding: 2px 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.filterSheet :global(.library-filter-sheet-section) {
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  gap: 10px;
+  min-height: 0;
+}
+
+.filterSheet :global(.library-filter-search) {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0 14px;
+  background: var(--bg);
+}
+
+.filterSheet :global(.library-filter-search) :global(.search-mark) {
+  width: 18px;
+  height: 18px;
+}
+
+.filterSheet :global(.library-filter-search) :global(.search-mark)::after {
+  right: -5px;
+  width: 8px;
+}
+
+.filterSheet :global(.library-filter-search) input {
+  min-width: 0;
+  width: 100%;
+  height: 40px;
+  border: 0;
+  outline: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 16px;
+}
+
+.filterSheet :global(.library-filter-search) input::placeholder {
+  color: var(--muted);
+}
+
+.filterSheet :global(.library-tag-category-grid) {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+  min-height: 0;
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.filterSheet :global(.library-tag-category) {
+  border-top: 1px solid rgba(214, 209, 198, 0.78);
+  padding: 12px 0;
+  background: transparent;
+}
+
+.filterSheet :global(.library-tag-category):first-child {
+  border-top: 0;
+}
+
+.filterSheet :global(.library-tag-category) h3 {
+  margin: 0 0 7px;
+  color: var(--muted);
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.filterSheet :global(.library-tag-category) div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0;
+}
+
+.filterSheet :global(.library-tag-category) button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 28px;
+  border: 0;
+  border-radius: 5px;
+  padding: 0 7px;
+  background: transparent;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.filterSheet :global(.library-saved-list-icon) {
+  flex: 0 0 auto;
+  color: var(--accent);
+}
+
+.filterSheet :global(.library-tag-category) button:not(:last-child) {
+  margin-right: 11px;
+}
+
+.filterSheet :global(.library-tag-category) button:not(:last-child)::after {
+  position: absolute;
+  top: 50%;
+  right: -8px;
+  color: rgba(100, 100, 95, 0.42);
+  font-weight: 700;
+  content: "|";
+  transform: translateY(-52%);
+}
+
+.filterSheet :global(.library-tag-category) button:hover {
+  background: rgba(37, 109, 133, 0.055);
+}
+
+.filterSheet :global(.library-tag-category) button[data-selected="true"] {
+  background: rgba(244, 216, 208, 0.72);
+  color: var(--accent);
+  font-weight: 800;
+}
+
+.filterSheet :global(.library-custom-tag-category) {
+  background: transparent;
+}
+
+.filterSheet :global(.library-filter-state) {
+  display: grid;
+  gap: 10px;
+}
+
+.filterSheet :global(.library-tag-empty) {
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  padding: 16px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.filterSheet :global(.library-filter-actions) {
+  display: grid;
+  gap: 10px;
+  padding-top: 2px;
+}
+
+.filterSheet :global(.library-filter-actions) p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.filterSheet :global(.library-filter-actions) div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+  gap: 8px;
+}
+
+.filterSheet :global(.library-filter-clear-button),
+.filterSheet :global(.library-filter-apply-button),
+.filterSheet :global(.library-filter-preview-retry) {
+  min-height: 42px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.filterSheet :global(.library-filter-apply-button) {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: white;
+}
+
+.filterSheet :global(.library-filter-preview-retry) {
+  justify-self: start;
+  min-height: 0;
+  padding: 7px 11px;
+  color: var(--accent);
+  font-size: 13px;
+}
+
+.filterSheet :global(.library-filter-clear-button):disabled {
+  cursor: default;
+  opacity: 0.42;
+}
+
+.filterSheet :global(.library-filter-apply-button):active,
+.filterSheet :global(.library-filter-clear-button):active,
+.filterSheet :global(.library-filter-preview-retry):active {
+  transform: translateY(1px);
+}
+
+@media (max-width: 380px) {
+  .view :global(.library-title-row) h1 {
+    font-size: 40px;
+  }
+
+  .view :global(.library-search) {
+    font-size: 16px;
+    padding-inline: 14px;
+  }
+}
+
+.view :global(.library-search-row) button {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.view :global(.rail-icon) {
+  position: relative;
+  width: 24px;
+  height: 24px;
+  color: currentColor;
+}
+
+.view :global(.rail-icon-filter)::before,
+.view :global(.rail-icon-filter)::after {
+  position: absolute;
+  left: 3px;
+  width: 18px;
+  height: 2px;
+  border-radius: 999px;
+  background: currentColor;
+  content: "";
+}
+
+.view :global(.rail-icon-filter)::before {
+  top: 7px;
+}
+
+.view :global(.rail-icon-filter)::after {
+  bottom: 7px;
+}
+
+.view :global(.rail-icon-search) {
+  border: 2px solid currentColor;
+  border-radius: 999px;
+}
+
+.view :global(.rail-icon-search)::after {
+  position: absolute;
+  right: -5px;
+  bottom: 1px;
+  width: 9px;
+  height: 2px;
+  border-radius: 999px;
+  background: currentColor;
+  transform: rotate(45deg);
+  content: "";
+}
+
+.view :global(.rail-icon-record) {
+  border: 2px solid currentColor;
+  border-radius: 999px;
+}
+
+.view :global(.rail-icon-record)::after {
+  position: absolute;
+  left: 9px;
+  bottom: -6px;
+  width: 2px;
+  height: 6px;
+  background: currentColor;
+  content: "";
+}
+
+.view :global(.search-mark), .filterSheet :global(.search-mark) {
+  position: relative;
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  border: 2px solid var(--text);
+  border-radius: 999px;
+}
+
+.view :global(.search-mark)::after, .filterSheet :global(.search-mark)::after {
+  position: absolute;
+  right: -6px;
+  bottom: 0;
+  width: 10px;
+  height: 2px;
+  border-radius: 999px;
+  background: var(--text);
+  transform: rotate(45deg);
+  content: "";
+}
+
+
+@keyframes library-skeleton-shimmer {
+  to {
+    transform: translateX(100%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .view :global(.library-skeleton)::after {
+    animation: none;
+  }
+}

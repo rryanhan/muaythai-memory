@@ -1,3 +1,4 @@
+import type { CaptureDraft, CaptureDraftRequest, CaptureDraftResponse } from "@/modules/capture/contracts";
 import type {
   CreateDrillInput,
   DrillDetail,
@@ -13,6 +14,9 @@ import type { StatusTagDto, TagCategoryDto, TagDto, TaxonomyResponse, TrainingMe
 // This file is the frontend import surface for API data types. It reuses the
 // pure contract types from backend modules without importing database code.
 export type {
+  CaptureDraft,
+  CaptureDraftRequest,
+  CaptureDraftResponse,
   CreateDrillInput,
   DrillDetail,
   DrillFilters,

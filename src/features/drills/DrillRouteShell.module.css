@@ -1,0 +1,124 @@
+/* Shared shell for standalone drill, edit, add, and capture routes. */
+.detailPage {
+  position: relative;
+  min-height: 100dvh;
+  max-width: 480px;
+  margin: 0 auto;
+  overflow: hidden;
+  padding: 22px 20px 118px;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.formPage {
+  position: relative;
+  min-height: 100dvh;
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 22px 20px 118px;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.detailPage :global(.drill-detail-page-header), .formPage :global(.drill-detail-page-header) {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 24px;
+}
+
+.detailPage :global(.drill-detail-page-back), .formPage :global(.drill-detail-page-back) {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.32);
+  color: var(--text);
+  font-size: 28px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.detailPage :global(.drill-detail-page-back):focus-visible, .formPage :global(.drill-detail-page-back):focus-visible {
+  outline: 1px solid rgba(209, 74, 50, 0.44);
+  outline-offset: 3px;
+}
+
+.detailPage :global(.drill-detail-page-back):active, .formPage :global(.drill-detail-page-back):active {
+  transform: translateY(1px);
+}
+
+.detailPage :global(.drill-detail-page-edit), .formPage :global(.drill-detail-page-edit) {
+  margin-left: auto;
+  border: 1px solid rgba(209, 74, 50, 0.36);
+  border-radius: 8px;
+  padding: 7px 10px;
+  background: rgba(255, 255, 255, 0.42);
+  color: var(--accent);
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 12px;
+  font-weight: 800;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+
+.detailPage :global(.drill-detail-page-edit):focus-visible, .formPage :global(.drill-detail-page-edit):focus-visible {
+  outline: 1px solid rgba(209, 74, 50, 0.44);
+  outline-offset: 3px;
+}
+
+.detailPage :global(.drill-detail-page-edit):active, .formPage :global(.drill-detail-page-edit):active {
+  transform: translateY(1px);
+}
+
+.detailPage :global(.drill-detail-page-back-placeholder), .formPage :global(.drill-detail-page-back-placeholder) {
+  cursor: default;
+  opacity: 0.34;
+}
+
+.detailPage :global(.drill-detail-content) {
+  padding-bottom: 22px;
+}
+
+.detailPage :global(.drill-detail-title-row) {
+  align-items: start;
+}
+
+.detailPage :global(.drill-detail-method-badge) {
+  width: 58px;
+  height: 58px;
+}
+
+.detailPage :global(.drill-detail-title-row) h2 {
+  font-size: 34px;
+  line-height: 0.98;
+}
+
+.formPage :global(.add-drill-heading) {
+  margin-bottom: 24px;
+}
+
+.formPage :global(.add-drill-heading) h1,
+.formPage :global(.add-drill-heading) p {
+  margin: 0;
+}
+
+.formPage :global(.add-drill-heading) h1 {
+  font-size: 42px;
+  line-height: 0.95;
+}
+
+.formPage :global(.add-drill-heading) p {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 18px;
+  line-height: 1.25;
+}
+
+.detailPage > *:not(:global(.notebook-grid)):not(:global(.bottom-nav)),
+.formPage > *:not(:global(.notebook-grid)):not(:global(.bottom-nav)) {
+  position: relative;
+  z-index: 1;
+}

@@ -6,6 +6,7 @@ import { RoutedBottomNav } from "@/components/navigation/RoutedBottomNav";
 import { DrillDetailBackButton } from "@/features/drills/DrillDetailBackButton";
 import { AddDrillForm } from "@/features/drills/AddDrillForm";
 import { getDrillById } from "@/modules/drills/queries";
+import routeStyles from "@/features/drills/DrillRouteShell.module.css";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -51,8 +52,8 @@ export default async function EditDrillPage({ params }: EditDrillPageProps) {
   }
 
   return (
-    <main className="add-drill-page">
-      <div className="drill-detail-page-grid" aria-hidden="true" />
+    <main className={routeStyles.formPage}>
+      <div className="notebook-grid" aria-hidden="true" />
       <header className="drill-detail-page-header">
         <DrillDetailBackButton />
         <p className="eyebrow">Edit Drill</p>

@@ -1,6 +1,6 @@
 "use client";
 
-import { ListBullets, Plus } from "@phosphor-icons/react";
+import { ListBullets, Microphone, Plus } from "@phosphor-icons/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
@@ -31,8 +31,13 @@ export function LibraryIndexPanel({
     router.prefetch("/drills/new");
   }
 
+  function prefetchCaptureDraft() {
+    router.prefetch("/capture/new");
+  }
+
   useEffect(() => {
     prefetchAddDrill();
+    prefetchCaptureDraft();
   }, []);
 
   return (
@@ -56,6 +61,19 @@ export function LibraryIndexPanel({
       {taxonomyState.status === "loaded" && (
         <>
           <div className="library-index-action-block">
+            <Link
+              className="library-add-drill-link"
+              href="/capture/new"
+              prefetch
+              onFocus={prefetchCaptureDraft}
+              onPointerEnter={prefetchCaptureDraft}
+              onTouchStart={prefetchCaptureDraft}
+            >
+              <span className="library-index-action-icon" aria-hidden="true">
+                <Microphone size={22} weight="bold" />
+              </span>
+              <span>Capture Draft</span>
+            </Link>
             <Link
               className="library-add-drill-link"
               href="/drills/new"

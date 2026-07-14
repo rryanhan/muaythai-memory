@@ -1,10 +1,13 @@
 import { RoutedBottomNav } from "@/components/navigation/RoutedBottomNav";
 import { AddDrillSkeleton } from "@/features/drills/AddDrillSkeleton";
+import routeStyles from "@/features/drills/DrillRouteShell.module.css";
+import skeletonStyles from "@/components/shared/Skeleton.module.css";
+import formStyles from "@/features/drills/DrillForm.module.css";
 
 export default function EditDrillLoading() {
   return (
-    <main className="add-drill-page" aria-label="Loading edit drill form">
-      <div className="drill-detail-page-grid" aria-hidden="true" />
+    <main className={routeStyles.formPage} aria-label="Loading edit drill form">
+      <div className="notebook-grid" aria-hidden="true" />
       <header className="drill-detail-page-header">
         <button
           type="button"
@@ -17,8 +20,8 @@ export default function EditDrillLoading() {
         <p className="eyebrow">Edit Drill</p>
       </header>
       <section className="add-drill-heading">
-        <span className="drill-detail-skeleton add-drill-skeleton-heading" />
-        <span className="drill-detail-skeleton add-drill-skeleton-subheading" />
+        <span className={`${skeletonStyles.skeleton} ${formStyles.skeletonHeading}`} />
+        <span className={`${skeletonStyles.skeleton} ${formStyles.skeletonSubheading}`} />
       </section>
       <AddDrillSkeleton />
       <RoutedBottomNav activeView="library" />

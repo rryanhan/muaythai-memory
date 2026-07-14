@@ -1,0 +1,342 @@
+/* Shared Add/Edit form and its route-level loading states. */
+.skeleton {
+  display: grid;
+  gap: 20px;
+  pointer-events: none;
+}
+
+.skeleton :global(.add-drill-section),
+.section {
+  display: grid;
+  gap: 12px;
+  border-top: 1px solid var(--border);
+  padding-top: 16px;
+}
+
+.skeletonHeading {
+  width: min(230px, 58vw);
+  height: 40px;
+  border-radius: 8px;
+}
+
+.skeletonSubheading {
+  display: block;
+  width: min(320px, 76vw);
+  height: 18px;
+  margin-top: 10px;
+  border-radius: 7px;
+}
+
+.skeletonArea {
+  width: 100%;
+  height: 74px;
+  border-radius: 8px;
+}
+
+.skeletonAreaTall {
+  height: 96px;
+}
+
+.skeletonSectionTitle {
+  width: 54px;
+  height: 14px;
+  margin-bottom: 12px;
+}
+
+.skeleton :global(.add-drill-skeleton-heading) {
+  width: min(230px, 58vw);
+  height: 40px;
+  border-radius: 8px;
+}
+
+.skeleton :global(.add-drill-skeleton-subheading) {
+  display: block;
+  width: min(320px, 76vw);
+  height: 18px;
+  margin-top: 10px;
+  border-radius: 7px;
+}
+
+.skeleton :global(.add-drill-skeleton-fields),
+.skeleton :global(.add-drill-skeleton-steps) {
+  display: grid;
+  gap: 10px;
+}
+
+.skeleton :global(.add-drill-skeleton-field),
+.skeleton :global(.add-drill-skeleton-area) {
+  width: 100%;
+  height: 46px;
+  border-radius: 8px;
+}
+
+.skeleton :global(.add-drill-skeleton-area) {
+  height: 74px;
+}
+
+.skeleton :global(.add-drill-skeleton-area-tall) {
+  height: 96px;
+}
+
+.skeleton :global(.add-drill-skeleton-steps) :global(.drill-detail-skeleton) {
+  height: 46px;
+  border-radius: 8px;
+}
+
+.skeleton :global(.add-drill-skeleton-steps) :global(.drill-detail-skeleton):last-child {
+  width: 78%;
+}
+
+.skeleton :global(.add-drill-skeleton-methods) {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.skeleton :global(.add-drill-skeleton-methods) :global(.drill-detail-skeleton) {
+  height: 56px;
+  border-radius: 8px;
+}
+
+.skeleton :global(.add-drill-skeleton-tags) {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.skeleton :global(.add-drill-skeleton-tags) :global(.drill-detail-skeleton) {
+  width: 78px;
+  height: 30px;
+  border-radius: 6px;
+}
+
+.skeleton :global(.add-drill-skeleton-tags) :global(.drill-detail-skeleton):nth-child(2) {
+  width: 104px;
+}
+
+.skeleton :global(.add-drill-skeleton-tags) :global(.drill-detail-skeleton):nth-child(4) {
+  width: 92px;
+}
+
+.form {
+  display: grid;
+  gap: 20px;
+}
+
+.form :global(.add-drill-section) {
+  display: grid;
+  gap: 12px;
+  border-top: 1px solid var(--border);
+  padding-top: 16px;
+}
+
+.form :global(.add-drill-section) label {
+  display: grid;
+  gap: 7px;
+}
+
+.form :global(.add-drill-section) label span {
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 750;
+}
+
+.form :global(.add-drill-section) input,
+.form :global(.add-drill-section) textarea {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 13px;
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--text);
+  font: inherit;
+  font-size: 16px;
+}
+
+.form :global(.add-drill-section) textarea {
+  resize: vertical;
+  line-height: 1.35;
+}
+
+.form :global(.add-drill-section) input:focus,
+.form :global(.add-drill-section) textarea:focus {
+  border-color: rgba(209, 74, 50, 0.58);
+  outline: 1px solid rgba(209, 74, 50, 0.18);
+}
+
+.form :global(.add-drill-step-list) {
+  display: grid;
+  gap: 9px;
+}
+
+.form :global(.add-drill-step-row) {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.form :global(.add-drill-step-row) > span {
+  color: var(--accent);
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.form :global(.add-drill-step-row) button,
+.form :global(.add-drill-secondary-button),
+.form :global(.add-drill-actions) button,
+.state button {
+  min-height: 40px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--text);
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.form :global(.add-drill-step-row) button {
+  min-height: 36px;
+  padding: 0 9px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.form :global(.add-drill-step-row) button:disabled,
+.form :global(.add-drill-actions) button:disabled {
+  cursor: default;
+  opacity: 0.44;
+}
+
+.form :global(.add-drill-secondary-button) {
+  justify-self: start;
+  padding: 0 12px;
+  color: var(--accent);
+}
+
+.form :global(.add-drill-method-grid) {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.form :global(.add-drill-method-grid) button {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  align-items: center;
+  gap: 9px;
+  min-height: 56px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.58);
+  color: var(--text);
+  font-weight: 800;
+  text-align: left;
+  cursor: pointer;
+}
+
+.form :global(.add-drill-method-grid) button[data-selected="true"] {
+  border-color: rgba(209, 74, 50, 0.48);
+  background: rgba(244, 216, 208, 0.62);
+  color: var(--accent);
+}
+
+.form :global(.add-drill-method-grid) img {
+  width: 38px;
+  height: 38px;
+}
+
+.form :global(.add-drill-tag-index) {
+  display: grid;
+  gap: 0;
+}
+
+.form :global(.add-drill-tag-index) section {
+  border-top: 1px solid rgba(214, 209, 198, 0.78);
+  padding: 12px 0;
+}
+
+.form :global(.add-drill-tag-index) section:first-child {
+  border-top: 0;
+}
+
+.form :global(.add-drill-tag-index) h3 {
+  margin: 0 0 7px;
+  color: var(--muted);
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.form :global(.add-drill-tag-index) div,
+.form :global(.add-drill-inline-tokens) {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.form :global(.add-drill-tag-index) button,
+.form :global(.add-drill-inline-tokens) button {
+  min-height: 30px;
+  border: 0;
+  border-radius: 5px;
+  padding: 0 8px;
+  background: transparent;
+  color: var(--accent);
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  text-transform: uppercase;
+}
+
+.form :global(.add-drill-tag-index) button[data-selected="true"],
+.form :global(.add-drill-inline-tokens) button[data-selected="true"] {
+  background: rgba(244, 216, 208, 0.72);
+}
+
+.form :global(.add-drill-error) {
+  margin: 0;
+  border-left: 2px solid var(--accent);
+  padding: 8px 0 8px 12px;
+  color: var(--accent);
+  font-weight: 750;
+}
+
+.form :global(.add-drill-actions) {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr);
+  gap: 10px;
+  border-top: 1px solid var(--border);
+  padding-top: 18px;
+}
+
+.form :global(.add-drill-actions) button[type="submit"] {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: white;
+}
+
+.state {
+  display: grid;
+  gap: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 18px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.state h2,
+.state p {
+  margin: 0;
+}
+
+.state p:not(:global(.eyebrow)) {
+  color: var(--muted);
+  font-size: 16px;
+  line-height: 1.35;
+}

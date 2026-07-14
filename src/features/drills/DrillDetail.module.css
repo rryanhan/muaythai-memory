@@ -1,0 +1,237 @@
+/* Shared drill record content, plus the Network detail drawer portal. */
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  background: rgba(23, 23, 23, 0.32);
+}
+
+.sheet {
+  position: fixed;
+  z-index: 100;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: min(100%, 480px);
+  max-height: 88dvh;
+  margin: 0 auto;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 18px 18px 0 0;
+  padding: 10px 20px 28px;
+  background: var(--surface);
+  box-shadow: 0 -18px 48px rgba(23, 23, 23, 0.14);
+  outline: none;
+}
+
+.sheet :global(.drill-detail-sheet-header) {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.sheet :global(.drill-detail-sheet-header) p {
+  margin: 0;
+}
+
+.sheet :global(.drill-detail-sheet-header) button,
+.sheet :global(.drill-detail-state) button {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--muted);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.sheet :global(.drill-detail-state) {
+  display: grid;
+  gap: 10px;
+  min-height: 180px;
+  align-content: center;
+}
+
+.sheet :global(.drill-detail-state) h2,
+.sheet :global(.drill-detail-state) p {
+  margin: 0;
+}
+
+.sheet :global(.drill-detail-state) h2 {
+  font-size: 28px;
+  line-height: 1;
+}
+
+.sheet :global(.drill-detail-state) p {
+  color: var(--muted);
+  font-size: 17px;
+  line-height: 1.35;
+}
+
+.sheet :global(.drill-detail-state) button {
+  justify-self: start;
+  color: var(--accent);
+}
+
+.content {
+  display: grid;
+  gap: 18px;
+}
+
+.content :global(.drill-detail-title-row) {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+}
+
+.content :global(.drill-detail-title-row) h2,
+.content :global(.drill-detail-title-row) p,
+.content :global(.drill-detail-summary),
+.content :global(.drill-detail-section) h3,
+.content :global(.drill-detail-section) p {
+  margin: 0;
+}
+
+.content :global(.drill-detail-method-badge) {
+  width: 52px;
+  height: 52px;
+}
+
+.content :global(.drill-detail-title-row) h2 {
+  font-size: 28px;
+  line-height: 1.05;
+}
+
+.content :global(.drill-detail-title-row) p,
+.content :global(.drill-detail-summary),
+.content :global(.drill-detail-section) p {
+  color: var(--muted);
+  font-size: 17px;
+  line-height: 1.4;
+}
+
+.content :global(.drill-detail-tags) {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.content :global(.drill-detail-chip) {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 8px 12px;
+  background: rgba(245, 244, 239, 0.78);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.content :global(.drill-detail-chip-custom) {
+  border-color: rgba(37, 109, 133, 0.24);
+  background: rgba(37, 109, 133, 0.08);
+  color: var(--teal);
+}
+
+.content :global(.drill-detail-chip-status) {
+  border-color: rgba(209, 74, 50, 0.32);
+  background: rgba(244, 216, 208, 0.5);
+  color: var(--accent);
+}
+
+.content :global(.drill-detail-section) {
+  border-top: 1px solid var(--border);
+  padding-top: 16px;
+}
+
+.content :global(.drill-detail-section) h3 {
+  margin-bottom: 10px;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 750;
+}
+
+.content :global(.drill-detail-section) ol {
+  margin: 0;
+  padding-left: 24px;
+  font-size: 18px;
+  line-height: 1.45;
+}
+
+.content :global(.drill-detail-section) li + li {
+  margin-top: 8px;
+}
+
+.content:global(.drill-detail-loading-content) {
+  pointer-events: none;
+}
+
+.content :global(.drill-detail-loading-title-stack),
+.content :global(.drill-detail-loading-summary),
+.content :global(.drill-detail-loading-steps) {
+  display: grid;
+  gap: 10px;
+}
+
+.content :global(.drill-detail-loading-badge) {
+  width: 58px;
+  height: 58px;
+  border-radius: 999px;
+}
+
+.content :global(.drill-detail-skeleton-title) {
+  width: min(260px, 62vw);
+  height: 34px;
+  border-radius: 8px;
+}
+
+.content :global(.drill-detail-skeleton-method) {
+  width: 108px;
+  height: 17px;
+}
+
+.content :global(.drill-detail-loading-summary) :global(.drill-detail-skeleton) {
+  height: 16px;
+  border-radius: 7px;
+}
+
+.content :global(.drill-detail-loading-summary) :global(.drill-detail-skeleton):first-child {
+  width: 92%;
+}
+
+.content :global(.drill-detail-loading-summary) :global(.drill-detail-skeleton):last-child {
+  width: 68%;
+}
+
+.content :global(.drill-detail-skeleton-chip) {
+  width: 78px;
+  height: 34px;
+}
+
+.content :global(.drill-detail-skeleton-section-title) {
+  width: 54px;
+  height: 14px;
+  margin-bottom: 12px;
+}
+
+.content :global(.drill-detail-loading-steps) :global(.drill-detail-skeleton) {
+  height: 18px;
+  border-radius: 7px;
+}
+
+.content :global(.drill-detail-loading-steps) :global(.drill-detail-skeleton):nth-child(1) {
+  width: 86%;
+}
+
+.content :global(.drill-detail-loading-steps) :global(.drill-detail-skeleton):nth-child(2) {
+  width: 74%;
+}
+
+.content :global(.drill-detail-loading-steps) :global(.drill-detail-skeleton):nth-child(3) {
+  width: 90%;
+}
+
+.content :global(.drill-detail-loading-steps) :global(.drill-detail-skeleton):nth-child(4) {
+  width: 62%;
+}

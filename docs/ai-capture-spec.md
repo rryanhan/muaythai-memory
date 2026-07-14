@@ -2,49 +2,57 @@
 
 ## Purpose
 
-AI capture turns a messy voice memo into a clean draft Drill.
+Capture turns a messy training note or future voice transcript into an editable Drill draft. It is a memory aid, not an autonomous coach: the user remains responsible for reviewing mechanics and taxonomy before saving.
 
-The output should be useful enough for the user to quickly review and save, but not overloaded with fields.
+Voice recording is deferred. Text capture at `/capture/new` uses the same draft shape and review form that voice transcription will use later.
 
-Voice memo is the default capture path. Manual entry should use the same output fields and review flow.
-
-Preferred capture control:
-
-- Tap mic: record voice memo.
-- Hold mic: reveal manual-input option.
-- Hold and swipe up: open manual entry.
-
-## MVP Output Shape
+## Active Output
 
 ```json
 {
   "title": "Slip Right Step-Through Uppercut Exit",
-  "summary": "A counter drill for slipping the cross, stepping through into a temporary southpaw shape, firing the left uppercut, then exiting before the return shot.",
+  "summary": "Slip the cross, step through into the uppercut, then leave off-line.",
+  "notes": "Keep the head off center and do not stand up during the step-through.",
   "steps": [
-    "Partner or pad holder feeds jab-cross at realistic rhythm.",
-    "On the cross, slip right and let the right foot step slightly across so the stance turns southpaw.",
-    "Keep the head off center and load the left side without standing up.",
-    "Drive the left uppercut as the rear foot steps through back toward orthodox.",
-    "Exit off-line with a small pivot or angle step instead of backing straight out."
+    "Partner feeds the cross.",
+    "Slip right and step through.",
+    "Throw the left uppercut.",
+    "Pivot out and reset."
   ],
-  "trainingMethods": ["Partner Drill", "Pad Work"],
-  "trainingTags": ["Slip", "Uppercut", "Step Through", "Stance Switch", "Angle"],
-  "coreIdea": "Counter Rotation",
-  "customTags": ["southpaw-transition", "sparring-focus"]
+  "trainingMethodSlugs": ["partner-drill"],
+  "tagSlugs": ["slip", "step-through", "uppercut", "pivot"]
 }
 ```
 
-## Output Fields
+- `title`: required, short drill name.
+- `summary`: required for AI capture; one short factual sentence describing what the drill practices.
+- `notes`: optional source-backed cues, reminders, or mistakes.
+- `steps`: one or more ordered physical actions.
+- `trainingMethodSlugs`: zero or more deterministic Training Method matches. The user must select at least one before saving.
+- `tagSlugs`: deterministic matches from the active standard-tag taxonomy.
 
-- `title`: short, readable drill name.
-- `summary`: one or two sentence explanation.
-- `steps`: ordered drill steps.
-- `trainingMethods`: one or more Training Methods.
-- `trainingTags`: standard Tags from the app taxonomy.
-- `coreIdea`: optional main training pattern the drill is teaching. Use `null` or leave empty when no clear idea is present.
-- `customTags`: optional user-specific or app-suggested tags.
+Core Idea, Status Tags, Custom Tag creation, confidence scores, training plans, and review dates are not capture outputs.
 
-Allowed first-pass Training Methods:
+## Hybrid Flow
+
+1. The client loads active taxonomy while the user writes the note.
+2. A deterministic parser immediately selects explicit Training Methods and standard Tags only.
+3. Those taxonomy controls become editable while title, summary, notes, and steps show a `Cleaning up...` state.
+4. Ollama or OpenAI produces title, a required factual summary, optional notes, and ordered steps from the original note.
+5. The text fields become editable when cleanup finishes. If cleanup fails, they unlock empty for manual entry and cleanup can be retried.
+6. A retry never overwrites text the user edited after a failed cleanup; suggestions remain field-level and optional.
+
+The deterministic parser is conservative:
+
+- It uses curated aliases and active taxonomy rows only.
+- It supports multiple explicitly named Training Methods.
+- It does not assume Technical Work when no method is clear.
+- It does not generate or display deterministic title, summary, notes, or steps.
+- It does not infer mechanics that were not stated.
+
+## Active Taxonomy
+
+Training Methods:
 
 - Pad Work
 - Bag Work
@@ -52,101 +60,37 @@ Allowed first-pass Training Methods:
 - Clinch
 - Technical Work
 
-Use Technical Work for isolated mechanics, technique-first motions, stance transitions, balance drills, slow reps, solo motion practice, and other technical practice that is not clearly pad work, bag work, partner work, or clinch. Use `Shadowboxing` as a standard Tag, not a Training Method. Do not classify warmups as Muay Thai Training Methods in the MVP; warmup belongs in the later workout or conditioning system.
+Standard Tag categories:
 
-Allowed first-pass Tags are leaf tags inside these browse groups:
+- Boxing: Jab, Cross, Hook, Uppercut, Body Shot
+- Kicking: Teep, Round Kick, Low Kick
+- Knees: Knee
+- Elbows: Elbow
+- Defense: Kick Check, Kick Catch, Parry, Long Guard
+- Head Movement: Slip, Roll
+- Footwork: Pivot, Switch Step, Step Through, Stance Switch
+- Sweeps: Sweep
+- Movement & Timing: Entry, Angle, Distance, Timing, Pressure, Feint
+- Practice Format: Shadowboxing
 
-- Boxing: `Jab`, `Cross`, `Hook`, `Uppercut`, `Body Shot`
-- Kicking: `Teep`, `Round Kick`, `Low Kick`
-- Knees: `Knee`
-- Elbows: `Elbow`
-- Defense: `Kick Check`, `Kick Catch`, `Parry`, `Long Guard`
-- Head Movement: `Slip`, `Roll`
-- Footwork: `Pivot`, `Switch Step`, `Step Through`, `Stance Switch`
-- Clinch: `Frame`, `Hand Trap`, `Hand Fighting`, `Body Lock`
-- Sweeps And Dumps: `Sweep`, `Dump`
-- Movement & Timing: `Entry`, `Angle`, `Distance`, `Timing`, `Pressure`, `Feint`
-- Practice Format: `Shadowboxing`
+Clinch is a Training Method, not a Tag. Shadowboxing is a Tag and maps to Technical Work when explicitly mentioned. Sweep is the only active sweep tag.
 
-## Capture Rules
+## AI Cleanup Rules
 
-- Extract one primary Core Idea when possible.
-- Choose Core Idea from the app's predefined Core Idea taxonomy.
-- If no standard Core Idea fits, set `coreIdea` to `null` and optionally include the user's wording as a Custom Tag if it is useful.
-- If the memo describes a simple combination, general rep structure, bag round, pad round, or drill without one clear lesson, set `coreIdea` to `null`.
-- Do not invent a Core Idea just to fill the field.
-- Prefer standard Tags before creating Custom Tags.
-- Do not duplicate the chosen Core Idea as a Tag. For example, if `coreIdea` is `Counter Rotation`, do not also add `Counter Rotation` to `trainingTags`.
-- Do not use Training Methods as Tags.
-- Do not use tag group labels as Tags. `Boxing`, `Kicking`, `Defense`, `Head Movement`, and `Footwork` are browse categories, not stored tags.
-- Choose concrete leaf tags. Example: use `Jab`, `Cross`, and `Hook`, not `Boxing`; use `Kick Check` or `Parry`, not `Defense`.
-- Use Custom Tags only when they capture useful personal meaning or something outside the standard taxonomy.
-- Keep steps practical and coach-like, not textbook-like.
-- Do not force confidence scores, status markers, review dates, or training plans into the capture output.
-- If the voice memo is unclear, create the best draft possible and leave uncertain details out rather than inventing exact mechanics.
+- Preserve the source sequence, side, stance, target, and mechanics.
+- Do not add techniques, targets, cues, or details absent from the source.
+- Always return one short factual summary without inventing benefits or objectives.
+- Keep steps to ordered, observable actions that advance the sequence.
+- Put guard, posture, pacing, reminders, constraints, mistakes, and other how-to-perform cues in notes.
+- Never duplicate a note as a step. Return `null` for notes only when the source contains no actual cue.
+- AI does not choose or modify Training Methods, standard Tags, Custom Tags, or Status Tags.
 
-Core Idea taxonomy:
+Draft generation is provider-backed. Local development defaults to Ollama with `qwen3:4b-instruct`; production can switch to OpenAI with `CAPTURE_DRAFT_PROVIDER=openai`. Both providers share the same API contract.
 
-- Range Finding
-- Feint To Draw
-- Jab To Enter
-- Teep To Interrupt
-- Hand Trap Entry
-- Pressure Entry
-- Slip To Counter
-- Parry To Counter
-- Check And Return
-- Catch And Return
-- Shell And Return
-- Roll And Return
-- Counter Rotation
-- Exit After Scoring
-- Angle After Strike
-- Angle After Defense
-- Ring Cutting
-- Stance Switch Attack
-- Open Stance Attack
-- Rhythm Change
-- Frame To Knee
-- Inside Control
-- Posture Break
-- Turn To Attack
-- Catch To Sweep
+## Review And Failure Behavior
 
-Example distinction:
-
-```json
-{
-  "title": "Jab Teep Feint To Shift Knee",
-  "trainingMethods": ["Partner Drill", "Technical Work"],
-  "trainingTags": ["Jab", "Teep", "Knee", "Entry", "Timing", "Feint"],
-  "coreIdea": "Feint To Draw",
-  "customTags": ["sparring-focus"]
-}
-```
-
-No Core Idea example:
-
-```json
-{
-  "title": "Jab Cross Rear Kick Pad Return",
-  "trainingMethods": ["Pad Work"],
-  "trainingTags": ["Jab", "Cross", "Round Kick", "Distance"],
-  "coreIdea": null,
-  "customTags": []
-}
-```
-
-## User Review
-
-After AI capture, the user should be able to edit:
-
-- title
-- summary
-- steps
-- trainingMethods
-- trainingTags
-- coreIdea
-- customTags
-
-Status markers and Training Plans can be added after saving.
+- If cleanup fails, empty text fields become editable so capture never blocks manual entry.
+- Cleanup can be retried without resetting taxonomy or user-entered text.
+- AI suggestions never overwrite user-owned fields.
+- The user can apply queued suggestions individually or explicitly apply all.
+- The original transcript exists only for the capture session and is not persisted separately.

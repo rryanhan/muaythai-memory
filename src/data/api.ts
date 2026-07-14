@@ -1,9 +1,12 @@
 import { z, ZodError, type ZodType } from "zod";
+import { captureDraftResponseSchema } from "@/modules/capture/contracts";
 import { drillDetailResponseSchema, drillListResponseSchema } from "@/modules/drills/contracts";
 import { graphResponseSchema } from "@/modules/graph/contracts";
 import { taxonomyResponseSchema } from "@/modules/taxonomy/contracts";
 import type {
   ApiClientOptions,
+  CaptureDraftRequest,
+  CaptureDraftResponse,
   CreateDrillInput,
   DrillDetail,
   DrillFilterInput,
@@ -77,6 +80,19 @@ export async function createDrill(input: CreateDrillInput, options: ApiClientOpt
   });
 
   return response.drill;
+}
+
+export async function createCaptureDraft(
+  input: CaptureDraftRequest,
+  options: ApiClientOptions = {},
+): Promise<CaptureDraftResponse> {
+  return fetchJson("/api/capture/draft", captureDraftResponseSchema, options, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(input),
+  });
 }
 
 export async function updateDrill(

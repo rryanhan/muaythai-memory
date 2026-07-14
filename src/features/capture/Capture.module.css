@@ -1,0 +1,176 @@
+/* This boundary can be composed into AddDrillForm without leaking Capture UI. */
+.scope {}
+
+.draftForm,
+.review {
+  display: grid;
+  gap: 20px;
+}
+
+.scope :global(.capture-warning) {
+  display: grid;
+  gap: 7px;
+  border-left: 2px solid var(--accent);
+  padding: 8px 0 8px 12px;
+}
+
+.scope :global(.capture-warning) p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1.35;
+}
+
+.scope :global(.capture-warning) :global(.eyebrow) {
+  color: var(--accent);
+}
+
+.scope :global(.capture-text-loading) {
+  display: grid;
+  gap: 20px;
+}
+
+.scope :global(.capture-cleaning-banner) {
+  display: grid;
+  gap: 5px;
+  border-left: 2px solid var(--accent);
+  padding: 8px 0 8px 12px;
+}
+
+.scope :global(.capture-cleaning-banner) p {
+  margin: 0;
+}
+
+.scope :global(.capture-cleaning-banner) p:not(:global(.eyebrow)) {
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.scope :global(.capture-text-loading-fields),
+.scope :global(.capture-text-loading-steps) {
+  display: grid;
+  gap: 9px;
+  pointer-events: none;
+}
+
+.scope :global(.capture-text-loading-fields) :global(.drill-detail-skeleton) {
+  height: 46px;
+  border-radius: 8px;
+}
+
+.scope :global(.capture-text-loading-fields) :global(.drill-detail-skeleton):nth-child(2) {
+  height: 74px;
+}
+
+.scope :global(.capture-text-loading-fields) :global(.drill-detail-skeleton):nth-child(3) {
+  height: 96px;
+}
+
+.scope :global(.capture-text-loading-steps) :global(.drill-detail-skeleton) {
+  height: 46px;
+  border-radius: 8px;
+}
+
+.scope :global(.capture-text-loading-steps) :global(.drill-detail-skeleton):nth-child(2) {
+  width: 88%;
+}
+
+.scope :global(.capture-text-loading-steps) :global(.drill-detail-skeleton):nth-child(3) {
+  width: 72%;
+}
+
+.scope :global(.capture-cleanup-state) {
+  display: grid;
+  gap: 9px;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  padding: 14px 0;
+}
+
+.scope :global(.capture-cleanup-state) > p,
+.scope :global(.capture-cleanup-heading) p,
+.scope :global(.capture-cleanup-suggestions) p {
+  margin: 0;
+}
+
+.scope :global(.capture-cleanup-state) > p:not(:global(.eyebrow)),
+.scope :global(.capture-cleanup-heading) p:not(:global(.eyebrow)),
+.scope :global(.capture-cleanup-suggestions) p,
+.scope :global(.capture-cleanup-suggestions) ol {
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.scope :global(.capture-cleanup-state-error) {
+  border-left: 2px solid var(--accent);
+  padding-left: 12px;
+}
+
+.scope :global(.capture-cleanup-state) button,
+.scope :global(.add-drill-error) button {
+  min-height: 34px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0 10px;
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--accent);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.scope :global(.capture-cleanup-state) > button {
+  justify-self: start;
+}
+
+.scope :global(.capture-cleanup-heading),
+.scope :global(.capture-cleanup-suggestions) article > div {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.scope :global(.capture-cleanup-heading) > div {
+  display: grid;
+  gap: 5px;
+}
+
+.scope :global(.capture-cleanup-suggestions) {
+  display: grid;
+}
+
+.scope :global(.capture-cleanup-suggestions) article {
+  display: grid;
+  gap: 7px;
+  border-top: 1px solid rgba(214, 209, 198, 0.78);
+  padding: 12px 0;
+}
+
+.scope :global(.capture-cleanup-suggestions) h3 {
+  margin: 0;
+  color: var(--text);
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 12px;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.scope :global(.capture-cleanup-suggestions) ol {
+  margin: 0;
+  padding-left: 21px;
+}
+
+.scope :global(.capture-cleanup-suggestions) li + li {
+  margin-top: 4px;
+}
+
+.draftForm :global(.add-drill-error) {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}

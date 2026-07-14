@@ -8,6 +8,7 @@ import { DrillDetailBackButton } from "@/features/drills/DrillDetailBackButton";
 import { DrillDetailContent } from "@/features/drills/DrillDetailContent";
 import { RoutedBottomNav } from "@/components/navigation/RoutedBottomNav";
 import { getDrillById } from "@/modules/drills/queries";
+import routeStyles from "@/features/drills/DrillRouteShell.module.css";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -53,8 +54,8 @@ export default async function DrillDetailPage({ params }: DrillDetailPageProps) 
   }
 
   return (
-    <main className="drill-detail-page">
-      <div className="drill-detail-page-grid" aria-hidden="true" />
+    <main className={routeStyles.detailPage}>
+      <div className="notebook-grid" aria-hidden="true" />
       <header className="drill-detail-page-header">
         <DrillDetailBackButton />
         <p className="eyebrow">Drill Record</p>

@@ -4,6 +4,7 @@ import { useRef, type PointerEvent } from "react";
 import { Drawer } from "vaul";
 import type { DrillDetail } from "@/data";
 import { DrillDetailContent } from "@/features/drills/DrillDetailContent";
+import styles from "./DrillDetail.module.css";
 
 type DrillDetailLoadState =
   | { status: "loading"; drillId: string }
@@ -63,9 +64,9 @@ export function DrillDetailSheet({
       autoFocus={false}
     >
       <Drawer.Portal>
-        <Drawer.Overlay className="drill-detail-backdrop" />
+        <Drawer.Overlay className={styles.backdrop} />
         <Drawer.Content
-          className="drill-detail-sheet"
+          className={styles.sheet}
           aria-label="Drill detail"
           onPointerDown={(event) => event.stopPropagation()}
           onPointerDownCapture={handlePointerDownCapture}

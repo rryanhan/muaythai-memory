@@ -1,4 +1,5 @@
 import type { DrillDetail } from "@/data";
+import styles from "./DrillDetail.module.css";
 
 type DrillDetailContentProps = {
   drill: DrillDetail;
@@ -12,7 +13,7 @@ export function DrillDetailContent({ drill, badgeByIconKey }: DrillDetailContent
   const notes = drill.notes?.trim();
 
   return (
-    <article className="drill-detail-content">
+    <article className={`${styles.content} drill-detail-content`}>
       <div className="drill-detail-title-row">
         {primaryBadge && (
           <img className="drill-detail-method-badge" src={primaryBadge} alt="" aria-hidden="true" />

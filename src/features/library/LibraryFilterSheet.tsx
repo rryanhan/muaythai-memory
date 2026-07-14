@@ -13,6 +13,7 @@ import {
   normalizeKeyword,
 } from "./library-helpers";
 import type { BuiltInStatusFilter, FilterPreviewState, TaxonomyLoadState } from "./types";
+import styles from "./Library.module.css";
 
 type LibraryFilterSheetProps = {
   open: boolean;
@@ -78,8 +79,8 @@ export function LibraryFilterSheet({
   return (
     <Drawer.Root open={open} onOpenChange={onOpenChange} direction="bottom" modal dismissible autoFocus={false}>
       <Drawer.Portal>
-        <Drawer.Overlay className="library-filter-backdrop" />
-        <Drawer.Content className="library-filter-sheet" aria-label="Library filters">
+        <Drawer.Overlay className={styles.filterBackdrop} />
+        <Drawer.Content className={styles.filterSheet} aria-label="Library filters">
           <Drawer.Handle className="sheet-handle" />
           <header className="library-filter-sheet-header">
             <div>

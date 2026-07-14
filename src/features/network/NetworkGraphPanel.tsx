@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type Dispatch, type SetStateAction } from "react";
+import Link from "next/link";
 import { getDrill, type GraphOptions, type GraphResponse, type TagDto, type TaxonomyResponse } from "@/data";
 import { badgeByIconKey } from "@/components/shared/context-badges";
 import { DrillDetailSheet } from "@/features/drills/DrillDetailSheet";
@@ -407,9 +408,9 @@ export function NetworkGraphPanel({
         >
           <span className="rail-icon rail-icon-search" aria-hidden="true" />
         </button>
-        <button type="button" className="record-button" aria-label="Record drill" disabled>
+        <Link className="record-button" href="/capture/new" aria-label="Capture drill draft" prefetch>
           <span className="rail-icon rail-icon-record" aria-hidden="true" />
-        </button>
+        </Link>
       </div>
 
       {selectedDrillId && visibleDetailState.status !== "idle" && (

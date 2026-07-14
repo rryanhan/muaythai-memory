@@ -18,6 +18,7 @@ import {
   toTaxonomyState,
 } from "./library-helpers";
 import { emptyLibraryFilters, type BuiltInStatusFilter, type LibraryFilters } from "./types";
+import styles from "./Library.module.css";
 
 // Owns Training Log query/filter state. Child components own index, sheet, and row presentation.
 export function LibraryView() {
@@ -146,7 +147,7 @@ export function LibraryView() {
   }
 
   return (
-    <section className="library-view" aria-label="Training Log">
+    <section className={styles.view} aria-label="Training Log">
       <button
         type="button"
         className="index-spine"
