@@ -13,6 +13,9 @@ build/
 out/
 tsconfig.tsbuildinfo
 
+# Downloaded local transcription models
+.local-models/
+
 # Logs
 *.log
 npm-debug.log*

@@ -32,7 +32,7 @@ export function LibraryIndexPanel({
   }
 
   function prefetchCaptureDraft() {
-    router.prefetch("/capture/new");
+    router.prefetch("/capture/new?mode=voice&from=library");
   }
 
   useEffect(() => {
@@ -63,7 +63,7 @@ export function LibraryIndexPanel({
           <div className="library-index-action-block">
             <Link
               className="library-add-drill-link"
-              href="/capture/new"
+              href="/capture/new?mode=voice&from=library"
               prefetch
               onFocus={prefetchCaptureDraft}
               onPointerEnter={prefetchCaptureDraft}
@@ -72,7 +72,7 @@ export function LibraryIndexPanel({
               <span className="library-index-action-icon" aria-hidden="true">
                 <Microphone size={22} weight="bold" />
               </span>
-              <span>Capture Draft</span>
+              <span>Capture Drill</span>
             </Link>
             <Link
               className="library-add-drill-link"

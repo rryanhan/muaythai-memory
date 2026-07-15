@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
+import "@fontsource/dseg7/classic-400.css";
 import { QueryProvider } from "@/components/providers/QueryProvider";
 import "./globals.css";
 

@@ -7,6 +7,323 @@
   gap: 20px;
 }
 
+.voicePanel {
+  display: grid;
+  gap: 18px;
+  border-top: 1px solid var(--border);
+  padding-top: 16px;
+}
+
+.voicePanel > p {
+  margin: 0;
+}
+
+.voiceStage {
+  position: relative;
+  display: grid;
+  width: 100%;
+  height: clamp(390px, 52svh, 470px);
+  min-height: 390px;
+  overflow: hidden;
+  grid-template-rows: 44px minmax(0, 1fr) 64px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: rgba(236, 234, 227, 0.78);
+  text-align: center;
+}
+
+.voiceConsoleHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border);
+  padding: 0 14px;
+  color: var(--muted);
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+.voiceConsoleState {
+  color: var(--muted);
+}
+
+.voiceConsoleState[data-status="recording"],
+.voiceConsoleState[data-status="finalizing"],
+.voiceConsoleState[data-status="error"] {
+  color: var(--accent);
+}
+
+.voiceConsoleDisplay {
+  display: grid;
+  min-height: 0;
+  grid-template-rows: auto minmax(158px, 1fr) auto;
+  gap: 10px;
+  padding: 22px 14px 16px;
+  background: rgba(245, 244, 239, 0.44);
+}
+
+.voiceTimer {
+  margin: 0;
+  font-family: "DSEG7", "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 52px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 400;
+  letter-spacing: 0;
+  line-height: 1;
+}
+
+.voiceWaveformViewport {
+  position: relative;
+  width: 100%;
+  min-height: 158px;
+  overflow: hidden;
+}
+
+.voiceWaveform {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0.58;
+  pointer-events: none;
+}
+
+.voiceWaveform[data-active="true"] {
+  opacity: 1;
+}
+
+.voiceConsoleMessage {
+  display: grid;
+  min-height: 34px;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.voiceConsoleMessage p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.voiceConsoleMessage button {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.voiceCommandRail {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: minmax(0, 0.72fr) minmax(0, 1.28fr);
+  border-top: 1px solid var(--border);
+}
+
+.voiceCommandRail button {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  overflow: hidden;
+  border: 0;
+  border-radius: 0;
+  padding: 0 10px;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0;
+  line-height: 1.1;
+  text-transform: uppercase;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.voiceCommandRail button:first-child {
+  border-right: 1px solid var(--border);
+}
+
+.voiceSecondaryCommand {
+  background: var(--surface-muted);
+  color: var(--text);
+}
+
+.voicePrimaryCommand {
+  background: var(--accent);
+  color: var(--text);
+}
+
+.voiceProgressCommand {
+  background: rgba(244, 216, 208, 0.62);
+  color: var(--accent);
+  cursor: wait !important;
+}
+
+.voiceCommandRail button:not(:disabled):active {
+  transform: translateY(1px);
+}
+
+.voicePreparingStage {
+  display: grid;
+  min-height: 260px;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 24px;
+  background: rgba(236, 234, 227, 0.78);
+  text-align: center;
+}
+
+.voicePreparingCopy {
+  display: grid;
+  justify-items: center;
+  gap: 7px;
+}
+
+.voicePreparingCopy p,
+.voiceError p {
+  margin: 0;
+}
+
+.voicePreparingStatus {
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.voicePreparingLimit,
+.voiceError p:not(:global(.eyebrow)) {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.voiceError {
+  display: grid;
+  width: 100%;
+  gap: 10px;
+  border-left: 2px solid var(--accent);
+  padding: 8px 0 8px 14px;
+  text-align: left;
+}
+
+.voiceError > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.voiceError button {
+  min-height: 38px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0 12px;
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.voiceCommandRail button:focus-visible,
+.voiceConsoleMessage button:focus-visible,
+.voiceError button:focus-visible,
+.transcriptSection button:focus-visible {
+  outline: 2px solid var(--teal);
+  outline-offset: -3px;
+}
+
+.transcriptSection {
+  display: grid;
+  gap: 12px;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  padding: 14px 0;
+}
+
+.transcriptHeading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.transcriptHeading > div {
+  display: grid;
+  gap: 4px;
+}
+
+.transcriptHeading p {
+  margin: 0;
+}
+
+.transcriptHeading p:not(:global(.eyebrow)) {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.transcriptEditor {
+  display: grid;
+  gap: 10px;
+}
+
+.transcriptPreview {
+  display: -webkit-box;
+  overflow: hidden;
+  margin: 0;
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.45;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.transcriptEditor textarea {
+  width: 100%;
+  resize: vertical;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.78);
+  color: var(--text);
+  font: inherit;
+  font-size: 15px;
+  line-height: 1.45;
+}
+
+.transcriptEditor textarea:focus {
+  border-color: var(--teal);
+  outline: none;
+}
+
+.transcriptEditor > div {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.transcriptEditor button:last-child {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--surface);
+}
+
+.transcriptEditor button:disabled {
+  opacity: 0.48;
+  cursor: not-allowed;
+}
+
 .scope :global(.capture-warning) {
   display: grid;
   gap: 7px;
@@ -173,4 +490,85 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+}
+
+.draftForm :global(.capture-draft-actions) button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+}
+
+.discardBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  background: rgba(34, 34, 32, 0.34);
+}
+
+.discardSheet {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 81;
+  display: grid;
+  max-width: 480px;
+  margin: 0 auto;
+  gap: 10px;
+  border: 1px solid var(--border);
+  border-bottom: 0;
+  border-radius: 8px 8px 0 0;
+  padding: 10px 20px calc(18px + env(safe-area-inset-bottom));
+  background: var(--surface);
+  color: var(--text);
+  outline: none;
+}
+
+.discardSheet h2,
+.discardSheet p {
+  margin: 0;
+}
+
+.discardSheet h2 {
+  margin-top: 4px;
+  font-size: 24px;
+  line-height: 1.05;
+}
+
+.discardSheet p {
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.discardActions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.discardActions button {
+  min-height: 46px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0 12px;
+  background: var(--surface-muted);
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.discardActions button:last-child {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--surface);
+}
+
+.discardActions button:focus-visible {
+  outline: 2px solid var(--teal);
+  outline-offset: 2px;
 }

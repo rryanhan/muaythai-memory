@@ -33,6 +33,8 @@ type AddDrillFormProps = {
   cleanupState?: DrillFormCleanupState;
   textFieldsPending?: boolean;
   onBeforeSave?: () => void;
+  onCancel?: () => void;
+  onSaveSuccess?: (drillId: string) => void;
 };
 
 export type DrillFormCleanupState = {
@@ -60,6 +62,8 @@ export function AddDrillForm({
   cleanupState,
   textFieldsPending = false,
   onBeforeSave,
+  onCancel,
+  onSaveSuccess,
 }: AddDrillFormProps) {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -109,6 +113,10 @@ export function AddDrillForm({
         queryClient.invalidateQueries({ queryKey: ["graph"] }),
         queryClient.invalidateQueries({ queryKey: ["drill", drill.id] }),
       ]);
+      if (onSaveSuccess) {
+        onSaveSuccess(drill.id);
+        return;
+      }
       router.push(`/drills/${drill.id}`);
       router.refresh();
     },
@@ -377,7 +385,7 @@ export function AddDrillForm({
       )}
 
       <div className="add-drill-actions">
-        <button type="button" onClick={() => router.back()}>
+        <button type="button" onClick={() => (onCancel ? onCancel() : router.back())}>
           Cancel
         </button>
         <button type="submit" disabled={saveMutation.isPending || textFieldsPending}>

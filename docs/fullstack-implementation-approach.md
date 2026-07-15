@@ -26,7 +26,7 @@ In plain language:
 - Store real app data in a structured relational database.
 - Keep tags and taxonomy as editable data, not hardcoded columns.
 - Give the graph lightweight node/edge payloads instead of full drill records.
-- Run transcription and AI cleanup in background jobs so the app does not freeze.
+- Keep transcription and AI cleanup asynchronous from form editing so the app does not freeze.
 
 ## First Product Scope
 
@@ -48,10 +48,10 @@ Do later:
 
 - Workout/exercise backend.
 - Training plans.
-- Voice memo transcription.
-- AI cleanup drafts.
 - Progress journal video uploads.
 - Social/shared knowledge webs.
+
+Active capture v1 uses ephemeral local Whisper transcription and editable AI cleanup drafts. Durable upload/job infrastructure remains deferred until production needs it.
 
 Workouts already have a model, but they should not slow down the first backend pass.
 
@@ -184,7 +184,7 @@ status_tags
 drill_status_tags
 ```
 
-Later tables:
+Later tables, only if durable capture history or background processing is introduced:
 
 ```txt
 voice_memos
@@ -393,7 +393,14 @@ GET    /api/graph/muay-thai?method=pad-work
 GET    /api/graph/muay-thai?tag=uppercut
 ```
 
-Later endpoints:
+Active capture endpoints:
+
+```txt
+POST   /api/capture/transcribe
+POST   /api/capture/draft
+```
+
+Later production job endpoints:
 
 ```txt
 POST   /api/capture/audio
@@ -484,21 +491,19 @@ Add Redis later for:
 
 ```txt
 User records voice memo
-  -> audio uploads
-  -> capture job is created
-  -> worker transcribes
-  -> worker cleans into structured draft
+  -> request-only audio is sent to local Whisper
+  -> ephemeral transcript returns
+  -> deterministic taxonomy is detected
+  -> AI cleanup runs without blocking taxonomy editing
   -> user reviews and edits
-  -> user confirms
-  -> drill is saved
+  -> user saves a normal drill
 ```
 
-Store:
+Capture v1 stores:
 
-- Original audio file.
-- Raw transcript.
-- AI structured draft.
 - Final user-confirmed drill.
+
+Capture v1 does not persist original audio, raw transcripts, or intermediate AI drafts. Durable capture artifacts and worker jobs are a later production decision.
 
 AI should assist capture, not secretly mutate the user's knowledge base.
 
@@ -570,12 +575,12 @@ If a save fails, revert and show a clear message.
 
 ### Phase 3: Capture
 
-- Add audio upload.
-- Add capture jobs.
-- Add transcription.
-- Add AI cleanup.
-- Add draft review.
-- Confirm draft into saved drill.
+- Add browser recording.
+- Add request-only local transcription.
+- Add deterministic taxonomy detection.
+- Add editable AI cleanup.
+- Add draft review and normal drill save.
+- Defer durable audio uploads and capture jobs.
 
 ### Phase 4: Profile And Journal
 

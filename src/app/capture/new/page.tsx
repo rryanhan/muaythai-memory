@@ -1,28 +1,20 @@
 import type { Metadata } from "next";
-import { RoutedBottomNav } from "@/components/navigation/RoutedBottomNav";
-import { CaptureDraftForm } from "@/features/capture/CaptureDraftForm";
-import { DrillDetailBackButton } from "@/features/drills/DrillDetailBackButton";
-import routeStyles from "@/features/drills/DrillRouteShell.module.css";
+import { CaptureDraftScreen, type CaptureOrigin } from "@/features/capture/CaptureDraftScreen";
+import type { CaptureMode } from "@/features/capture/CaptureDraftForm";
 
 export const metadata: Metadata = {
-  title: "Capture Draft | Muay Thai Memory",
-  description: "Turn a messy training note into a draft drill.",
+  title: "Capture Drill | Muay Thai Memory",
+  description: "Record or type a training note and turn it into a drill.",
 };
 
-export default function CaptureDraftPage() {
-  return (
-    <main className={routeStyles.formPage}>
-      <div className="notebook-grid" aria-hidden="true" />
-      <header className="drill-detail-page-header">
-        <DrillDetailBackButton />
-        <p className="eyebrow">Capture Draft</p>
-      </header>
-      <section className="add-drill-heading">
-        <h1>Capture Draft</h1>
-        <p>Paste the messy version. Clean it up before saving.</p>
-      </section>
-      <CaptureDraftForm />
-      <RoutedBottomNav activeView="library" />
-    </main>
-  );
+type CaptureDraftPageProps = {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+};
+
+export default async function CaptureDraftPage({ searchParams }: CaptureDraftPageProps) {
+  const params = await searchParams;
+  const initialMode: CaptureMode = params.mode === "text" ? "text" : "voice";
+  const origin: CaptureOrigin = params.from === "network" ? "network" : "library";
+
+  return <CaptureDraftScreen initialMode={initialMode} origin={origin} />;
 }

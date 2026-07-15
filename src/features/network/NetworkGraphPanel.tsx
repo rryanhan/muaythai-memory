@@ -408,7 +408,12 @@ export function NetworkGraphPanel({
         >
           <span className="rail-icon rail-icon-search" aria-hidden="true" />
         </button>
-        <Link className="record-button" href="/capture/new" aria-label="Capture drill draft" prefetch>
+        <Link
+          className="record-button"
+          href="/capture/new?mode=voice&from=network"
+          aria-label="Capture drill"
+          prefetch
+        >
           <span className="rail-icon rail-icon-record" aria-hidden="true" />
         </Link>
       </div>

@@ -1,4 +1,9 @@
-import type { CaptureDraft, CaptureDraftRequest, CaptureDraftResponse } from "@/modules/capture/contracts";
+import type {
+  CaptureDraft,
+  CaptureDraftRequest,
+  CaptureDraftResponse,
+  CaptureTranscriptionResponse,
+} from "@/modules/capture/contracts";
 import type {
   CreateDrillInput,
   DrillDetail,
@@ -17,6 +22,7 @@ export type {
   CaptureDraft,
   CaptureDraftRequest,
   CaptureDraftResponse,
+  CaptureTranscriptionResponse,
   CreateDrillInput,
   DrillDetail,
   DrillFilters,

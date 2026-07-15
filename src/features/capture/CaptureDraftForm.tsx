@@ -1,5 +1,6 @@
 "use client";
 
+import { Microphone, PencilSimple } from "@phosphor-icons/react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { createCaptureDraft, getTaxonomy, type ApiError, type CaptureDraft } from "@/data";
@@ -11,11 +12,30 @@ import {
 import type { DrillCleanupValues } from "@/features/drills/cleanup-merge";
 import drillStyles from "@/features/drills/DrillForm.module.css";
 import { parseCaptureTranscript } from "@/modules/capture/parser";
+import { isCurrentCaptureCleanup } from "./capture-session";
 import styles from "./Capture.module.css";
+import { VoiceCapturePanel, type VoiceCaptureState } from "./VoiceCapturePanel";
+
+export type CaptureMode = "voice" | "text";
+export type CaptureWorkflowPhase = "input" | "processing" | "review";
+
+export type CaptureWorkflowState = {
+  mode: CaptureMode;
+  phase: CaptureWorkflowPhase;
+  hasUnsavedWork: boolean;
+};
+
+type CaptureDraftFormProps = {
+  initialMode: CaptureMode;
+  onWorkflowChange?: (state: CaptureWorkflowState) => void;
+  onRequestExit?: () => void;
+  onSaveSuccess?: (drillId: string) => void;
+};
 
 type CaptureSession = {
   id: number;
   transcript: string;
+  source: CaptureMode;
   initialValues: DrillFormInitialValues;
   warnings: string[];
 };
@@ -25,14 +45,40 @@ type CleanupSuggestion = {
   values: DrillCleanupValues;
 };
 
-export function CaptureDraftForm() {
+type CleanupRequest = {
+  note: string;
+  signal: AbortSignal;
+  requestId: number;
+  sessionId: number;
+};
+
+const idleVoiceState: VoiceCaptureState = {
+  status: "idle",
+  hasUnsavedWork: false,
+};
+
+export function CaptureDraftForm({
+  initialMode,
+  onWorkflowChange,
+  onRequestExit,
+  onSaveSuccess,
+}: CaptureDraftFormProps) {
+  const [mode, setMode] = useState<CaptureMode>(initialMode);
+  const [voiceState, setVoiceState] = useState<VoiceCaptureState>(idleVoiceState);
   const [transcript, setTranscript] = useState("");
+  const [pendingVoiceTranscript, setPendingVoiceTranscript] = useState<string | null>(null);
   const [session, setSession] = useState<CaptureSession | null>(null);
+  const [transcriptEditorOpen, setTranscriptEditorOpen] = useState(false);
+  const [transcriptRevision, setTranscriptRevision] = useState("");
   const [cleanupSuggestion, setCleanupSuggestion] = useState<CleanupSuggestion | null>(null);
   const [cleanupError, setCleanupError] = useState<string | null>(null);
+  const [cleanupPending, setCleanupPending] = useState(false);
   const [textFieldsRevealed, setTextFieldsRevealed] = useState(false);
   const abortController = useRef<AbortController | null>(null);
   const nextSessionId = useRef(1);
+  const activeSessionId = useRef<number | null>(null);
+  const nextCleanupRequestId = useRef(1);
+  const activeCleanupRequestId = useRef<number | null>(null);
   const nextCleanupRevision = useRef(1);
   const taxonomyQuery = useQuery({
     queryKey: ["taxonomy"],
@@ -40,9 +86,14 @@ export function CaptureDraftForm() {
     staleTime: 10 * 60 * 1000,
   });
   const cleanupMutation = useMutation({
-    mutationFn: ({ note, signal }: { note: string; signal: AbortSignal }) =>
+    mutationFn: ({ note, signal }: CleanupRequest) =>
       createCaptureDraft({ transcript: note }, { requestInit: { signal } }),
-    onSuccess: (response) => {
+    onSuccess: (response, request) => {
+      if (!isCurrentCaptureCleanup(request, activeCleanupRequestId.current, activeSessionId.current)) {
+        return;
+      }
+
+      setCleanupPending(false);
       setCleanupSuggestion({
         revision: nextCleanupRevision.current++,
         values: toCleanupValues(response.draft),
@@ -50,7 +101,7 @@ export function CaptureDraftForm() {
       setTextFieldsRevealed(true);
       setCleanupError(null);
       setSession((current) =>
-        current
+        current?.id === request.sessionId
           ? {
               ...current,
               warnings: unique([...current.warnings, ...response.warnings]),
@@ -58,55 +109,139 @@ export function CaptureDraftForm() {
           : current,
       );
     },
-    onError: (error) => {
-      if (isAbortError(error)) return;
+    onError: (error, request) => {
+      if (
+        isAbortError(error) ||
+        !isCurrentCaptureCleanup(request, activeCleanupRequestId.current, activeSessionId.current)
+      ) {
+        return;
+      }
+
+      setCleanupPending(false);
       setTextFieldsRevealed(true);
       setCleanupError(getCaptureErrorMessage(error));
     },
   });
 
   useEffect(() => {
-    return () => abortController.current?.abort();
+    return () => {
+      activeCleanupRequestId.current = null;
+      abortController.current?.abort();
+    };
   }, []);
+
+  useEffect(() => {
+    if (!pendingVoiceTranscript || !taxonomyQuery.data) return;
+    const readyTranscript = pendingVoiceTranscript;
+    setPendingVoiceTranscript(null);
+    beginDraft(readyTranscript, "voice");
+    // The transcript is consumed once when app-wide taxonomy becomes ready.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingVoiceTranscript, taxonomyQuery.data]);
+
+  useEffect(() => {
+    const phase: CaptureWorkflowPhase = session
+      ? "review"
+      : pendingVoiceTranscript ||
+          voiceState.status === "finalizing" ||
+          voiceState.status === "transcribing"
+        ? "processing"
+        : "input";
+    const hasUnsavedWork = Boolean(
+      session || pendingVoiceTranscript || transcript.trim() || voiceState.hasUnsavedWork,
+    );
+
+    onWorkflowChange?.({ mode, phase, hasUnsavedWork });
+  }, [mode, onWorkflowChange, pendingVoiceTranscript, session, transcript, voiceState]);
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!taxonomyQuery.data) return;
+    beginDraft(transcript, "text");
+  }
 
-    const deterministicResult = parseCaptureTranscript(transcript, taxonomyQuery.data);
+  function beginDraft(note: string, source: CaptureMode) {
+    const normalizedNote = note.trim();
+    if (!taxonomyQuery.data || normalizedNote.length < 12) return;
+
+    const sessionId = nextSessionId.current++;
+    const deterministicResult = parseCaptureTranscript(normalizedNote, taxonomyQuery.data);
+    activeSessionId.current = sessionId;
     setSession({
-      id: nextSessionId.current++,
-      transcript,
+      id: sessionId,
+      transcript: normalizedNote,
+      source,
       initialValues: toTaxonomyInitialValues(deterministicResult),
       warnings: deterministicResult.warnings,
     });
+    setTranscript(normalizedNote);
+    setTranscriptEditorOpen(false);
+    setTranscriptRevision(normalizedNote);
     setCleanupSuggestion(null);
     setCleanupError(null);
     setTextFieldsRevealed(false);
-    startCleanup(transcript);
+    startCleanup(normalizedNote, sessionId);
   }
 
-  function startCleanup(note: string) {
+  function startCleanup(note: string, sessionId: number) {
     abortController.current?.abort();
     const controller = new AbortController();
+    const requestId = nextCleanupRequestId.current++;
     abortController.current = controller;
+    activeCleanupRequestId.current = requestId;
+    setCleanupPending(true);
     setCleanupError(null);
-    cleanupMutation.mutate({ note, signal: controller.signal });
+    cleanupMutation.mutate({ note, signal: controller.signal, requestId, sessionId });
   }
 
   function cancelCleanup() {
+    activeCleanupRequestId.current = null;
     abortController.current?.abort();
     abortController.current = null;
+    setCleanupPending(false);
+  }
+
+  function selectMode(nextMode: CaptureMode) {
+    setMode(nextMode);
+    setVoiceState(idleVoiceState);
+
+    const nextUrl = new URL(window.location.href);
+    nextUrl.searchParams.set("mode", nextMode);
+    window.history.replaceState(window.history.state, "", `${nextUrl.pathname}${nextUrl.search}`);
+  }
+
+  function handleVoiceTranscript(nextTranscript: string) {
+    setTranscript(nextTranscript);
+    if (taxonomyQuery.data) {
+      beginDraft(nextTranscript, "voice");
+      return;
+    }
+    setPendingVoiceTranscript(nextTranscript);
+  }
+
+  function editPendingTranscriptAsText() {
+    if (!pendingVoiceTranscript) return;
+    setTranscript(pendingVoiceTranscript);
+    setPendingVoiceTranscript(null);
+    selectMode("text");
+  }
+
+  function regenerateFromTranscript() {
+    if (!session || transcriptRevision.trim().length < 12) return;
+    const confirmed = window.confirm(
+      "Regenerating will replace the current drill fields, Training Methods, and tags with a new draft based on this transcript.",
+    );
+    if (!confirmed) return;
+    beginDraft(transcriptRevision, session.source);
   }
 
   if (session) {
-    const cleanupState: DrillFormCleanupState = cleanupMutation.isPending
+    const cleanupState: DrillFormCleanupState = cleanupPending
       ? { status: "pending" }
       : cleanupError
         ? {
             status: "error",
             errorMessage: cleanupError,
-            onRetry: () => startCleanup(session.transcript),
+            onRetry: () => startCleanup(session.transcript, session.id),
           }
         : cleanupSuggestion
           ? {
@@ -118,6 +253,48 @@ export function CaptureDraftForm() {
 
     return (
       <div className={`${styles.scope} ${styles.review}`}>
+        <section className={styles.transcriptSection}>
+          <div className={styles.transcriptHeading}>
+            <div>
+              <p className="eyebrow">Original Memo</p>
+              <p>{session.source === "voice" ? "Transcribed locally" : "Typed note"}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setTranscriptRevision(session.transcript);
+                setTranscriptEditorOpen((open) => !open);
+              }}
+            >
+              <PencilSimple size={16} weight="bold" />
+              Edit transcript
+            </button>
+          </div>
+          {transcriptEditorOpen ? (
+            <div className={styles.transcriptEditor}>
+              <textarea
+                value={transcriptRevision}
+                onChange={(event) => setTranscriptRevision(event.target.value)}
+                rows={6}
+                aria-label="Edit original transcript"
+              />
+              <div>
+                <button type="button" onClick={() => setTranscriptEditorOpen(false)}>
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={transcriptRevision.trim().length < 12}
+                  onClick={regenerateFromTranscript}
+                >
+                  Regenerate draft
+                </button>
+              </div>
+            </div>
+          ) : (
+            <p className={styles.transcriptPreview}>{session.transcript}</p>
+          )}
+        </section>
         {session.warnings.length > 0 && (
           <section className="capture-warning" aria-label="Draft warnings">
             <p className="eyebrow">Review Notes</p>
@@ -132,8 +309,49 @@ export function CaptureDraftForm() {
           cleanupState={cleanupState}
           textFieldsPending={!textFieldsRevealed}
           onBeforeSave={cancelCleanup}
+          onCancel={onRequestExit}
+          onSaveSuccess={onSaveSuccess}
         />
       </div>
+    );
+  }
+
+  if (pendingVoiceTranscript) {
+    return (
+      <section className={styles.voicePanel} aria-live="polite">
+        <p className="eyebrow">Preparing Draft</p>
+        <div className={styles.voicePreparingStage}>
+          {taxonomyQuery.isError ? (
+            <div className={styles.voiceError}>
+              <p className="eyebrow">Taxonomy Error</p>
+              <p>The recording is safe for this session, but its tags could not be prepared.</p>
+              <div>
+                <button type="button" onClick={() => void taxonomyQuery.refetch()}>
+                  Retry
+                </button>
+                <button type="button" onClick={editPendingTranscriptAsText}>
+                  Edit as text
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className={styles.voicePreparingCopy}>
+              <p className={styles.voicePreparingStatus}>Preparing drill taxonomy</p>
+              <p className={styles.voicePreparingLimit}>Your transcript stays in this capture session.</p>
+            </div>
+          )}
+        </div>
+      </section>
+    );
+  }
+
+  if (mode === "voice") {
+    return (
+      <VoiceCapturePanel
+        onTranscript={handleVoiceTranscript}
+        onUseText={() => selectMode("text")}
+        onStateChange={setVoiceState}
+      />
     );
   }
 
@@ -162,8 +380,9 @@ export function CaptureDraftForm() {
       )}
 
       <div className="add-drill-actions capture-draft-actions">
-        <button type="button" onClick={() => setTranscript("")} disabled={!transcript.trim()}>
-          Clear
+        <button type="button" onClick={() => selectMode("voice")}>
+          <Microphone size={18} weight="regular" />
+          Use microphone
         </button>
         <button type="submit" disabled={!taxonomyQuery.data || transcript.trim().length < 12}>
           {taxonomyQuery.isLoading ? "Preparing" : "Generate draft"}

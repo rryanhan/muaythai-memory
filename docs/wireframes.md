@@ -71,9 +71,15 @@ Middle icon: Search
 
 Bottom icon: Capture
 
-- Tap mic to record a voice memo.
-- Hold mic to reveal manual input.
-- Hold and swipe up to manual-input icon to open manual entry.
+- Tap the action-rail mic to open voice capture.
+- Tap Record on the capture page to request microphone access and begin recording.
+- A single continuous live waveform crosses a center baseline to confirm that the microphone is receiving speech.
+- Voice capture uses one full-width angular input console with a digital timer, waveform display, and split command rail.
+- The left command switches between Type Instead and Cancel; the primary right command switches between Start Recording and Stop & Transcribe.
+- After Stop, the console briefly shows `Finalizing` while the browser completes the audio file, then advances to local transcription.
+- Finalization and transcription are time-bounded. Recoverable failures return to a retained Recorded state with Transcribe, Record Again, and Discard actions.
+- Type Instead opens the same capture workflow with manual text input.
+- Hold-and-swipe manual entry remains a later gesture enhancement.
 
 ### Active State
 
@@ -244,16 +250,22 @@ If the search input is empty and the user taps the search icon again, no search 
 
 ## Capture Interaction
 
+Capture uses `/capture/new?mode=voice|text&from=network|library`. Back and the persistent bottom navigation return to or highlight the originating view. Voice Memo and text input are distinct input surfaces inside one Capture Drill shell.
+
 Low-fidelity flow:
 
 ```txt
 Tap mic
 ↓
-Record voice memo
+Tap Start Recording and record Voice Memo
 ↓
-AI capture creates draft drill
+Finalize the browser recording
 ↓
-Review title, summary, steps, trainingMethods, trainingTags, coreIdea, customTags
+Local Whisper transcribes after recording stops
+↓
+Capture detects taxonomy and cleans the draft
+↓
+Review title, summary, notes, steps, Training Methods, and Tags
 ↓
 Save drill
 ```
@@ -261,13 +273,15 @@ Save drill
 Manual input flow:
 
 ```txt
-Hold mic
+Tap Type Instead
 ↓
-Manual input icon appears above mic
-↓
-Swipe up while holding
-↓
-Manual entry opens
+Manual text capture opens
 ↓
 User fills same fields as AI capture draft
 ```
+
+Cancelling an active recording discards it and resets the timer. Cancelling transcription retains the completed recording for Transcribe, Record Again, or Discard. During review, a compact transcript excerpt remains visible above the editable drill form. Regenerating from an edited transcript requires confirmation because it replaces the current drill fields, Training Methods, and Tags.
+
+Once Capture contains unsaved work, header back, form Cancel, bottom navigation, browser Back, and refresh require discard confirmation. No separate review checkbox is required.
+
+Hold-and-swipe remains documented as a future shortcut, not a Voice Capture v1 requirement.

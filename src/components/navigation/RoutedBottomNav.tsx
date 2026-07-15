@@ -5,6 +5,7 @@ import { BottomNav, type AppView } from "@/components/navigation/BottomNav";
 
 type RoutedBottomNavProps = {
   activeView: AppView;
+  onNavigate?: (destination: string, view: AppView) => void;
 };
 
 const viewRoutes: Record<AppView, string> = {
@@ -14,8 +15,20 @@ const viewRoutes: Record<AppView, string> = {
 };
 
 // Used by standalone routes, where the nav needs real URL navigation instead of AppShell state changes.
-export function RoutedBottomNav({ activeView }: RoutedBottomNavProps) {
+export function RoutedBottomNav({ activeView, onNavigate }: RoutedBottomNavProps) {
   const router = useRouter();
 
-  return <BottomNav activeView={activeView} onChange={(view) => router.push(viewRoutes[view])} />;
+  return (
+    <BottomNav
+      activeView={activeView}
+      onChange={(view) => {
+        const destination = viewRoutes[view];
+        if (onNavigate) {
+          onNavigate(destination, view);
+          return;
+        }
+        router.push(destination);
+      }}
+    />
+  );
 }

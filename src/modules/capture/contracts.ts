@@ -24,6 +24,10 @@ export const captureDraftResponseSchema = z.object({
   warnings: z.array(z.string()),
 });
 
+export const captureTranscriptionResponseSchema = z.object({
+  transcript: z.string().trim().min(1),
+});
+
 // The model-facing schema avoids transforms/defaults because strict structured
 // output schemas work best when the model must explicitly fill every key.
 export const modelCaptureDraftSchema = z.object({
@@ -36,4 +40,5 @@ export const modelCaptureDraftSchema = z.object({
 export type CaptureDraftRequest = z.infer<typeof captureDraftRequestSchema>;
 export type CaptureDraft = z.infer<typeof captureDraftSchema>;
 export type CaptureDraftResponse = z.infer<typeof captureDraftResponseSchema>;
+export type CaptureTranscriptionResponse = z.infer<typeof captureTranscriptionResponseSchema>;
 export type ModelCaptureDraft = z.infer<typeof modelCaptureDraftSchema>;
