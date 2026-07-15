@@ -6,6 +6,7 @@ import type {
 } from "@/modules/capture/contracts";
 import type {
   CreateDrillInput,
+  DeleteDrillResponse,
   DrillDetail,
   DrillFilters,
   DrillListResponse,
@@ -24,6 +25,7 @@ export type {
   CaptureDraftResponse,
   CaptureTranscriptionResponse,
   CreateDrillInput,
+  DeleteDrillResponse,
   DrillDetail,
   DrillFilters,
   DrillListResponse,

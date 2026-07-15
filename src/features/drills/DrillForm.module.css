@@ -340,3 +340,135 @@
   font-size: 16px;
   line-height: 1.35;
 }
+
+.dangerSection {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 18px;
+  margin-top: 30px;
+  border-top: 1px solid var(--border);
+  padding-top: 18px;
+}
+
+.dangerSection h2,
+.dangerSection p {
+  margin: 0;
+}
+
+.dangerSection h2 {
+  font-size: 20px;
+}
+
+.deleteTrigger {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 40px;
+  border: 1px solid rgba(209, 74, 50, 0.48);
+  border-radius: 8px;
+  padding: 0 11px;
+  background: rgba(255, 255, 255, 0.5);
+  color: var(--accent);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.deleteBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  background: rgba(34, 34, 32, 0.34);
+}
+
+.deleteSheet {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 81;
+  display: grid;
+  max-width: 480px;
+  margin: 0 auto;
+  gap: 10px;
+  border: 1px solid var(--border);
+  border-bottom: 0;
+  border-radius: 8px 8px 0 0;
+  padding: 10px 20px calc(18px + env(safe-area-inset-bottom));
+  background: var(--surface);
+  color: var(--text);
+  outline: none;
+}
+
+.deleteSheet h2,
+.deleteSheet p {
+  margin: 0;
+}
+
+.deleteSheet h2 {
+  margin-top: 4px;
+  overflow-wrap: anywhere;
+  font-size: 24px;
+  line-height: 1.05;
+}
+
+.deleteSheet > p {
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.deleteError {
+  border-left: 2px solid var(--accent);
+  padding: 7px 0 7px 10px;
+  color: var(--accent) !important;
+  font-weight: 700;
+}
+
+.deleteActions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.deleteActions button {
+  min-height: 46px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0 12px;
+  background: var(--surface-muted);
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.deleteActions button:last-child {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--surface);
+}
+
+.deleteActions button:disabled {
+  cursor: wait;
+  opacity: 0.58;
+}
+
+.deleteTrigger:focus-visible,
+.deleteActions button:focus-visible {
+  outline: 2px solid var(--teal);
+  outline-offset: 2px;
+}
+
+@media (max-width: 390px) {
+  .dangerSection {
+    align-items: start;
+    flex-direction: column;
+  }
+}

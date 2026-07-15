@@ -42,6 +42,15 @@ export class UpdateDrillValidationError extends Error {
   }
 }
 
+export class DeleteDrillValidationError extends Error {
+  readonly status = 404;
+
+  constructor() {
+    super("Drill not found.");
+    this.name = "DeleteDrillValidationError";
+  }
+}
+
 export async function createDrill(rawInput: CreateDrillInput): Promise<DrillDetail> {
   const input = createDrillInputSchema.parse(rawInput);
   const trainingMethodSlugs = unique(input.trainingMethodSlugs);
@@ -198,6 +207,18 @@ export async function updateDrill(id: string, rawInput: UpdateDrillInput): Promi
   const drillDetail = await getDrillById(id);
   if (!drillDetail) throw new UpdateDrillValidationError(["Updated drill could not be loaded."], 404);
   return drillDetail;
+}
+
+/** Permanently removes one owned drill; database cascades clean up its relationships. */
+export async function deleteDrill(id: string): Promise<string> {
+  const user = await getCurrentUserForWrite();
+  const [deletedDrill] = await db
+    .delete(drills)
+    .where(and(eq(drills.id, id), eq(drills.userId, user.id)))
+    .returning({ id: drills.id });
+
+  if (!deletedDrill) throw new DeleteDrillValidationError();
+  return deletedDrill.id;
 }
 
 async function getActiveTrainingMethodsBySlug(slugs: string[]) {

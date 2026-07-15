@@ -3,7 +3,11 @@ import {
   captureDraftResponseSchema,
   captureTranscriptionResponseSchema,
 } from "@/modules/capture/contracts";
-import { drillDetailResponseSchema, drillListResponseSchema } from "@/modules/drills/contracts";
+import {
+  deleteDrillResponseSchema,
+  drillDetailResponseSchema,
+  drillListResponseSchema,
+} from "@/modules/drills/contracts";
 import { graphResponseSchema } from "@/modules/graph/contracts";
 import { taxonomyResponseSchema } from "@/modules/taxonomy/contracts";
 import type {
@@ -132,6 +136,17 @@ export async function updateDrill(
   });
 
   return response.drill;
+}
+
+export async function deleteDrill(id: string, options: ApiClientOptions = {}): Promise<string> {
+  const drillId = z.string().uuid().parse(id);
+  const response = await fetchJson(
+    `/api/drills/${encodeURIComponent(drillId)}`,
+    deleteDrillResponseSchema,
+    options,
+    { method: "DELETE" },
+  );
+  return response.deletedId;
 }
 
 // Graph data is lightweight node/edge data, not full drill records.

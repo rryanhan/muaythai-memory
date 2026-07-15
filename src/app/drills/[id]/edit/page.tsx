@@ -5,6 +5,7 @@ import { z } from "zod";
 import { RoutedBottomNav } from "@/components/navigation/RoutedBottomNav";
 import { DrillDetailBackButton } from "@/features/drills/DrillDetailBackButton";
 import { AddDrillForm } from "@/features/drills/AddDrillForm";
+import { DeleteDrillSection } from "@/features/drills/DeleteDrillSection";
 import { getDrillById } from "@/modules/drills/queries";
 import routeStyles from "@/features/drills/DrillRouteShell.module.css";
 
@@ -63,6 +64,7 @@ export default async function EditDrillPage({ params }: EditDrillPageProps) {
         <p>Adjust the steps, notes, tags, and saved-list markers.</p>
       </section>
       <AddDrillForm mode="edit" initialDrill={drill} />
+      <DeleteDrillSection drillId={drill.id} drillTitle={drill.title} />
       <RoutedBottomNav activeView="library" />
     </main>
   );

@@ -1,7 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z, ZodError } from "zod";
-import { drillDetailResponseSchema, updateDrillInputSchema } from "@/modules/drills/contracts";
-import { UpdateDrillValidationError, updateDrill } from "@/modules/drills/mutations";
+import {
+  deleteDrillResponseSchema,
+  drillDetailResponseSchema,
+  updateDrillInputSchema,
+} from "@/modules/drills/contracts";
+import {
+  DeleteDrillValidationError,
+  deleteDrill,
+  UpdateDrillValidationError,
+  updateDrill,
+} from "@/modules/drills/mutations";
 import { getDrillById } from "@/modules/drills/queries";
 
 export const dynamic = "force-dynamic";
@@ -40,6 +49,17 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
   }
 }
 
+export async function DELETE(_request: NextRequest, context: { params: Promise<{ id: string }> }) {
+  try {
+    const { id } = routeParamsSchema.parse(await context.params);
+    return NextResponse.json(
+      deleteDrillResponseSchema.parse({ deletedId: await deleteDrill(id) }),
+    );
+  } catch (error) {
+    return handleRouteError(error, "Failed to delete drill.");
+  }
+}
+
 function handleRouteError(error: unknown, fallbackMessage: string) {
   if (error instanceof ZodError) {
     return NextResponse.json({ error: "Invalid drill id or response shape.", issues: error.issues }, { status: 400 });
@@ -47,6 +67,10 @@ function handleRouteError(error: unknown, fallbackMessage: string) {
 
   if (error instanceof UpdateDrillValidationError) {
     return NextResponse.json({ error: "Invalid drill update.", issues: error.issues }, { status: error.status });
+  }
+
+  if (error instanceof DeleteDrillValidationError) {
+    return NextResponse.json({ error: error.message }, { status: error.status });
   }
 
   console.error(fallbackMessage, error);

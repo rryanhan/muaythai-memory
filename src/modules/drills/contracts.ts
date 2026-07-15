@@ -53,6 +53,10 @@ export const drillDetailResponseSchema = z.object({
   drill: drillDetailSchema,
 });
 
+export const deleteDrillResponseSchema = z.object({
+  deletedId: z.string().uuid(),
+});
+
 export const createDrillInputSchema = z.object({
   title: z.string().trim().min(1),
   summary: z
@@ -83,6 +87,7 @@ export type DrillSummary = z.infer<typeof drillSummarySchema>;
 export type DrillDetail = z.infer<typeof drillDetailSchema>;
 export type DrillListResponse = z.infer<typeof drillListResponseSchema>;
 export type DrillDetailResponse = z.infer<typeof drillDetailResponseSchema>;
+export type DeleteDrillResponse = z.infer<typeof deleteDrillResponseSchema>;
 export type CreateDrillInput = z.input<typeof createDrillInputSchema>;
 export type UpdateDrillInput = z.input<typeof updateDrillInputSchema>;
 
