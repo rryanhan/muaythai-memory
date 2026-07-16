@@ -9,6 +9,7 @@ import { DrillDetailContent } from "@/features/drills/DrillDetailContent";
 import { RoutedBottomNav } from "@/components/navigation/RoutedBottomNav";
 import { getDrillById } from "@/modules/drills/queries";
 import routeStyles from "@/features/drills/DrillRouteShell.module.css";
+import { requireCurrentPageUserId } from "@/modules/auth";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -32,7 +33,8 @@ export async function generateMetadata({ params }: DrillDetailPageProps): Promis
     };
   }
 
-  const drill = await getCachedDrillById(parsedParams.data.id);
+  const userId = await requireCurrentPageUserId(`/drills/${parsedParams.data.id}`);
+  const drill = await getCachedDrillById(userId, parsedParams.data.id);
 
   return {
     title: drill ? `${drill.title} | Muay Thai Memory` : "Drill not found | Muay Thai Memory",
@@ -47,7 +49,8 @@ export default async function DrillDetailPage({ params }: DrillDetailPageProps) 
     notFound();
   }
 
-  const drill = await getCachedDrillById(parsedParams.data.id);
+  const userId = await requireCurrentPageUserId(`/drills/${parsedParams.data.id}`);
+  const drill = await getCachedDrillById(userId, parsedParams.data.id);
 
   if (!drill) {
     notFound();

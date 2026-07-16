@@ -1,4 +1,4 @@
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, isNull, or } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   drillStatusTags,
@@ -10,7 +10,6 @@ import {
   tags,
   trainingMethods,
 } from "@/db/schema";
-import { getCurrentUserForWrite } from "@/modules/users";
 import {
   createDrillInputSchema,
   updateDrillInputSchema,
@@ -51,14 +50,14 @@ export class DeleteDrillValidationError extends Error {
   }
 }
 
-export async function createDrill(rawInput: CreateDrillInput): Promise<DrillDetail> {
+export async function createDrill(userId: string, rawInput: CreateDrillInput): Promise<DrillDetail> {
   const input = createDrillInputSchema.parse(rawInput);
   const trainingMethodSlugs = unique(input.trainingMethodSlugs);
   const tagSlugs = unique(input.tagSlugs);
   const statusSlugs = unique(input.statusTagSlugs);
   const [methodRows, tagRows, statusRows] = await Promise.all([
     getActiveTrainingMethodsBySlug(trainingMethodSlugs),
-    getActiveTagsBySlug(tagSlugs),
+    getActiveTagsBySlug(userId, tagSlugs),
     getActiveStatusTagsBySlug(statusSlugs),
   ]);
   const issues = [
@@ -71,13 +70,11 @@ export async function createDrill(rawInput: CreateDrillInput): Promise<DrillDeta
     throw new CreateDrillValidationError(issues);
   }
 
-  const user = await getCurrentUserForWrite();
-
   const createdDrillId = await db.transaction(async (tx) => {
     const [drill] = await tx
       .insert(drills)
       .values({
-        userId: user.id,
+        userId,
         title: input.title,
         summary: input.summary ?? "",
         notes: input.notes,
@@ -122,19 +119,19 @@ export async function createDrill(rawInput: CreateDrillInput): Promise<DrillDeta
     return drill.id;
   });
 
-  const drillDetail = await getDrillById(createdDrillId);
+  const drillDetail = await getDrillById(userId, createdDrillId);
   if (!drillDetail) throw new Error("Created drill could not be loaded.");
   return drillDetail;
 }
 
-export async function updateDrill(id: string, rawInput: UpdateDrillInput): Promise<DrillDetail> {
+export async function updateDrill(userId: string, id: string, rawInput: UpdateDrillInput): Promise<DrillDetail> {
   const input = updateDrillInputSchema.parse(rawInput);
   const trainingMethodSlugs = unique(input.trainingMethodSlugs);
   const tagSlugs = unique(input.tagSlugs);
   const statusSlugs = unique(input.statusTagSlugs);
   const [methodRows, tagRows, statusRows] = await Promise.all([
     getActiveTrainingMethodsBySlug(trainingMethodSlugs),
-    getActiveTagsBySlug(tagSlugs),
+    getActiveTagsBySlug(userId, tagSlugs),
     getActiveStatusTagsBySlug(statusSlugs),
   ]);
   const issues = [
@@ -147,8 +144,6 @@ export async function updateDrill(id: string, rawInput: UpdateDrillInput): Promi
     throw new UpdateDrillValidationError(issues);
   }
 
-  const user = await getCurrentUserForWrite();
-
   await db.transaction(async (tx) => {
     const [updatedDrill] = await tx
       .update(drills)
@@ -158,7 +153,7 @@ export async function updateDrill(id: string, rawInput: UpdateDrillInput): Promi
         notes: input.notes,
         updatedAt: new Date(),
       })
-      .where(and(eq(drills.id, id), eq(drills.userId, user.id)))
+      .where(and(eq(drills.id, id), eq(drills.userId, userId)))
       .returning({ id: drills.id });
 
     if (!updatedDrill) {
@@ -204,17 +199,16 @@ export async function updateDrill(id: string, rawInput: UpdateDrillInput): Promi
     }
   });
 
-  const drillDetail = await getDrillById(id);
+  const drillDetail = await getDrillById(userId, id);
   if (!drillDetail) throw new UpdateDrillValidationError(["Updated drill could not be loaded."], 404);
   return drillDetail;
 }
 
 /** Permanently removes one owned drill; database cascades clean up its relationships. */
-export async function deleteDrill(id: string): Promise<string> {
-  const user = await getCurrentUserForWrite();
+export async function deleteDrill(userId: string, id: string): Promise<string> {
   const [deletedDrill] = await db
     .delete(drills)
-    .where(and(eq(drills.id, id), eq(drills.userId, user.id)))
+    .where(and(eq(drills.id, id), eq(drills.userId, userId)))
     .returning({ id: drills.id });
 
   if (!deletedDrill) throw new DeleteDrillValidationError();
@@ -228,13 +222,19 @@ async function getActiveTrainingMethodsBySlug(slugs: string[]) {
     .where(and(inArray(trainingMethods.slug, slugs), eq(trainingMethods.active, true)));
 }
 
-async function getActiveTagsBySlug(slugs: string[]) {
+async function getActiveTagsBySlug(userId: string, slugs: string[]) {
   if (slugs.length === 0) return [];
 
   return db
     .select({ id: tags.id, slug: tags.slug })
     .from(tags)
-    .where(and(inArray(tags.slug, slugs), eq(tags.active, true)));
+    .where(
+      and(
+        inArray(tags.slug, slugs),
+        eq(tags.active, true),
+        or(isNull(tags.userId), eq(tags.userId, userId)),
+      ),
+    );
 }
 
 async function getActiveStatusTagsBySlug(slugs: string[]) {

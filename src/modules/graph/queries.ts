@@ -8,6 +8,7 @@ import type { GraphEdge, GraphNode, GraphOptions, GraphResponse } from "./contra
 // always present; tag/status layers are optional so the graph does not start
 // as a dense hairball.
 export async function getMuayThaiGraph(
+  userId: string,
   filters: Partial<DrillFilters> = {},
   options: Partial<GraphOptions> = {},
 ): Promise<GraphResponse> {
@@ -18,7 +19,7 @@ export async function getMuayThaiGraph(
     showStatusTags: options.showStatusTags ?? false,
   };
 
-  const [taxonomy, drillList] = await Promise.all([getTaxonomy(), listDrills()]);
+  const [taxonomy, drillList] = await Promise.all([getTaxonomy(userId), listDrills(userId)]);
   const allDrills = drillList.drills;
   const matchedDrills = allDrills.filter((drill) => drillMatchesFilters(drill, normalizedFilters));
   const hasActiveFilters = hasFilters(normalizedFilters);

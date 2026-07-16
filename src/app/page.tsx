@@ -2,6 +2,7 @@ import { AppShell } from "@/components/app/AppShell";
 import type { AppView } from "@/components/navigation/BottomNav";
 import { getMuayThaiGraph } from "@/modules/graph";
 import type { GraphResponse } from "@/data";
+import { requireCurrentPageUser } from "@/modules/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -11,14 +12,16 @@ type HomePageProps = {
 
 export default async function HomePage({ searchParams }: HomePageProps) {
   const initialView = getInitialView(searchParams ? await searchParams : undefined);
-  const initialGraph = initialView === "network" ? await getInitialGraph() : undefined;
+  const user = await requireCurrentPageUser(initialView === "network" ? "/" : `/?view=${initialView}`);
+  const initialGraph = initialView === "network" ? await getInitialGraph(user.id) : undefined;
 
-  return <AppShell initialGraph={initialGraph} initialView={initialView} />;
+  return <AppShell currentUser={user} initialGraph={initialGraph} initialView={initialView} />;
 }
 
-async function getInitialGraph(): Promise<GraphResponse | undefined> {
+async function getInitialGraph(userId: string): Promise<GraphResponse | undefined> {
   try {
     return await getMuayThaiGraph(
+      userId,
       {},
       {
         showTags: false,

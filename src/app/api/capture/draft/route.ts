@@ -7,15 +7,17 @@ import {
   CaptureDraftConfigError,
   CaptureDraftGenerationError,
 } from "@/modules/capture/errors";
+import { authenticationErrorResponse, requireCurrentUserId } from "@/modules/auth";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 export async function POST(request: NextRequest) {
   try {
+    const userId = await requireCurrentUserId();
     const input = captureDraftRequestSchema.parse(await request.json());
     const response = captureDraftResponseSchema.parse(
-      await generateCaptureDraft(input.transcript, { signal: request.signal }),
+      await generateCaptureDraft(userId, input.transcript, { signal: request.signal }),
     );
     return NextResponse.json(response);
   } catch (error) {
@@ -24,6 +26,9 @@ export async function POST(request: NextRequest) {
 }
 
 function handleRouteError(error: unknown) {
+  const authResponse = authenticationErrorResponse(error);
+  if (authResponse) return authResponse;
+
   if (error instanceof ZodError) {
     return NextResponse.json(
       { error: "Invalid capture draft request or response shape.", issues: error.issues },

@@ -8,6 +8,7 @@ import { AddDrillForm } from "@/features/drills/AddDrillForm";
 import { DeleteDrillSection } from "@/features/drills/DeleteDrillSection";
 import { getDrillById } from "@/modules/drills/queries";
 import routeStyles from "@/features/drills/DrillRouteShell.module.css";
+import { requireCurrentPageUserId } from "@/modules/auth";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -31,7 +32,8 @@ export async function generateMetadata({ params }: EditDrillPageProps): Promise<
     };
   }
 
-  const drill = await getCachedDrillById(parsedParams.data.id);
+  const userId = await requireCurrentPageUserId(`/drills/${parsedParams.data.id}/edit`);
+  const drill = await getCachedDrillById(userId, parsedParams.data.id);
 
   return {
     title: drill ? `Edit ${drill.title} | Muay Thai Memory` : "Edit drill | Muay Thai Memory",
@@ -46,7 +48,8 @@ export default async function EditDrillPage({ params }: EditDrillPageProps) {
     notFound();
   }
 
-  const drill = await getCachedDrillById(parsedParams.data.id);
+  const userId = await requireCurrentPageUserId(`/drills/${parsedParams.data.id}/edit`);
+  const drill = await getCachedDrillById(userId, parsedParams.data.id);
 
   if (!drill) {
     notFound();

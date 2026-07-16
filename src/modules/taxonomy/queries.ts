@@ -5,7 +5,7 @@ import type { TagCategoryDto, TagDto, TaxonomyResponse } from "./contracts";
 
 // Single read model for taxonomy screens, filter sheets, capture review, and
 // graph controls. The database remains the source of truth for tag changes.
-export async function getTaxonomy(): Promise<TaxonomyResponse> {
+export async function getTaxonomy(userId: string): Promise<TaxonomyResponse> {
   const [methodRows, categoryRows, standardTagRows, customTagRows, statusRows] = await Promise.all([
     db
       .select({
@@ -56,7 +56,7 @@ export async function getTaxonomy(): Promise<TaxonomyResponse> {
       })
       .from(tags)
       .leftJoin(tagCategories, eq(tags.categoryId, tagCategories.id))
-      .where(and(eq(tags.kind, "custom"), eq(tags.active, true)))
+      .where(and(eq(tags.kind, "custom"), eq(tags.userId, userId), eq(tags.active, true)))
       .orderBy(asc(tags.name)),
     db
       .select({

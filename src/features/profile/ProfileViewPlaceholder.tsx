@@ -1,45 +1,70 @@
+"use client";
+
+import { useQuery } from "@tanstack/react-query";
+import { getDrills } from "@/data";
+import { SignOutButton } from "@/features/auth/SignOutButton";
+import type { CurrentAppUser } from "@/modules/auth";
 import styles from "./ProfileViewPlaceholder.module.css";
 
-const profileCollections = [
-  {
-    title: "Favourite Drills",
-    count: "3",
-    items: ["Slip Right Step-Through Uppercut", "Kick Catch Sweep"],
-  },
-  {
-    title: "Drill Back In",
-    count: "3",
-    items: ["Technical Defensive Mirror", "Ring Cutting Jab Low Kick"],
-  },
-];
+type ProfileViewPlaceholderProps = {
+  currentUser: CurrentAppUser;
+};
 
-// Temporary profile surface until profile data and journal uploads become real features.
-export function ProfileViewPlaceholder() {
+// Profile data remains intentionally small for this milestone, but every value
+// now belongs to the authenticated user instead of a hardcoded demo account.
+export function ProfileViewPlaceholder({ currentUser }: ProfileViewPlaceholderProps) {
+  const allDrillsQuery = useQuery({
+    queryKey: ["drills", "profile", "all"],
+    queryFn: ({ signal }) => getDrills({}, { requestInit: { signal } }),
+    staleTime: 60 * 1000,
+  });
+  const favouritesQuery = useQuery({
+    queryKey: ["drills", "profile", "starred"],
+    queryFn: ({ signal }) =>
+      getDrills({ statusTagSlugs: ["starred"] }, { requestInit: { signal } }),
+    staleTime: 60 * 1000,
+  });
+  const drillBackInQuery = useQuery({
+    queryKey: ["drills", "profile", "drill-back-in"],
+    queryFn: ({ signal }) =>
+      getDrills({ statusTagSlugs: ["drill-back-in"] }, { requestInit: { signal } }),
+    staleTime: 60 * 1000,
+  });
+  const collections = [
+    { title: "Favourite Drills", response: favouritesQuery.data },
+    { title: "Drill Back In", response: drillBackInQuery.data },
+  ];
+  const entryCount = allDrillsQuery.data?.total;
+
   return (
-    <section className={styles.root} aria-label="Profile placeholder">
+    <section className={styles.root} aria-label="Profile">
       <header className={styles.header}>
         <div className={styles.avatar} aria-hidden="true">
-          RH
+          {getInitials(currentUser.displayName)}
         </div>
         <div>
           <p className="eyebrow">Profile</p>
-          <h1>Ryan Han</h1>
-          <p>31 entries</p>
+          <h1>{currentUser.displayName}</h1>
+          <p>{entryCount === undefined ? "Loading entries" : `${entryCount} entries`}</p>
+          {currentUser.email && <p className={styles.email}>{currentUser.email}</p>}
         </div>
       </header>
 
       <div className={styles.collections}>
-        {profileCollections.map((collection) => (
+        {collections.map((collection) => (
           <section key={collection.title} className={styles.collection}>
             <div className={styles.collectionHeading}>
               <p>{collection.title}</p>
-              <span>{collection.count}</span>
+              <span>{collection.response?.total ?? "-"}</span>
             </div>
-            {collection.items.map((item) => (
-              <div key={item} className={styles.miniRow}>
-                {item}
+            {(collection.response?.drills.slice(0, 3) ?? []).map((drill) => (
+              <div key={drill.id} className={styles.miniRow}>
+                {drill.title}
               </div>
             ))}
+            {collection.response?.total === 0 && (
+              <p className={styles.emptyCollection}>No drills saved here yet.</p>
+            )}
             <button type="button">View all</button>
           </section>
         ))}
@@ -55,6 +80,21 @@ export function ProfileViewPlaceholder() {
           </p>
         </div>
       </section>
+
+      <section className={styles.account}>
+        <p className="eyebrow">Account</p>
+        <SignOutButton className={styles.signOut} errorClassName={styles.signOutError} />
+      </section>
     </section>
   );
+}
+
+function getInitials(displayName: string): string {
+  const initials = displayName
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join("");
+  return initials || "F";
 }

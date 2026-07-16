@@ -8,6 +8,11 @@ import {
 } from "@/modules/drills/contracts";
 import { CreateDrillValidationError, createDrill } from "@/modules/drills/mutations";
 import { listDrills } from "@/modules/drills/queries";
+import {
+  authenticationErrorResponse,
+  requireCurrentAppUser,
+  requireCurrentUserId,
+} from "@/modules/auth";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -16,8 +21,9 @@ export const runtime = "nodejs";
 // and organized library need to share.
 export async function GET(request: NextRequest) {
   try {
+    const userId = await requireCurrentUserId();
     const filters = parseDrillFiltersFromSearchParams(request.nextUrl.searchParams);
-    const drillList = drillListResponseSchema.parse(await listDrills(filters));
+    const drillList = drillListResponseSchema.parse(await listDrills(userId, filters));
     return NextResponse.json(drillList);
   } catch (error) {
     return handleRouteError(error, "Failed to load drills.");
@@ -26,8 +32,9 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const user = await requireCurrentAppUser();
     const input = createDrillInputSchema.parse(await request.json());
-    const response = drillDetailResponseSchema.parse({ drill: await createDrill(input) });
+    const response = drillDetailResponseSchema.parse({ drill: await createDrill(user.id, input) });
     return NextResponse.json(response, { status: 201 });
   } catch (error) {
     return handleRouteError(error, "Failed to create drill.");
@@ -35,6 +42,9 @@ export async function POST(request: NextRequest) {
 }
 
 function handleRouteError(error: unknown, fallbackMessage: string) {
+  const authResponse = authenticationErrorResponse(error);
+  if (authResponse) return authResponse;
+
   if (error instanceof ZodError) {
     return NextResponse.json({ error: "Invalid drill request or response shape.", issues: error.issues }, { status: 400 });
   }

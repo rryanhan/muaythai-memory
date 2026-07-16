@@ -17,8 +17,8 @@ const timestamps = {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 };
 
-// Local app users. Supabase Auth can own authentication later; this table owns
-// the profile data the product needs to render.
+// Supabase Auth owns identity; this matching-ID row owns the profile data the
+// product needs to render and relate to domain records.
 export const users = pgTable(
   "users",
   {

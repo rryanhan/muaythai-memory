@@ -7,6 +7,7 @@ import { LibraryView } from "@/features/library/LibraryView";
 import { NetworkView } from "@/features/network/NetworkView";
 import { ProfileViewPlaceholder } from "@/features/profile/ProfileViewPlaceholder";
 import type { GraphResponse } from "@/data";
+import type { CurrentAppUser } from "@/modules/auth";
 import styles from "./AppShell.module.css";
 
 const viewLabels: Record<AppView, string> = {
@@ -16,11 +17,12 @@ const viewLabels: Record<AppView, string> = {
 };
 
 type AppShellProps = {
+  currentUser: CurrentAppUser;
   initialGraph?: GraphResponse;
   initialView?: AppView;
 };
 
-export function AppShell({ initialGraph, initialView = "network" }: AppShellProps) {
+export function AppShell({ currentUser, initialGraph, initialView = "network" }: AppShellProps) {
   const searchParams = useSearchParams();
   const [activeView, setActiveView] = useState<AppView>(initialView);
   const [networkHasMounted, setNetworkHasMounted] = useState(initialView === "network");
@@ -60,7 +62,7 @@ export function AppShell({ initialGraph, initialView = "network" }: AppShellProp
         )}
         {profileHasMounted && (
           <div className="app-view-pane" hidden={activeView !== "profile"}>
-            <ProfileViewPlaceholder />
+            <ProfileViewPlaceholder currentUser={currentUser} />
           </div>
         )}
       </div>

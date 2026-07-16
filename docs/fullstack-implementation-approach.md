@@ -99,9 +99,38 @@ profile
 
 Owns:
 
-- Sign in.
-- Sessions.
-- Current user lookup.
+- Passwordless email magic-link sign in through Supabase Auth.
+- Cookie-backed server sessions through `@supabase/ssr`.
+- Verified current-user lookup and public app-user synchronization.
+- Per-user authorization at every server query and mutation boundary.
+
+The browser uses Supabase only for authentication. Drill, graph, taxonomy, and
+capture data continue to flow through typed Next API routes and Drizzle.
+
+Current authorization is enforced in those server modules by passing the
+verified user id into every read and write. Row Level Security is deferred while
+domain tables remain server-only, but must be added before any domain table is
+queried directly from a browser or third-party client.
+
+Supabase dashboard setup for magic links:
+
+- Keep the Email provider enabled.
+- Keep `{{ .ConfirmationURL }}` in the passwordless email template. The app
+  intentionally does not ask users to enter an OTP code.
+- Add the local, HTTPS tunnel, and production `/auth/confirm` URLs to the Auth
+  redirect allow list.
+- Use custom SMTP before inviting users outside the Supabase project team.
+
+See `docs/authentication.md` for the callback and verification workflow.
+
+Existing development data can be transferred after the target account signs in:
+
+```bash
+npm run db:claim-dev-user -- --email fighter@example.com --display-name "Fighter Name"
+```
+
+The command validates the Auth user with the service-role client and moves the
+`Dev Fighter` drills and custom tags in one transaction.
 
 ### users
 

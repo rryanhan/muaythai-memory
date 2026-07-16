@@ -15,10 +15,11 @@ export type GenerateCaptureDraftOptions = {
 };
 
 export async function generateCaptureDraft(
+  userId: string,
   transcript: string,
   options: GenerateCaptureDraftOptions = {},
 ): Promise<CaptureDraftResponse> {
-  const taxonomy = await getTaxonomy();
+  const taxonomy = await getTaxonomy(userId);
   const deterministicResult = parseCaptureTranscript(transcript, taxonomy);
   const provider = getCaptureDraftProvider();
   const modelDraft = await provider.generate({

@@ -18,9 +18,12 @@
     "db:migrate": "drizzle-kit migrate",
     "db:seed": "tsx src/db/seed.ts",
     "db:seed-drills": "tsx src/db/seed-dev-drills.ts",
+    "db:claim-dev-user": "tsx src/db/claim-dev-user.ts",
     "db:verify-taxonomy": "tsx src/db/verify-taxonomy.ts",
     "db:verify-step3": "tsx src/db/verify-step3.ts",
     "api:verify": "tsx src/data/verify-api.ts",
+    "auth:verify": "tsx src/db/verify-auth-ownership.ts",
+    "auth:verify-api": "tsx src/data/verify-auth-api.ts",
     "capture:verify": "tsx src/modules/capture/verify-capture.ts",
     "whisper:setup": "bash scripts/setup-local-whisper.sh",
     "whisper:serve": "bash scripts/start-local-whisper.sh"
@@ -28,6 +31,7 @@
   "dependencies": {
     "@fontsource/dseg7": "^4.5.4",
     "@phosphor-icons/react": "^2.1.10",
+    "@supabase/ssr": "^0.12.3",
     "@supabase/supabase-js": "latest",
     "@tanstack/react-query": "^5.101.2",
     "d3": "^7.9.0",

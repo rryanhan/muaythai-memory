@@ -1,4 +1,4 @@
-import { asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, or } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   drillStatusTags,
@@ -20,9 +20,9 @@ type DrillStepDto = DrillDetail["steps"][number];
 
 // Returns list-ready drill summaries. Full steps are intentionally left out so
 // library/profile/network screens can load quickly on mobile.
-export async function listDrills(filters: Partial<DrillFilters> = {}): Promise<DrillListResponse> {
+export async function listDrills(userId: string, filters: Partial<DrillFilters> = {}): Promise<DrillListResponse> {
   const normalizedFilters = normalizeDrillFilters(filters);
-  const allDrills = await loadDrillSummaries();
+  const allDrills = await loadDrillSummaries(userId);
   const filteredDrills = allDrills.filter((drill) => drillMatchesFilters(drill, normalizedFilters));
 
   return {
@@ -34,14 +34,18 @@ export async function listDrills(filters: Partial<DrillFilters> = {}): Promise<D
 
 // Detail loading is separate from list loading because graph nodes should open
 // the full drill only after the user taps one.
-export async function getDrillById(id: string): Promise<DrillDetail | null> {
-  const [drillRow] = await db.select().from(drills).where(eq(drills.id, id)).limit(1);
+export async function getDrillById(userId: string, id: string): Promise<DrillDetail | null> {
+  const [drillRow] = await db
+    .select()
+    .from(drills)
+    .where(and(eq(drills.id, id), eq(drills.userId, userId)))
+    .limit(1);
 
   if (!drillRow) return null;
 
   const [trainingMethodRows, tagRows, statusRows, stepRows] = await Promise.all([
     loadTrainingMethodsForDrill(id),
-    loadTagsForDrill(id),
+    loadTagsForDrill(userId, id),
     loadStatusTagsForDrill(id),
     loadStepsForDrill(id),
   ]);
@@ -61,11 +65,14 @@ export async function getDrillById(id: string): Promise<DrillDetail | null> {
   };
 }
 
-export async function getFirstDrillDetail(filters: Partial<DrillFilters> = {}): Promise<DrillDetail | null> {
-  const drillList = await listDrills(filters);
+export async function getFirstDrillDetail(
+  userId: string,
+  filters: Partial<DrillFilters> = {},
+): Promise<DrillDetail | null> {
+  const drillList = await listDrills(userId, filters);
   const firstDrill = drillList.drills[0];
   if (!firstDrill) return null;
-  return getDrillById(firstDrill.id);
+  return getDrillById(userId, firstDrill.id);
 }
 
 export function normalizeDrillFilters(filters: Partial<DrillFilters> = {}): DrillFilters {
@@ -106,12 +113,17 @@ export function drillMatchesFilters(drill: DrillSummary, filters: DrillFilters):
 // Step 3 favors one simple read model over clever SQL composition. Once the
 // product has real scale, these filters can move into SQL without changing API
 // response contracts.
-async function loadDrillSummaries(): Promise<DrillSummary[]> {
-  const [drillRows, methodsByDrillId, tagsByDrillId, statusTagsByDrillId] = await Promise.all([
-    db.select().from(drills).orderBy(desc(drills.createdAt), asc(drills.title)),
-    loadTrainingMethodsByDrillId(),
-    loadTagsByDrillId(),
-    loadStatusTagsByDrillId(),
+async function loadDrillSummaries(userId: string): Promise<DrillSummary[]> {
+  const drillRows = await db
+    .select()
+    .from(drills)
+    .where(eq(drills.userId, userId))
+    .orderBy(desc(drills.createdAt), asc(drills.title));
+  const drillIds = drillRows.map((drill) => drill.id);
+  const [methodsByDrillId, tagsByDrillId, statusTagsByDrillId] = await Promise.all([
+    loadTrainingMethodsByDrillId(drillIds),
+    loadTagsByDrillId(userId, drillIds),
+    loadStatusTagsByDrillId(drillIds),
   ]);
 
   return drillRows.map((drill) => {
@@ -131,7 +143,9 @@ async function loadDrillSummaries(): Promise<DrillSummary[]> {
   });
 }
 
-async function loadTrainingMethodsByDrillId(): Promise<Map<string, TrainingMethodDto[]>> {
+async function loadTrainingMethodsByDrillId(drillIds: string[]): Promise<Map<string, TrainingMethodDto[]>> {
+  if (drillIds.length === 0) return new Map();
+
   const rows = await db
     .select({
       drillId: drillTrainingMethods.drillId,
@@ -143,7 +157,7 @@ async function loadTrainingMethodsByDrillId(): Promise<Map<string, TrainingMetho
     })
     .from(drillTrainingMethods)
     .innerJoin(trainingMethods, eq(drillTrainingMethods.trainingMethodId, trainingMethods.id))
-    .where(eq(trainingMethods.active, true))
+    .where(and(inArray(drillTrainingMethods.drillId, drillIds), eq(trainingMethods.active, true)))
     .orderBy(asc(trainingMethods.sortOrder), asc(trainingMethods.name));
 
   return groupByDrillId(rows, (row) => ({
@@ -172,7 +186,9 @@ async function loadTrainingMethodsForDrill(drillId: string): Promise<TrainingMet
   return rows;
 }
 
-async function loadTagsByDrillId(): Promise<Map<string, TagDto[]>> {
+async function loadTagsByDrillId(userId: string, drillIds: string[]): Promise<Map<string, TagDto[]>> {
+  if (drillIds.length === 0) return new Map();
+
   const rows = await db
     .select({
       drillId: drillTags.drillId,
@@ -188,7 +204,13 @@ async function loadTagsByDrillId(): Promise<Map<string, TagDto[]>> {
     .from(drillTags)
     .innerJoin(tags, eq(drillTags.tagId, tags.id))
     .leftJoin(tagCategories, eq(tags.categoryId, tagCategories.id))
-    .where(eq(tags.active, true))
+    .where(
+      and(
+        inArray(drillTags.drillId, drillIds),
+        eq(tags.active, true),
+        or(isNull(tags.userId), eq(tags.userId, userId)),
+      ),
+    )
     .orderBy(asc(tagCategories.sortOrder), asc(tags.sortOrder), asc(tags.name));
 
   return groupByDrillId(rows, (row) => ({
@@ -208,7 +230,7 @@ async function loadTagsByDrillId(): Promise<Map<string, TagDto[]>> {
   }));
 }
 
-async function loadTagsForDrill(drillId: string): Promise<TagDto[]> {
+async function loadTagsForDrill(userId: string, drillId: string): Promise<TagDto[]> {
   const rows = await db
     .select({
       id: tags.id,
@@ -223,7 +245,13 @@ async function loadTagsForDrill(drillId: string): Promise<TagDto[]> {
     .from(drillTags)
     .innerJoin(tags, eq(drillTags.tagId, tags.id))
     .leftJoin(tagCategories, eq(tags.categoryId, tagCategories.id))
-    .where(eq(drillTags.drillId, drillId))
+    .where(
+      and(
+        eq(drillTags.drillId, drillId),
+        eq(tags.active, true),
+        or(isNull(tags.userId), eq(tags.userId, userId)),
+      ),
+    )
     .orderBy(asc(tagCategories.sortOrder), asc(tags.sortOrder), asc(tags.name));
 
   return rows.map((row) => ({
@@ -243,7 +271,9 @@ async function loadTagsForDrill(drillId: string): Promise<TagDto[]> {
   }));
 }
 
-async function loadStatusTagsByDrillId(): Promise<Map<string, StatusTagDto[]>> {
+async function loadStatusTagsByDrillId(drillIds: string[]): Promise<Map<string, StatusTagDto[]>> {
+  if (drillIds.length === 0) return new Map();
+
   const rows = await db
     .select({
       drillId: drillStatusTags.drillId,
@@ -254,7 +284,7 @@ async function loadStatusTagsByDrillId(): Promise<Map<string, StatusTagDto[]>> {
     })
     .from(drillStatusTags)
     .innerJoin(statusTags, eq(drillStatusTags.statusTagId, statusTags.id))
-    .where(eq(statusTags.active, true))
+    .where(and(inArray(drillStatusTags.drillId, drillIds), eq(statusTags.active, true)))
     .orderBy(asc(statusTags.sortOrder), asc(statusTags.name));
 
   return groupByDrillId(rows, (row) => ({
@@ -281,7 +311,9 @@ async function loadStatusTagsForDrill(drillId: string): Promise<StatusTagDto[]> 
   return rows;
 }
 
-async function loadStepsByDrillId(): Promise<Map<string, DrillStepDto[]>> {
+async function loadStepsByDrillId(drillIds: string[]): Promise<Map<string, DrillStepDto[]>> {
+  if (drillIds.length === 0) return new Map();
+
   const rows = await db
     .select({
       drillId: drillSteps.drillId,
@@ -290,6 +322,7 @@ async function loadStepsByDrillId(): Promise<Map<string, DrillStepDto[]>> {
       body: drillSteps.body,
     })
     .from(drillSteps)
+    .where(inArray(drillSteps.drillId, drillIds))
     .orderBy(asc(drillSteps.position));
 
   return groupByDrillId(rows, (row) => ({

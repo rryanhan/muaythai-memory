@@ -1,10 +1,12 @@
 import { config } from "dotenv";
+import { eq } from "drizzle-orm";
 import { getDrillById, listDrills } from "@/modules/drills/queries";
 import { graphResponseSchema } from "@/modules/graph/contracts";
 import { getMuayThaiGraph } from "@/modules/graph/queries";
 import { taxonomyResponseSchema } from "@/modules/taxonomy/contracts";
 import { getTaxonomy } from "@/modules/taxonomy/queries";
-import { postgresClient } from "./client";
+import { db, postgresClient } from "./client";
+import { drills, users } from "./schema";
 
 config({ path: ".env.local" });
 
@@ -15,7 +17,14 @@ function expect(condition: boolean, message: string) {
 }
 
 async function main() {
-  const taxonomy = taxonomyResponseSchema.parse(await getTaxonomy());
+  const [owner] = await db
+    .select({ id: users.id })
+    .from(users)
+    .innerJoin(drills, eq(drills.userId, users.id))
+    .limit(1);
+  if (!owner) throw new Error("Expected at least one user with seeded drills.");
+
+  const taxonomy = taxonomyResponseSchema.parse(await getTaxonomy(owner.id));
   const standardTagNames = new Set(taxonomy.standardTags.map((tag) => tag.name));
   const methodNames = new Set(taxonomy.trainingMethods.map((method) => method.name));
 
@@ -38,7 +47,7 @@ async function main() {
   expect(!standardTagNames.has("Exits"), "Exits should not be active.");
   expect(taxonomy.standardTags.filter((tag) => tag.name.includes("Sweep")).length === 1, "Sweep should be the only sweep tag.");
 
-  const drillList = await listDrills();
+  const drillList = await listDrills(owner.id);
   expect(drillList.total > 0, "Expected dev drills to be seeded.");
   expect(drillList.drills.every((drill) => drill.trainingMethods.length > 0), "Every drill should have a training method.");
   expect(drillList.drills.every((drill) => drill.tags.length > 0), "Every drill should have at least one standard tag.");
@@ -46,26 +55,26 @@ async function main() {
   const firstDrill = drillList.drills[0];
   if (!firstDrill) throw new Error("Expected a drill to verify detail loading.");
 
-  const detail = await getDrillById(firstDrill.id);
+  const detail = await getDrillById(owner.id, firstDrill.id);
   expect(Boolean(detail), "Expected drill detail to load.");
   expect((detail?.steps.length ?? 0) > 0, "Expected drill detail to include steps.");
   expect(!JSON.stringify(detail).includes("coreIdea"), "Core Idea must not appear in drill API/query payloads.");
 
-  const padWork = await listDrills({ methodSlugs: ["pad-work"] });
+  const padWork = await listDrills(owner.id, { methodSlugs: ["pad-work"] });
   expect(padWork.total > 0, "Expected Pad Work filter to return drills.");
   expect(
     padWork.drills.every((drill) => drill.trainingMethods.some((method) => method.slug === "pad-work")),
     "Pad Work filter returned a drill without Pad Work.",
   );
 
-  const uppercut = await listDrills({ tagSlugs: ["uppercut"] });
+  const uppercut = await listDrills(owner.id, { tagSlugs: ["uppercut"] });
   expect(uppercut.total > 0, "Expected Uppercut tag filter to return drills.");
   expect(
     uppercut.drills.every((drill) => [...drill.tags, ...drill.customTags].some((tag) => tag.slug === "uppercut")),
     "Uppercut tag filter returned a drill without Uppercut.",
   );
 
-  const starred = await listDrills({ statusTagSlugs: ["starred"] });
+  const starred = await listDrills(owner.id, { statusTagSlugs: ["starred"] });
   expect(starred.total > 0, "Expected Starred status filter to return drills.");
   expect(
     starred.drills.every((drill) => drill.statusTags.some((status) => status.slug === "starred")),
@@ -73,7 +82,11 @@ async function main() {
   );
 
   const graph = graphResponseSchema.parse(
-    await getMuayThaiGraph({ methodSlugs: ["pad-work"], tagSlugs: ["uppercut"], tagMode: "any" }, { showTags: true }),
+    await getMuayThaiGraph(
+      owner.id,
+      { methodSlugs: ["pad-work"], tagSlugs: ["uppercut"], tagMode: "any" },
+      { showTags: true },
+    ),
   );
   const graphNodeIds = new Set(graph.nodes.map((node) => node.id));
   expect(graph.nodes.length > 0, "Expected graph nodes.");

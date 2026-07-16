@@ -2,13 +2,15 @@ import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 import { taxonomyResponseSchema } from "@/modules/taxonomy/contracts";
 import { getTaxonomy } from "@/modules/taxonomy/queries";
+import { authenticationErrorResponse, requireCurrentUserId } from "@/modules/auth";
 
 export const dynamic = "force-dynamic";
 
 // Read-only taxonomy endpoint for filters, capture review, and graph controls.
 export async function GET() {
   try {
-    const taxonomy = taxonomyResponseSchema.parse(await getTaxonomy());
+    const userId = await requireCurrentUserId();
+    const taxonomy = taxonomyResponseSchema.parse(await getTaxonomy(userId));
     return NextResponse.json(taxonomy);
   } catch (error) {
     return handleRouteError(error, "Failed to load taxonomy.");
@@ -16,6 +18,9 @@ export async function GET() {
 }
 
 function handleRouteError(error: unknown, fallbackMessage: string) {
+  const authResponse = authenticationErrorResponse(error);
+  if (authResponse) return authResponse;
+
   if (error instanceof ZodError) {
     return NextResponse.json({ error: "Invalid taxonomy response shape.", issues: error.issues }, { status: 500 });
   }

@@ -40,6 +40,12 @@
   font-size: 18px;
 }
 
+.header .email {
+  margin-top: 5px;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
 .collections {
   display: grid;
   gap: 18px;
@@ -86,6 +92,14 @@
   font-weight: 600;
 }
 
+.emptyCollection {
+  margin: 0;
+  padding: 10px 0;
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 14px;
+}
+
 .journal {
   display: grid;
   min-height: 180px;
@@ -111,5 +125,38 @@
   margin-top: 12px;
   color: var(--muted);
   font-size: 17px;
+  line-height: 1.35;
+}
+
+.account {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.account p {
+  margin: 0 0 10px;
+}
+
+.signOut {
+  min-height: 42px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0 14px;
+  background: rgba(255, 255, 255, 0.44);
+  color: var(--muted);
+  cursor: pointer;
+  font-weight: 650;
+}
+
+.signOut:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
+.account .signOutError {
+  margin: 9px 0 0;
+  color: var(--accent);
+  font-size: 13px;
   line-height: 1.35;
 }
