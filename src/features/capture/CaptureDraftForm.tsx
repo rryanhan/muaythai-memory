@@ -1,20 +1,32 @@
 "use client";
 
-import { Microphone, PencilSimple } from "@phosphor-icons/react";
+import dynamic from "next/dynamic";
+import { Microphone } from "@phosphor-icons/react/Microphone";
+import { PencilSimple } from "@phosphor-icons/react/PencilSimple";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { createCaptureDraft, getTaxonomy, type ApiError, type CaptureDraft } from "@/data";
-import {
-  AddDrillForm,
-  type DrillFormCleanupState,
-  type DrillFormInitialValues,
-} from "@/features/drills/AddDrillForm";
+import type { ApiError } from "@/data/api-core";
+import { createCaptureDraft } from "@/data/capture";
+import { getTaxonomy } from "@/data/taxonomy";
+import type { CaptureDraft } from "@/data/types";
+import { AddDrillSkeleton } from "@/features/drills/AddDrillSkeleton";
+import type { DrillFormCleanupState, DrillFormInitialValues } from "@/features/drills/drill-form-types";
 import type { DrillCleanupValues } from "@/features/drills/cleanup-merge";
 import drillStyles from "@/features/drills/DrillForm.module.css";
-import { parseCaptureTranscript } from "@/modules/capture/parser";
+import type { CaptureTaxonomyResult } from "@/modules/capture/parser";
 import { isCurrentCaptureCleanup } from "./capture-session";
 import styles from "./Capture.module.css";
-import { VoiceCapturePanel, type VoiceCaptureState } from "./VoiceCapturePanel";
+import type { VoiceCaptureState } from "./VoiceCapturePanel";
+
+const AddDrillForm = dynamic(
+  () => import("@/features/drills/AddDrillForm").then((module) => module.AddDrillForm),
+  { loading: () => <AddDrillSkeleton /> },
+);
+
+const VoiceCapturePanel = dynamic(
+  () => import("./VoiceCapturePanel").then((module) => module.VoiceCapturePanel),
+  { loading: () => <VoiceCaptureLoading />, ssr: false },
+);
 
 export type CaptureMode = "voice" | "text";
 export type CaptureWorkflowPhase = "input" | "processing" | "review";
@@ -80,6 +92,8 @@ export function CaptureDraftForm({
   const nextCleanupRequestId = useRef(1);
   const activeCleanupRequestId = useRef<number | null>(null);
   const nextCleanupRevision = useRef(1);
+  const nextParserRequestId = useRef(1);
+  const activeParserRequestId = useRef<number | null>(null);
   const taxonomyQuery = useQuery({
     queryKey: ["taxonomy"],
     queryFn: ({ signal }) => getTaxonomy({ requestInit: { signal } }),
@@ -125,6 +139,7 @@ export function CaptureDraftForm({
 
   useEffect(() => {
     return () => {
+      activeParserRequestId.current = null;
       activeCleanupRequestId.current = null;
       abortController.current?.abort();
     };
@@ -134,7 +149,7 @@ export function CaptureDraftForm({
     if (!pendingVoiceTranscript || !taxonomyQuery.data) return;
     const readyTranscript = pendingVoiceTranscript;
     setPendingVoiceTranscript(null);
-    beginDraft(readyTranscript, "voice");
+    void beginDraft(readyTranscript, "voice");
     // The transcript is consumed once when app-wide taxonomy becomes ready.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingVoiceTranscript, taxonomyQuery.data]);
@@ -156,12 +171,17 @@ export function CaptureDraftForm({
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    beginDraft(transcript, "text");
+    void beginDraft(transcript, "text");
   }
 
-  function beginDraft(note: string, source: CaptureMode) {
+  async function beginDraft(note: string, source: CaptureMode) {
     const normalizedNote = note.trim();
     if (!taxonomyQuery.data || normalizedNote.length < 12) return;
+
+    const parserRequestId = nextParserRequestId.current++;
+    activeParserRequestId.current = parserRequestId;
+    const { parseCaptureTranscript } = await import("@/modules/capture/parser");
+    if (activeParserRequestId.current !== parserRequestId) return;
 
     const sessionId = nextSessionId.current++;
     const deterministicResult = parseCaptureTranscript(normalizedNote, taxonomyQuery.data);
@@ -201,6 +221,7 @@ export function CaptureDraftForm({
   }
 
   function selectMode(nextMode: CaptureMode) {
+    activeParserRequestId.current = null;
     setMode(nextMode);
     setVoiceState(idleVoiceState);
 
@@ -212,7 +233,7 @@ export function CaptureDraftForm({
   function handleVoiceTranscript(nextTranscript: string) {
     setTranscript(nextTranscript);
     if (taxonomyQuery.data) {
-      beginDraft(nextTranscript, "voice");
+      void beginDraft(nextTranscript, "voice");
       return;
     }
     setPendingVoiceTranscript(nextTranscript);
@@ -231,7 +252,7 @@ export function CaptureDraftForm({
       "Regenerating will replace the current drill fields, Training Methods, and tags with a new draft based on this transcript.",
     );
     if (!confirmed) return;
-    beginDraft(transcriptRevision, session.source);
+    void beginDraft(transcriptRevision, session.source);
   }
 
   if (session) {
@@ -393,13 +414,35 @@ export function CaptureDraftForm({
 }
 
 function toTaxonomyInitialValues(
-  result: ReturnType<typeof parseCaptureTranscript>,
+  result: CaptureTaxonomyResult,
 ): DrillFormInitialValues {
   return {
     trainingMethodSlugs: result.trainingMethodSlugs,
     tagSlugs: result.tagSlugs,
     statusTagSlugs: [],
   };
+}
+
+function VoiceCaptureLoading() {
+  return (
+    <section className={styles.voicePanel} aria-busy="true" aria-label="Loading voice recorder">
+      <p className="eyebrow">Voice Memo</p>
+      <div className={styles.voiceStage} data-status="idle">
+        <div className={styles.voiceConsoleHeader}>
+          <span>MIC INPUT</span>
+          <span className={styles.voiceConsoleState}>LOADING</span>
+        </div>
+        <div className={styles.voiceConsoleDisplay}>
+          <p className={styles.voiceTimer}>0:00</p>
+          <div className={styles.voiceWaveformViewport} />
+          <div className={styles.voiceConsoleMessage}>
+            <p>Preparing microphone controls</p>
+          </div>
+        </div>
+        <div className={styles.voiceCommandRail} aria-hidden="true" />
+      </div>
+    </section>
+  );
 }
 
 function toCleanupValues(draft: CaptureDraft): DrillCleanupValues {

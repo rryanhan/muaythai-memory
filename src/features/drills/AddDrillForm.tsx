@@ -6,15 +6,10 @@ import { useRouter } from "next/navigation";
 import { badgeByIconKey } from "@/components/shared/context-badges";
 import skeletonStyles from "@/components/shared/Skeleton.module.css";
 import captureStyles from "@/features/capture/Capture.module.css";
-import {
-  createDrill,
-  getTaxonomy,
-  updateDrill,
-  type ApiError,
-  type DrillDetail,
-  type StatusTagDto,
-  type TrainingMethodDto,
-} from "@/data";
+import type { ApiError } from "@/data/api-core";
+import { createDrill, updateDrill } from "@/data/drills";
+import { getTaxonomy } from "@/data/taxonomy";
+import type { DrillDetail, StatusTagDto, TrainingMethodDto } from "@/data/types";
 import { AddDrillSkeleton } from "./AddDrillSkeleton";
 import {
   hasPendingDrillCleanup,
@@ -24,6 +19,7 @@ import {
   type DrillDirtyFields,
   type PendingDrillCleanup,
 } from "./cleanup-merge";
+import type { DrillFormCleanupState, DrillFormInitialValues } from "./drill-form-types";
 import styles from "./DrillForm.module.css";
 
 type AddDrillFormProps = {
@@ -37,23 +33,7 @@ type AddDrillFormProps = {
   onSaveSuccess?: (drillId: string) => void;
 };
 
-export type DrillFormCleanupState = {
-  status: "idle" | "pending" | "ready" | "error";
-  revision?: number;
-  values?: DrillCleanupValues;
-  errorMessage?: string;
-  onRetry?: () => void;
-};
-
-export type DrillFormInitialValues = {
-  title?: string;
-  summary?: string | null;
-  notes?: string | null;
-  steps?: string[];
-  trainingMethodSlugs?: string[];
-  tagSlugs?: string[];
-  statusTagSlugs?: string[];
-};
+export type { DrillFormCleanupState, DrillFormInitialValues } from "./drill-form-types";
 
 export function AddDrillForm({
   mode = "create",

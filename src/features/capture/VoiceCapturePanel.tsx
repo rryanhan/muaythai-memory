@@ -1,8 +1,12 @@
 "use client";
 
-import { Keyboard, Microphone, Stop, X } from "@phosphor-icons/react";
+import { Keyboard } from "@phosphor-icons/react/Keyboard";
+import { Microphone } from "@phosphor-icons/react/Microphone";
+import { Stop } from "@phosphor-icons/react/Stop";
+import { X } from "@phosphor-icons/react/X";
 import { useEffect, useRef, useState } from "react";
-import { transcribeCaptureRecording, type ApiError } from "@/data";
+import type { ApiError } from "@/data/api-core";
+import { transcribeCaptureRecording } from "@/data/capture";
 import {
   CAPTURE_CLIENT_TRANSCRIPTION_TIMEOUT_MS,
   CAPTURE_FINALIZATION_TIMEOUT_MS,
@@ -34,6 +38,8 @@ export type VoiceCaptureState = {
   hasUnsavedWork: boolean;
 };
 
+// Recorder lifecycle stays inside this deferred phase so idle text capture and
+// drill review do not compile browser audio APIs they cannot use.
 export function VoiceCapturePanel({
   onTranscript,
   onUseText,

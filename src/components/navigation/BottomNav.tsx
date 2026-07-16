@@ -1,4 +1,6 @@
-import { Graph, Stack, UserCircle } from "@phosphor-icons/react";
+import { Graph } from "@phosphor-icons/react/Graph";
+import { Stack } from "@phosphor-icons/react/Stack";
+import { UserCircle } from "@phosphor-icons/react/UserCircle";
 import styles from "./BottomNav.module.css";
 
 export type AppView = "network" | "library" | "profile";
