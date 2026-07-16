@@ -87,7 +87,7 @@
 }
 
 .view :global(.network-status-chip),
-.controlsSheet :global(.network-filter-chip),
+.view :global(.network-filter-chip),
 .view :global(.network-preview-chip),
 .view :global(.network-sync-chip),
 .view :global(.network-error-chip) {
@@ -99,7 +99,7 @@
   font-size: 14px;
 }
 
-.controlsSheet :global(.network-filter-chip),
+.view :global(.network-filter-chip),
 .view :global(.network-error-chip) {
   display: inline-flex;
   align-items: center;
@@ -115,7 +115,7 @@
   color: var(--teal);
 }
 
-.controlsSheet :global(.network-filter-chip) span {
+.view :global(.network-filter-chip) span {
   color: var(--muted);
 }
 

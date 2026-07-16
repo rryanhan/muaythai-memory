@@ -89,24 +89,26 @@ export function DrillDetailSheet({
           </header>
           <Drawer.Description className="sr-only">{getSheetDescription(state)}</Drawer.Description>
 
-          {state.status === "loading" && (
-            <div className="drill-detail-state">
-              <h2>Loading drill</h2>
-              <p>Pulling the full steps and notes.</p>
-            </div>
-          )}
+          <div className={styles.scrollBody}>
+            {state.status === "loading" && (
+              <div className="drill-detail-state">
+                <h2>Loading drill</h2>
+                <p>Pulling the full steps and notes.</p>
+              </div>
+            )}
 
-          {state.status === "error" && (
-            <div className="drill-detail-state">
-              <h2>Couldn&apos;t load drill</h2>
-              <p>{state.message}</p>
-              <button type="button" onClick={onRetry}>
-                Retry
-              </button>
-            </div>
-          )}
+            {state.status === "error" && (
+              <div className="drill-detail-state">
+                <h2>Couldn&apos;t load drill</h2>
+                <p>{state.message}</p>
+                <button type="button" onClick={onRetry}>
+                  Retry
+                </button>
+              </div>
+            )}
 
-          {state.status === "loaded" && <DrillDetailContent drill={state.drill} badgeByIconKey={badgeByIconKey} />}
+            {state.status === "loaded" && <DrillDetailContent drill={state.drill} badgeByIconKey={badgeByIconKey} />}
+          </div>
         </Drawer.Content>
       </Drawer.Portal>
     </Drawer.Root>

@@ -1,7 +1,7 @@
 /* Shared drill record content, plus the Network detail drawer portal. */
 .backdrop {
   position: fixed;
-  inset: 0;
+  inset: 0 0 var(--nav-height);
   z-index: 90;
   background: rgba(23, 23, 23, 0.32);
 }
@@ -11,17 +11,27 @@
   z-index: 100;
   left: 0;
   right: 0;
-  bottom: 0;
+  bottom: var(--nav-height);
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
   width: min(100%, 480px);
-  max-height: 88dvh;
+  max-height: calc(88dvh - var(--nav-height));
   margin: 0 auto;
-  overflow-y: auto;
+  overflow: hidden;
   border: 1px solid var(--border);
   border-radius: 18px 18px 0 0;
-  padding: 10px 20px 28px;
+  padding: 10px 20px 0;
   background: var(--surface);
   box-shadow: 0 -18px 48px rgba(23, 23, 23, 0.14);
   outline: none;
+}
+
+.scrollBody {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-bottom: max(28px, env(safe-area-inset-bottom));
+  -webkit-overflow-scrolling: touch;
 }
 
 .sheet :global(.drill-detail-sheet-header) {
