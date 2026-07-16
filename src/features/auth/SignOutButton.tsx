@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useJournalUpload } from "@/features/journal/JournalUploadProvider";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 type SignOutButtonProps = {
@@ -11,10 +12,16 @@ type SignOutButtonProps = {
 
 export function SignOutButton({ className, errorClassName }: SignOutButtonProps) {
   const queryClient = useQueryClient();
+  const journalUpload = useJournalUpload();
   const [pending, setPending] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   async function signOut() {
+    if (journalUpload.hasWork) {
+      const confirmed = window.confirm("Discard the active journal upload and sign out?");
+      if (!confirmed) return;
+      await journalUpload.discardWork();
+    }
     setPending(true);
     setErrorMessage(null);
     const supabase = createSupabaseBrowserClient();

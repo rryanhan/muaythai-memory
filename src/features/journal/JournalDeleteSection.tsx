@@ -15,7 +15,10 @@ export function JournalDeleteSection({ entryId }: { entryId: string }) {
     mutationFn: () => deleteJournalEntry(entryId),
     onSuccess: async () => {
       queryClient.removeQueries({ queryKey: ["journal", entryId] });
-      await queryClient.invalidateQueries({ queryKey: ["journal"] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["journal"] }),
+        queryClient.invalidateQueries({ queryKey: ["drill-journal"] }),
+      ]);
       router.replace("/?view=profile");
       router.refresh();
     },

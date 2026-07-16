@@ -141,6 +141,15 @@ object is confirmed and the entry moves to `ready`. Deleting an entry permanentl
 removes both its database records and video. Video bytes never pass through the
 Next server and are never public.
 
+Ready-entry metadata may be edited without replacing the stored video. The date,
+caption, and optional owned Drill relationship remain user-scoped. The client may
+keep one active TUS upload alive across in-app navigation, but selected files and
+preview URLs remain memory-only and are not restored after a full browser refresh.
+
+Full Drill pages may lazily request the newest ready Journal entry linked to that
+Drill. Signed playback URLs stay in Journal-specific responses and never become
+part of the normal Drill or graph payloads.
+
 ## Network View Data
 
 The default Network View should show:

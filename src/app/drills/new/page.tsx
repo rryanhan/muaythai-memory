@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { RoutedBottomNav } from "@/components/navigation/RoutedBottomNav";
 import { DrillDetailBackButton } from "@/features/drills/DrillDetailBackButton";
-import { AddDrillForm } from "@/features/drills/AddDrillForm";
+import { AddDrillPageForm } from "@/features/drills/AddDrillPageForm";
 import routeStyles from "@/features/drills/DrillRouteShell.module.css";
 import { requireCurrentPageUserId } from "@/modules/auth";
 
@@ -10,8 +10,13 @@ export const metadata: Metadata = {
   description: "Create a saved Muay Thai drill.",
 };
 
-export default async function AddDrillPage() {
+export default async function AddDrillPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ from?: string }>;
+}) {
   await requireCurrentPageUserId("/drills/new");
+  const fromJournal = (await searchParams).from === "journal";
 
   return (
     <main className={routeStyles.formPage}>
@@ -21,11 +26,11 @@ export default async function AddDrillPage() {
         <p className="eyebrow">Add Drill</p>
       </header>
       <section className="add-drill-heading">
-        <h1>New Drill</h1>
-        <p>Save the steps, notes, and tags while it is still fresh.</p>
+        <h1>{fromJournal ? "New Related Drill" : "New Drill"}</h1>
+        <p>{fromJournal ? "Create the drill, then return to your journal entry." : "Save the steps, notes, and tags while it is still fresh."}</p>
       </section>
-      <AddDrillForm />
-      <RoutedBottomNav activeView="library" />
+      <AddDrillPageForm fromJournal={fromJournal} />
+      <RoutedBottomNav activeView={fromJournal ? "profile" : "library"} />
     </main>
   );
 }

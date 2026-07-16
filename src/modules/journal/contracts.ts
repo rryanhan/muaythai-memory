@@ -29,6 +29,12 @@ export const createJournalUploadInputSchema = z.object({
   drillId: z.string().uuid().optional().nullable(),
 });
 
+export const updateJournalEntryInputSchema = z.object({
+  occurredOn: journalDateSchema,
+  caption: optionalCaptionSchema,
+  drillId: z.string().uuid().optional().nullable(),
+});
+
 export const journalDrillSchema = z.object({
   id: z.string().uuid(),
   title: z.string(),
@@ -57,6 +63,11 @@ export const journalDetailResponseSchema = z.object({
   entry: journalEntryDetailSchema,
 });
 
+export const journalPreviewResponseSchema = z.object({
+  entry: journalEntryDetailSchema.nullable(),
+  total: z.number().int().nonnegative(),
+});
+
 export const journalUploadIntentResponseSchema = z.object({
   entryId: z.string().uuid(),
   upload: z.object({
@@ -75,9 +86,11 @@ export const deleteJournalEntryResponseSchema = z.object({
 });
 
 export type CreateJournalUploadInput = z.input<typeof createJournalUploadInputSchema>;
+export type UpdateJournalEntryInput = z.input<typeof updateJournalEntryInputSchema>;
 export type JournalEntrySummary = z.infer<typeof journalEntrySummarySchema>;
 export type JournalEntryDetail = z.infer<typeof journalEntryDetailSchema>;
 export type JournalListResponse = z.infer<typeof journalListResponseSchema>;
+export type JournalPreviewResponse = z.infer<typeof journalPreviewResponseSchema>;
 export type JournalUploadIntentResponse = z.infer<typeof journalUploadIntentResponseSchema>;
 export type CompleteJournalUploadResponse = z.infer<typeof completeJournalUploadResponseSchema>;
 export type DeleteJournalEntryResponse = z.infer<typeof deleteJournalEntryResponseSchema>;

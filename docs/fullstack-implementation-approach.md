@@ -460,9 +460,17 @@ Active journal endpoints:
 GET    /api/journal
 POST   /api/journal/uploads
 GET    /api/journal/:id
+PATCH  /api/journal/:id
 POST   /api/journal/:id/complete
 DELETE /api/journal/:id
+GET    /api/drills/:id/journal-preview
 ```
+
+`GET /api/journal` accepts an optional owned `drillId` filter. Journal upload
+state lives in a root client provider so one TUS upload can continue through
+in-app navigation. Refresh-resumable files and concurrent upload queues remain
+deferred. Full Drill pages load related media lazily to protect the primary Drill
+and graph read paths.
 
 ## Graph Read Model
 

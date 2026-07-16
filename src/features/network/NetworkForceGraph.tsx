@@ -54,6 +54,8 @@ type DragState = {
 const fallbackSize: Size = { width: 390, height: 980 };
 const zoomBounds = { min: 0.55, max: 2.4 };
 const farZoomThreshold = 0.62;
+const semanticZoomExponent = 0.15;
+const semanticNodeScaleBounds = { min: 0.9, max: 1.15 };
 
 export function NetworkForceGraph({
   graph,
@@ -78,6 +80,10 @@ export function NetworkForceGraph({
 
   const renderSize = viewportSize ?? fallbackSize;
   const layoutSize = useMemo(() => getLayoutSize(renderSize), [renderSize]);
+  const initialCameraTransform = useMemo(
+    () => getInitialZoomTransform(renderSize, layoutSize),
+    [layoutSize, renderSize],
+  );
   const graphModel = useMemo(
     () => buildGraphModel(graph, badgeByIconKey, positionsRef.current, layoutSize),
     [badgeByIconKey, graph, layoutSize],
@@ -92,6 +98,7 @@ export function NetworkForceGraph({
     [physicsNodes],
   );
   const focusedMethodSet = useMemo(() => new Set(focusedMethodSlugs), [focusedMethodSlugs]);
+  const semanticNodeScale = getSemanticNodeScale(cameraTransform.k, initialCameraTransform.k);
 
   const applyZoomTransform = useCallback((transform: ZoomTransform) => {
     setCameraTransform(transform);
@@ -190,19 +197,19 @@ export function NetworkForceGraph({
     const selection = select(svg);
     zoomBehaviorRef.current = zoomBehavior;
     selection.call(zoomBehavior).on("dblclick.zoom", null);
-    selection.call(zoomBehavior.transform, getInitialZoomTransform(viewportSize, layoutSize));
+    selection.call(zoomBehavior.transform, initialCameraTransform);
 
     return () => {
       selection.on(".zoom", null);
     };
-  }, [applyZoomTransform, layoutSize, viewportSize]);
+  }, [applyZoomTransform, initialCameraTransform, layoutSize, viewportSize]);
 
   function resetCamera() {
     const svg = svgRef.current;
     const zoomBehavior = zoomBehaviorRef.current;
     if (!svg || !zoomBehavior || !viewportSize) return;
 
-    select(svg).call(zoomBehavior.transform, getInitialZoomTransform(viewportSize, layoutSize));
+    select(svg).call(zoomBehavior.transform, initialCameraTransform);
   }
 
   function handleNodePointerDown(node: PhysicsNode, event: ReactPointerEvent<SVGGElement>) {
@@ -346,18 +353,23 @@ export function NetworkForceGraph({
                   onPointerUp={finishNodeDrag}
                   onPointerCancel={finishNodeDrag}
                 >
-                  <rect
-                    className="network-force-hit-area"
-                    x="-18"
-                    y="-18"
-                    width="36"
-                    height="36"
-                    rx="18"
-                  />
-                  <circle r="7.5" />
-                  <text className="network-force-drill-label" x={node.r + 7} y="4">
-                    {node.displayLabel}
-                  </text>
+                  <g
+                    className="network-force-node-visual"
+                    transform={`scale(${semanticNodeScale.compensation})`}
+                  >
+                    <rect
+                      className="network-force-hit-area"
+                      x="-18"
+                      y="-18"
+                      width="36"
+                      height="36"
+                      rx="18"
+                    />
+                    <circle r="7.5" />
+                    <text className="network-force-drill-label" x={node.r + 7} y="4">
+                      {node.displayLabel}
+                    </text>
+                  </g>
                 </g>
               );
             })}
@@ -378,29 +390,37 @@ export function NetworkForceGraph({
                   onPointerUp={finishNodeDrag}
                   onPointerCancel={finishNodeDrag}
                 >
-                  <rect
-                    className="network-force-hit-area"
-                    x={node.box.left - 8}
-                    y={node.box.top - 8}
-                    width={node.box.right - node.box.left + 16}
-                    height={node.box.bottom - node.box.top + 16}
-                    rx="12"
-                  />
-                  {node.badgeSrc ? (
-                    <image
-                      href={node.badgeSrc}
-                      x="-31"
-                      y="-37"
-                      width="62"
-                      height="62"
-                      preserveAspectRatio="xMidYMid meet"
+                  <g
+                    className="network-force-node-visual"
+                    transform={`scale(${semanticNodeScale.compensation})`}
+                  >
+                    <rect
+                      className="network-force-hit-area"
+                      x={node.box.left - 8}
+                      y={node.box.top - 8}
+                      width={node.box.right - node.box.left + 16}
+                      height={node.box.bottom - node.box.top + 16}
+                      rx="12"
                     />
-                  ) : (
-                    <path className="network-force-method-fallback" d="M0,-33 L29,-16 L29,16 L0,33 L-29,16 L-29,-16 Z" />
-                  )}
-                  <text textAnchor="middle" y="40">
-                    {node.label}
-                  </text>
+                    {node.badgeSrc ? (
+                      <image
+                        href={node.badgeSrc}
+                        x="-31"
+                        y="-37"
+                        width="62"
+                        height="62"
+                        preserveAspectRatio="xMidYMid meet"
+                      />
+                    ) : (
+                      <path
+                        className="network-force-method-fallback"
+                        d="M0,-33 L29,-16 L29,16 L0,33 L-29,16 L-29,-16 Z"
+                      />
+                    )}
+                    <text textAnchor="middle" y="40">
+                      {node.label}
+                    </text>
+                  </g>
                 </g>
               );
             })}
@@ -423,18 +443,23 @@ export function NetworkForceGraph({
                   onPointerUp={finishNodeDrag}
                   onPointerCancel={finishNodeDrag}
                 >
-                  <rect
-                    className="network-force-hit-area"
-                    x={node.box.left - 5}
-                    y={node.box.top - 5}
-                    width={node.box.right - node.box.left + 10}
-                    height={node.box.bottom - node.box.top + 10}
-                    rx="8"
-                  />
-                  <circle r={node.r} />
-                  <text x={node.r + 7} y="4">
-                    {node.displayLabel}
-                  </text>
+                  <g
+                    className="network-force-node-visual"
+                    transform={`scale(${semanticNodeScale.compensation})`}
+                  >
+                    <rect
+                      className="network-force-hit-area"
+                      x={node.box.left - 5}
+                      y={node.box.top - 5}
+                      width={node.box.right - node.box.left + 10}
+                      height={node.box.bottom - node.box.top + 10}
+                      rx="8"
+                    />
+                    <circle r={node.r} />
+                    <text x={node.r + 7} y="4">
+                      {node.displayLabel}
+                    </text>
+                  </g>
                 </g>
               );
             })}
@@ -446,4 +471,23 @@ export function NetworkForceGraph({
       </button>
     </div>
   );
+}
+
+function getSemanticNodeScale(cameraScale: number, baselineCameraScale: number): {
+  visible: number;
+  compensation: number;
+} {
+  const safeCameraScale = Math.max(cameraScale, Number.EPSILON);
+  const safeBaselineScale = Math.max(baselineCameraScale, Number.EPSILON);
+  const relativeCameraScale = safeCameraScale / safeBaselineScale;
+  const relativeVisibleScale = Math.min(
+    semanticNodeScaleBounds.max,
+    Math.max(semanticNodeScaleBounds.min, relativeCameraScale ** semanticZoomExponent),
+  );
+  const visible = safeBaselineScale * relativeVisibleScale;
+
+  return {
+    visible,
+    compensation: visible / safeCameraScale,
+  };
 }

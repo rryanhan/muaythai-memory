@@ -25,6 +25,14 @@
   margin: 0;
 }
 
+.headerAction {
+  margin-left: auto;
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 750;
+  text-decoration: none;
+}
+
 .back {
   display: grid;
   width: 42px;
@@ -89,16 +97,12 @@
   background: rgba(255, 255, 255, 0.38);
 }
 
-.videoPreview,
 .videoPlaceholder {
   display: block;
   width: 100%;
-  aspect-ratio: 16 / 10;
+  aspect-ratio: 4 / 5;
+  max-height: 58dvh;
   background: var(--graphite);
-}
-
-.videoPreview {
-  object-fit: contain;
 }
 
 .videoPlaceholder {
@@ -401,16 +405,6 @@
   height: 46px;
 }
 
-/* Dedicated entry page */
-.entryVideo {
-  display: block;
-  width: calc(100% + 40px);
-  max-height: 58dvh;
-  margin: 0 -20px;
-  background: var(--graphite);
-  object-fit: contain;
-}
-
 .entryMeta {
   display: grid;
   gap: 18px;
@@ -472,11 +466,6 @@
 @media (max-width: 360px) {
   .page {
     padding-inline: 16px;
-  }
-
-  .entryVideo {
-    width: calc(100% + 32px);
-    margin-inline: -16px;
   }
 
   .fileActions {

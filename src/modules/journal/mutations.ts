@@ -11,9 +11,11 @@ import {
 } from "./constants";
 import {
   createJournalUploadInputSchema,
+  updateJournalEntryInputSchema,
   type CreateJournalUploadInput,
   type JournalEntryDetail,
   type JournalUploadIntentResponse,
+  type UpdateJournalEntryInput,
 } from "./contracts";
 import { getJournalEntryById, getOwnedJournalRow } from "./queries";
 
@@ -111,6 +113,36 @@ export async function completeJournalUpload(userId: string, entryId: string): Pr
 
   const entry = await getJournalEntryById(userId, entryId);
   if (!entry) throw new JournalMutationError("Completed journal entry could not be loaded.", 404);
+  return entry;
+}
+
+export async function updateJournalEntry(
+  userId: string,
+  entryId: string,
+  rawInput: UpdateJournalEntryInput,
+): Promise<JournalEntryDetail> {
+  const input = updateJournalEntryInputSchema.parse(rawInput);
+  const current = await getOwnedJournalRow(userId, entryId);
+  if (!current) throw new JournalMutationError("Journal entry not found.", 404);
+  if (current.status !== "ready") {
+    throw new JournalMutationError("Finish the video upload before editing this entry.", 409);
+  }
+  if (input.drillId) await assertOwnedDrill(userId, input.drillId);
+
+  const [updated] = await db
+    .update(journalEntries)
+    .set({
+      occurredOn: input.occurredOn,
+      caption: input.caption,
+      drillId: input.drillId ?? null,
+      updatedAt: new Date(),
+    })
+    .where(and(eq(journalEntries.id, entryId), eq(journalEntries.userId, userId)))
+    .returning({ id: journalEntries.id });
+  if (!updated) throw new JournalMutationError("Journal entry not found.", 404);
+
+  const entry = await getJournalEntryById(userId, entryId);
+  if (!entry) throw new JournalMutationError("Updated journal entry could not be loaded.", 404);
   return entry;
 }
 

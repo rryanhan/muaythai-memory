@@ -2,8 +2,10 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { preload } from "react-dom";
 import "@fontsource/dseg7/classic-400.css";
+import "@daypicker/react/style.css";
 import { QueryProvider } from "@/components/providers/QueryProvider";
 import { contextBadgeUrls } from "@/components/shared/context-badges";
+import { JournalUploadProvider } from "@/features/journal/JournalUploadProvider";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -23,7 +25,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        <QueryProvider>{children}</QueryProvider>
+        <QueryProvider>
+          <JournalUploadProvider>{children}</JournalUploadProvider>
+        </QueryProvider>
       </body>
     </html>
   );

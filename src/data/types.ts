@@ -22,7 +22,9 @@ import type {
   JournalEntryDetail,
   JournalEntrySummary,
   JournalListResponse,
+  JournalPreviewResponse,
   JournalUploadIntentResponse,
+  UpdateJournalEntryInput,
 } from "@/modules/journal/contracts";
 import type { ProfileDto, ProfileResponse } from "@/modules/profile/contracts";
 import type { StatusTagDto, TagCategoryDto, TagDto, TaxonomyResponse, TrainingMethodDto } from "@/modules/taxonomy/contracts";
@@ -51,6 +53,7 @@ export type {
   JournalEntryDetail,
   JournalEntrySummary,
   JournalListResponse,
+  JournalPreviewResponse,
   JournalUploadIntentResponse,
   ProfileDto,
   ProfileResponse,
@@ -60,6 +63,7 @@ export type {
   TaxonomyResponse,
   TrainingMethodDto,
   UpdateDrillInput,
+  UpdateJournalEntryInput,
 };
 
 // UI controls may separate standard and custom tags even though the backend

@@ -21,7 +21,14 @@ const checks: Array<{ path: string; method?: string; body?: BodyInit; headers?: 
     headers: { "content-type": "application/json" },
   },
   { path: "/api/journal/00000000-0000-4000-8000-000000000000" },
+  {
+    path: "/api/journal/00000000-0000-4000-8000-000000000000",
+    method: "PATCH",
+    body: JSON.stringify({ occurredOn: "2026-07-16", caption: null, drillId: null }),
+    headers: { "content-type": "application/json" },
+  },
   { path: "/api/journal/00000000-0000-4000-8000-000000000000/complete", method: "POST" },
+  { path: "/api/drills/00000000-0000-4000-8000-000000000000/journal-preview" },
 ];
 
 async function main() {

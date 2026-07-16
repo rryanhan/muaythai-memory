@@ -2,7 +2,7 @@
 .view {
   position: relative;
   min-height: calc(100dvh - var(--nav-height));
-  padding: 28px 20px 32px;
+  padding: 24px 20px 32px;
   background-image: linear-gradient(rgba(36, 39, 41, 0.05) 1px, transparent 1px),
     linear-gradient(90deg, rgba(36, 39, 41, 0.05) 1px, transparent 1px);
   background-size: 42px 42px;
@@ -12,7 +12,7 @@
   position: fixed;
   z-index: 35;
   left: max(0px, calc(50% - 240px));
-  top: 178px;
+  top: 164px;
   width: 16px;
   height: 96px;
   border: 0;
@@ -36,8 +36,8 @@
   z-index: 10;
   top: 0;
   display: grid;
-  gap: 8px;
-  padding: 0 0 20px;
+  gap: 6px;
+  padding: 0 0 16px;
   background: linear-gradient(var(--bg) 78%, rgba(245, 244, 239, 0));
 }
 
@@ -49,8 +49,8 @@
 }
 
 .view :global(.library-title-row) img {
-  width: 62px;
-  height: 62px;
+  width: 56px;
+  height: 56px;
 }
 
 .view :global(.library-title-row):not(:has(img)) {
@@ -59,14 +59,14 @@
 
 .view :global(.library-title-row) h1 {
   margin: 0;
-  font-size: 44px;
+  font-size: 40px;
   line-height: 0.95;
 }
 
 .view :global(.library-title-row) p {
   margin: 0;
   color: var(--muted);
-  font-size: 18px;
+  font-size: 16px;
 }
 
 .view :global(.library-search-row) {
@@ -74,21 +74,21 @@
   grid-template-columns: 1fr auto;
   gap: 12px;
   align-items: center;
-  margin-top: 16px;
+  margin-top: 12px;
 }
 
 .view :global(.library-search) {
   display: flex;
   align-items: center;
-  gap: 14px;
-  min-height: 54px;
+  gap: 12px;
+  min-height: 50px;
   min-width: 0;
   border: 1px solid var(--border);
   border-radius: 8px;
-  padding: 0 16px;
+  padding: 0 14px;
   background: rgba(255, 255, 255, 0.86);
   color: var(--muted);
-  font-size: 17px;
+  font-size: 16px;
 }
 
 .view :global(.library-search) input {
@@ -118,8 +118,8 @@
 .view :global(.search-mark) {
   position: relative;
   flex: 0 0 auto;
-  width: 22px;
-  height: 22px;
+  width: 20px;
+  height: 20px;
   border: 2px solid var(--text);
   border-radius: 999px;
 }
@@ -150,9 +150,9 @@
 
 .view :global(.library-loading-row) {
   display: grid;
-  gap: 9px;
+  gap: 8px;
   border-bottom: 1px solid var(--border);
-  padding: 17px 0;
+  padding: 15px 0;
 }
 
 .view :global(.library-skeleton) {
@@ -174,12 +174,12 @@
 
 .view :global(.library-skeleton-title) {
   width: min(420px, 78vw);
-  height: 23px;
+  height: 21px;
 }
 
 .view :global(.library-skeleton-tags) {
   width: min(260px, 52vw);
-  height: 15px;
+  height: 14px;
   border-radius: 7px;
 }
 
@@ -659,7 +659,7 @@
 
 @media (max-width: 380px) {
   .view :global(.library-title-row) h1 {
-    font-size: 40px;
+    font-size: 38px;
   }
 
   .view :global(.library-search) {
@@ -671,8 +671,8 @@
 .view :global(.library-search-row) button {
   display: grid;
   place-items: center;
-  width: 56px;
-  height: 56px;
+  width: 50px;
+  height: 50px;
   border: 1px solid var(--border);
   border-radius: 999px;
   background: var(--surface);

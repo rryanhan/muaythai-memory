@@ -8,11 +8,19 @@ export function JournalDiscardSheet({
   pending,
   onStay,
   onDiscard,
+  title = "Discard journal entry?",
+  description = "Your selected video and unsaved entry details will be lost.",
+  stayLabel = "Keep editing",
+  discardLabel = "Discard entry",
 }: {
   open: boolean;
   pending: boolean;
   onStay: () => void;
   onDiscard: () => void;
+  title?: string;
+  description?: string;
+  stayLabel?: string;
+  discardLabel?: string;
 }) {
   return (
     <Drawer.Root open={open} onOpenChange={(nextOpen) => !nextOpen && !pending && onStay()}>
@@ -20,14 +28,14 @@ export function JournalDiscardSheet({
         <Drawer.Overlay className={styles.sheetOverlay} />
         <Drawer.Content className={styles.discardSheet} aria-label="Discard journal entry confirmation">
           <Drawer.Handle className="sheet-handle" />
-          <Drawer.Title asChild><h2>Discard journal entry?</h2></Drawer.Title>
+          <Drawer.Title asChild><h2>{title}</h2></Drawer.Title>
           <Drawer.Description asChild>
-            <p>Your selected video and unsaved entry details will be lost.</p>
+            <p>{description}</p>
           </Drawer.Description>
           <div className={styles.sheetActions}>
-            <button type="button" disabled={pending} onClick={onStay}>Keep editing</button>
+            <button type="button" disabled={pending} onClick={onStay}>{stayLabel}</button>
             <button type="button" disabled={pending} data-danger="true" onClick={onDiscard}>
-              {pending ? "Discarding..." : "Discard entry"}
+              {pending ? "Discarding..." : discardLabel}
             </button>
           </div>
         </Drawer.Content>

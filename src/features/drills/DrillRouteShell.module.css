@@ -87,8 +87,17 @@
 }
 
 .detailPage :global(.drill-detail-method-badge) {
-  width: 58px;
-  height: 58px;
+  width: 54px;
+  height: 54px;
+}
+
+.detailPage :global(.drill-detail-loading-badge) {
+  width: 54px;
+  height: 54px;
+}
+
+.detailPage :global(.drill-detail-skeleton-title) {
+  height: 33px;
 }
 
 .detailPage :global(.drill-detail-title-row) h2 {

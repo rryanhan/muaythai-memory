@@ -4,9 +4,9 @@ import { eq } from "drizzle-orm";
 import { db, postgresClient } from "@/db/client";
 import { drills, journalEntries, journalMedia, users } from "@/db/schema";
 import { JOURNAL_VIDEO_MAX_BYTES } from "./constants";
-import { createJournalUploadInputSchema, journalDateSchema } from "./contracts";
+import { createJournalUploadInputSchema, journalDateSchema, updateJournalEntryInputSchema } from "./contracts";
 import { createJournalUploadIntent } from "./mutations";
-import { decodeJournalCursor, encodeJournalCursor, getOwnedJournalRow, listJournalEntries } from "./queries";
+import { decodeJournalCursor, encodeJournalCursor, getOwnedJournalRow, isOwnedDrill, listJournalEntries } from "./queries";
 import { validateJournalVideoFile } from "@/features/journal/upload-journal-video";
 
 async function main() {
@@ -25,6 +25,15 @@ function verifyContracts() {
     sizeBytes: JOURNAL_VIDEO_MAX_BYTES + 1,
     occurredOn: "2026-07-16",
   }).success, false);
+  assert.deepEqual(updateJournalEntryInputSchema.parse({
+    occurredOn: "2026-07-16",
+    caption: "  Better timing  ",
+    drillId: null,
+  }), {
+    occurredOn: "2026-07-16",
+    caption: "Better timing",
+    drillId: null,
+  });
   assert.throws(
     () => validateJournalVideoFile(new File([new Uint8Array([1])], "clip.avi", { type: "video/x-msvideo" })),
     /MP4, WebM, or QuickTime/,
@@ -74,6 +83,10 @@ async function verifyOwnershipAndVisibility() {
     assert.deepEqual(listA.entries.map((entry) => entry.id), [readyA]);
     assert.deepEqual(listB.entries.map((entry) => entry.id), [readyB]);
     assert.equal(listA.entries[0]?.drill?.id, drillA);
+    assert.deepEqual((await listJournalEntries(userA, { drillId: drillA })).entries.map((entry) => entry.id), [readyA]);
+    assert.deepEqual((await listJournalEntries(userA, { drillId: drillB })).entries, []);
+    assert.equal(await isOwnedDrill(userA, drillA), true);
+    assert.equal(await isOwnedDrill(userA, drillB), false);
     assert.equal(await getOwnedJournalRow(userB, readyA), null);
 
     await assert.rejects(

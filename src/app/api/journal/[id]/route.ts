@@ -4,9 +4,10 @@ import { requireCurrentAppUser, requireCurrentUserId } from "@/modules/auth";
 import {
   deleteJournalEntryResponseSchema,
   journalDetailResponseSchema,
+  updateJournalEntryInputSchema,
 } from "@/modules/journal/contracts";
 import { journalErrorResponse } from "@/modules/journal/http";
-import { deleteJournalEntry } from "@/modules/journal/mutations";
+import { deleteJournalEntry, updateJournalEntry } from "@/modules/journal/mutations";
 import { getJournalEntryById } from "@/modules/journal/queries";
 
 export const dynamic = "force-dynamic";
@@ -23,6 +24,18 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ id
     return NextResponse.json(journalDetailResponseSchema.parse({ entry }));
   } catch (error) {
     return journalErrorResponse(error, "Journal entry could not be loaded.");
+  }
+}
+
+export async function PATCH(request: NextRequest, context: { params: Promise<{ id: string }> }) {
+  try {
+    const user = await requireCurrentAppUser();
+    const { id } = paramsSchema.parse(await context.params);
+    const input = updateJournalEntryInputSchema.parse(await request.json());
+    const entry = await updateJournalEntry(user.id, id, input);
+    return NextResponse.json(journalDetailResponseSchema.parse({ entry }));
+  } catch (error) {
+    return journalErrorResponse(error, "Journal entry could not be updated.");
   }
 }
 

@@ -1,0 +1,253 @@
+.fieldTrigger {
+  display: flex;
+  width: 100%;
+  min-height: 46px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0 12px;
+  background: rgba(255, 255, 255, 0.55);
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  font-size: 15px;
+  text-align: left;
+}
+
+.fieldTrigger span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fieldTrigger svg {
+  flex: 0 0 auto;
+  color: var(--accent);
+}
+
+.fieldTrigger:disabled {
+  cursor: wait;
+  opacity: 0.58;
+}
+
+.pickerSheet {
+  position: fixed;
+  right: 0;
+  bottom: var(--nav-height);
+  left: 0;
+  z-index: 100;
+  display: grid;
+  max-width: 480px;
+  max-height: min(76dvh, 660px);
+  margin: 0 auto;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-bottom: 0;
+  border-radius: 8px 8px 0 0;
+  padding: 10px 16px 18px;
+  background: var(--surface);
+}
+
+.pickerHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 0 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.pickerHeader h2,
+.pickerHeader p {
+  margin: 0;
+}
+
+.pickerHeader h2 {
+  font-size: 21px;
+}
+
+.pickerHeader p {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.pickerHeader > button,
+.todayAction {
+  min-height: 36px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 0 11px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.pickerSearch {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 9px;
+  min-height: 46px;
+  margin: 14px 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0 12px;
+  background: rgba(255, 255, 255, 0.55);
+}
+
+.pickerSearch svg {
+  color: var(--muted);
+}
+
+.pickerSearch input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+}
+
+.createDrillAction {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  gap: 9px;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  padding: 0 4px;
+  background: transparent;
+  color: var(--accent);
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 750;
+  text-align: left;
+}
+
+.drillPickerList {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.drillPickerList button {
+  display: flex;
+  width: 100%;
+  min-height: 46px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  padding: 8px 4px;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+}
+
+.drillPickerList button[data-selected="true"] {
+  color: var(--accent);
+}
+
+.drillPickerList button span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.drillPickerList > p {
+  margin: 18px 4px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.calendar {
+  width: 100%;
+  margin: 14px auto 8px;
+  --rdp-accent-color: var(--accent);
+  --rdp-accent-background-color: var(--accent-soft);
+  --rdp-day-width: min(42px, calc((100vw - 44px) / 7));
+  --rdp-day-height: 42px;
+  --rdp-day_button-width: min(42px, calc((100vw - 44px) / 7));
+  --rdp-day_button-height: 42px;
+  --rdp-day_button-border-radius: 6px;
+  --rdp-day_button-border: 1px solid transparent;
+  --rdp-selected-border: 1px solid var(--accent);
+  --rdp-today-color: var(--accent);
+}
+
+.calendar :global(.rdp-months),
+.calendar :global(.rdp-month),
+.calendar :global(.rdp-month_grid) {
+  width: 100%;
+  max-width: 100%;
+}
+
+.calendar :global(.rdp-month_caption) {
+  height: 44px;
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+}
+
+.calendar :global(.rdp-caption_label) {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 13px;
+  font-weight: 750;
+  text-transform: uppercase;
+}
+
+.calendar :global(.rdp-button_previous),
+.calendar :global(.rdp-button_next) {
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  color: var(--text);
+}
+
+.calendar :global(.rdp-weekday) {
+  height: 34px;
+  color: var(--muted);
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 10px;
+  font-weight: 650;
+  text-transform: uppercase;
+}
+
+.calendar :global(.rdp-day_button) {
+  margin: 1px auto;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+}
+
+.calendar :global(.rdp-selected) :global(.rdp-day_button) {
+  background: var(--accent);
+  color: white;
+  font-weight: 750;
+}
+
+.calendar :global(.rdp-disabled) {
+  opacity: 0.28;
+}
+
+.todayAction {
+  justify-self: stretch;
+  margin-top: 6px;
+  color: var(--accent);
+}

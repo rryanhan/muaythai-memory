@@ -6,6 +6,7 @@ import { z } from "zod";
 import { badgeByIconKey } from "@/components/shared/context-badges";
 import { DrillDetailBackButton } from "@/features/drills/DrillDetailBackButton";
 import { DrillDetailContent } from "@/features/drills/DrillDetailContent";
+import { DrillJournalPreview } from "@/features/journal/DrillJournalPreview";
 import { RoutedBottomNav } from "@/components/navigation/RoutedBottomNav";
 import { getDrillById } from "@/modules/drills/queries";
 import routeStyles from "@/features/drills/DrillRouteShell.module.css";
@@ -67,6 +68,7 @@ export default async function DrillDetailPage({ params }: DrillDetailPageProps) 
         </Link>
       </header>
       <DrillDetailContent drill={drill} badgeByIconKey={badgeByIconKey} />
+      <DrillJournalPreview drillId={drill.id} />
       <RoutedBottomNav activeView="library" />
     </main>
   );

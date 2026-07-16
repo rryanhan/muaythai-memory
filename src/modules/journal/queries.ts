@@ -1,9 +1,14 @@
-import { and, desc, eq, lt, or } from "drizzle-orm";
+import { and, count, desc, eq, lt, or } from "drizzle-orm";
 import { db } from "@/db/client";
 import { drills, journalEntries, journalMedia } from "@/db/schema";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { JOURNAL_MEDIA_BUCKET, JOURNAL_PLAYBACK_URL_SECONDS } from "./constants";
-import type { JournalEntryDetail, JournalEntrySummary, JournalListResponse } from "./contracts";
+import type {
+  JournalEntryDetail,
+  JournalEntrySummary,
+  JournalListResponse,
+  JournalPreviewResponse,
+} from "./contracts";
 
 type JournalCursor = {
   occurredOn: string;
@@ -22,7 +27,7 @@ export class JournalCursorError extends Error {
 
 export async function listJournalEntries(
   userId: string,
-  options: { cursor?: string | null; limit?: number } = {},
+  options: { cursor?: string | null; limit?: number; drillId?: string | null } = {},
 ): Promise<JournalListResponse> {
   const limit = Math.min(Math.max(options.limit ?? 10, 1), 25);
   const cursor = options.cursor ? decodeJournalCursor(options.cursor) : null;
@@ -56,6 +61,7 @@ export async function listJournalEntries(
       and(
         eq(journalEntries.userId, userId),
         eq(journalEntries.status, "ready"),
+        options.drillId ? eq(journalEntries.drillId, options.drillId) : undefined,
         cursorCondition,
       ),
     )
@@ -72,6 +78,83 @@ export async function listJournalEntries(
       ? encodeJournalCursor({ occurredOn: lastRow.occurredOn, createdAt: lastRow.createdAt, id: lastRow.id })
       : null,
   };
+}
+
+export async function getJournalPreviewForDrill(
+  userId: string,
+  drillId: string,
+): Promise<JournalPreviewResponse | undefined> {
+  const [ownedDrill] = await db
+    .select({ id: drills.id })
+    .from(drills)
+    .where(and(eq(drills.id, drillId), eq(drills.userId, userId)))
+    .limit(1);
+  if (!ownedDrill) return undefined;
+
+  const [latestRows, totalRows] = await Promise.all([
+    db
+      .select({
+        id: journalEntries.id,
+        occurredOn: journalEntries.occurredOn,
+        caption: journalEntries.caption,
+        createdAt: journalEntries.createdAt,
+        drillId: drills.id,
+        drillTitle: drills.title,
+        durationMs: journalMedia.durationMs,
+        mimeType: journalMedia.mimeType,
+        storagePath: journalMedia.storagePath,
+      })
+      .from(journalEntries)
+      .innerJoin(journalMedia, eq(journalMedia.journalEntryId, journalEntries.id))
+      .leftJoin(drills, eq(journalEntries.drillId, drills.id))
+      .where(
+        and(
+          eq(journalEntries.userId, userId),
+          eq(journalEntries.drillId, drillId),
+          eq(journalEntries.status, "ready"),
+        ),
+      )
+      .orderBy(desc(journalEntries.occurredOn), desc(journalEntries.createdAt), desc(journalEntries.id))
+      .limit(1),
+    db
+      .select({ value: count() })
+      .from(journalEntries)
+      .where(
+        and(
+          eq(journalEntries.userId, userId),
+          eq(journalEntries.drillId, drillId),
+          eq(journalEntries.status, "ready"),
+        ),
+      ),
+  ]);
+
+  const latest = latestRows[0];
+  const total = totalRows[0]?.value ?? 0;
+  if (!latest) return { entry: null, total };
+
+  const { data, error } = await createSupabaseAdminClient().storage
+    .from(JOURNAL_MEDIA_BUCKET)
+    .createSignedUrl(latest.storagePath, JOURNAL_PLAYBACK_URL_SECONDS);
+  if (error || !data?.signedUrl) {
+    throw new Error(`Journal playback URL failed: ${error?.message ?? "No URL returned."}`);
+  }
+
+  return {
+    entry: {
+      ...toSummary(latest),
+      playbackUrl: data.signedUrl,
+    },
+    total,
+  };
+}
+
+export async function isOwnedDrill(userId: string, drillId: string): Promise<boolean> {
+  const [row] = await db
+    .select({ id: drills.id })
+    .from(drills)
+    .where(and(eq(drills.id, drillId), eq(drills.userId, userId)))
+    .limit(1);
+  return Boolean(row);
 }
 
 export async function getJournalEntryById(userId: string, id: string): Promise<JournalEntryDetail | null> {

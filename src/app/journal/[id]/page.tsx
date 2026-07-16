@@ -5,6 +5,7 @@ import { cache } from "react";
 import { z } from "zod";
 import { RoutedBottomNav } from "@/components/navigation/RoutedBottomNav";
 import { JournalDeleteSection } from "@/features/journal/JournalDeleteSection";
+import { JournalVideoPlayer } from "@/features/journal/JournalVideoPlayer";
 import styles from "@/features/journal/Journal.module.css";
 import { requireCurrentPageUserId } from "@/modules/auth";
 import { getJournalEntryById } from "@/modules/journal/queries";
@@ -15,7 +16,10 @@ export const runtime = "nodejs";
 const paramsSchema = z.object({ id: z.string().uuid() });
 const getCachedEntry = cache(getJournalEntryById);
 
-type JournalEntryPageProps = { params: Promise<{ id: string }> };
+type JournalEntryPageProps = {
+  params: Promise<{ id: string }>;
+  searchParams?: Promise<{ fromDrill?: string }>;
+};
 
 export async function generateMetadata({ params }: JournalEntryPageProps): Promise<Metadata> {
   const parsed = paramsSchema.safeParse(await params);
@@ -25,21 +29,27 @@ export async function generateMetadata({ params }: JournalEntryPageProps): Promi
   return { title: entry ? `${formatJournalDate(entry.occurredOn)} | Progress Journal` : "Journal entry not found | Muay Thai Memory" };
 }
 
-export default async function JournalEntryPage({ params }: JournalEntryPageProps) {
+export default async function JournalEntryPage({ params, searchParams }: JournalEntryPageProps) {
   const parsed = paramsSchema.safeParse(await params);
   if (!parsed.success) notFound();
   const userId = await requireCurrentPageUserId(`/journal/${parsed.data.id}`);
   const entry = await getCachedEntry(userId, parsed.data.id);
   if (!entry) notFound();
+  const fromDrill = z.string().uuid().safeParse((await searchParams)?.fromDrill);
+  const backHref = fromDrill.success ? `/drills/${fromDrill.data}/journal` : "/?view=profile";
+  const editHref = fromDrill.success
+    ? `/journal/${entry.id}/edit?fromDrill=${fromDrill.data}`
+    : `/journal/${entry.id}/edit`;
 
   return (
     <main className={styles.page}>
       <div className="notebook-grid" aria-hidden="true" />
       <header className={styles.routeHeader}>
-        <Link className={styles.back} href="/?view=profile" aria-label="Back to Profile">←</Link>
+        <Link className={styles.back} href={backHref} aria-label="Back">←</Link>
         <p className="eyebrow">Progress Journal</p>
+        <Link className={styles.headerAction} href={editHref} prefetch>Edit</Link>
       </header>
-      <video className={styles.entryVideo} controls playsInline preload="metadata" src={entry.playbackUrl} />
+      <JournalVideoPlayer src={entry.playbackUrl} label="Journal entry video" />
       <section className={styles.entryMeta}>
         <p className={styles.entryDate}>
           <time dateTime={entry.occurredOn}>{formatJournalDate(entry.occurredOn)}</time>

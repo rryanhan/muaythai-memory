@@ -86,7 +86,7 @@
 
 .content {
   display: grid;
-  gap: 18px;
+  gap: 16px;
 }
 
 .content :global(.drill-detail-title-row) {
@@ -105,12 +105,12 @@
 }
 
 .content :global(.drill-detail-method-badge) {
-  width: 52px;
-  height: 52px;
+  width: 48px;
+  height: 48px;
 }
 
 .content :global(.drill-detail-title-row) h2 {
-  font-size: 28px;
+  font-size: 26px;
   line-height: 1.05;
 }
 
@@ -118,23 +118,23 @@
 .content :global(.drill-detail-summary),
 .content :global(.drill-detail-section) p {
   color: var(--muted);
-  font-size: 17px;
+  font-size: 16px;
   line-height: 1.4;
 }
 
 .content :global(.drill-detail-tags) {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
 }
 
 .content :global(.drill-detail-chip) {
   border: 1px solid var(--border);
   border-radius: 999px;
-  padding: 8px 12px;
+  padding: 6px 9px;
   background: rgba(245, 244, 239, 0.78);
   color: var(--text);
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 650;
 }
 
@@ -152,7 +152,7 @@
 
 .content :global(.drill-detail-section) {
   border-top: 1px solid var(--border);
-  padding-top: 16px;
+  padding-top: 14px;
 }
 
 .content :global(.drill-detail-section) h3 {
@@ -165,7 +165,7 @@
 .content :global(.drill-detail-section) ol {
   margin: 0;
   padding-left: 24px;
-  font-size: 18px;
+  font-size: 17px;
   line-height: 1.45;
 }
 
@@ -185,14 +185,14 @@
 }
 
 .content :global(.drill-detail-loading-badge) {
-  width: 58px;
-  height: 58px;
+  width: 48px;
+  height: 48px;
   border-radius: 999px;
 }
 
 .content :global(.drill-detail-skeleton-title) {
   width: min(260px, 62vw);
-  height: 34px;
+  height: 30px;
   border-radius: 8px;
 }
 
@@ -216,7 +216,7 @@
 
 .content :global(.drill-detail-skeleton-chip) {
   width: 78px;
-  height: 34px;
+  height: 30px;
 }
 
 .content :global(.drill-detail-skeleton-section-title) {
