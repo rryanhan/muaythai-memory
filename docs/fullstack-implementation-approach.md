@@ -191,8 +191,22 @@ Owns:
 
 - Starred drills.
 - Drill Back In queue.
-- Progress journal.
-- Later training clip uploads.
+- Display name and profile avatar.
+- Progress journal entries.
+- Private training clip uploads.
+
+Profile avatars use the public Supabase Storage bucket `profile-avatars`.
+Uploads pass through the authenticated Next API so the service-role key never
+reaches the browser. The API verifies JPEG, PNG, and WebP signatures, enforces a
+5 MB limit, and stores versioned objects under the authenticated user id. The
+public URL is stored in `users.avatar_url`; replacing or removing an avatar
+cleans up superseded objects on a best-effort basis.
+
+Journal video uses a private `journal-media` bucket with one-hour signed reads
+and direct TUS resumable uploads. Upload intents are created by the authenticated
+Next API, but video bytes travel directly from the browser to Supabase Storage.
+Supabase Storage is the object store for both avatars and journal media; an AWS
+S3 bucket is not required.
 
 ## Database Approach
 
@@ -211,6 +225,8 @@ tags
 drill_tags
 status_tags
 drill_status_tags
+journal_entries
+journal_media
 ```
 
 Later tables, only if durable capture history or background processing is introduced:
@@ -219,8 +235,6 @@ Later tables, only if durable capture history or background processing is introd
 voice_memos
 capture_jobs
 ai_drafts
-journal_entries
-training_videos
 exercises
 workout_types
 exercise_tags
@@ -438,9 +452,16 @@ POST   /api/capture/jobs/:id/confirm
 
 GET    /api/profile/status/starred
 GET    /api/profile/status/drill-back-in
+```
 
-POST   /api/journal
+Active journal endpoints:
+
+```txt
 GET    /api/journal
+POST   /api/journal/uploads
+GET    /api/journal/:id
+POST   /api/journal/:id/complete
+DELETE /api/journal/:id
 ```
 
 ## Graph Read Model
@@ -613,10 +634,12 @@ If a save fails, revert and show a clear message.
 
 ### Phase 4: Profile And Journal
 
-- Persist Starred and Drill Back In.
+- Build Profile overview and profile editing.
+- Persist the public profile avatar in Supabase Storage.
+- Show Starred and Drill Back In collections and Training Method totals.
 - Add progress journal entries.
 - Add optional linked drill.
-- Add video upload later.
+- Add private, signed, resumable video uploads.
 
 ### Phase 5: Workouts
 

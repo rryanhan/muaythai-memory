@@ -15,6 +15,16 @@ import type {
   UpdateDrillInput,
 } from "@/modules/drills/contracts";
 import type { GraphEdge, GraphNode, GraphOptions, GraphResponse } from "@/modules/graph/contracts";
+import type {
+  CompleteJournalUploadResponse,
+  CreateJournalUploadInput,
+  DeleteJournalEntryResponse,
+  JournalEntryDetail,
+  JournalEntrySummary,
+  JournalListResponse,
+  JournalUploadIntentResponse,
+} from "@/modules/journal/contracts";
+import type { ProfileDto, ProfileResponse } from "@/modules/profile/contracts";
 import type { StatusTagDto, TagCategoryDto, TagDto, TaxonomyResponse, TrainingMethodDto } from "@/modules/taxonomy/contracts";
 
 // This file is the frontend import surface for API data types. It reuses the
@@ -35,6 +45,15 @@ export type {
   GraphNode,
   GraphOptions,
   GraphResponse,
+  CompleteJournalUploadResponse,
+  CreateJournalUploadInput,
+  DeleteJournalEntryResponse,
+  JournalEntryDetail,
+  JournalEntrySummary,
+  JournalListResponse,
+  JournalUploadIntentResponse,
+  ProfileDto,
+  ProfileResponse,
   StatusTagDto,
   TagCategoryDto,
   TagDto,

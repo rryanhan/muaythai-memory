@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { BottomNav, type AppView } from "@/components/navigation/BottomNav";
 import { LibraryView } from "@/features/library/LibraryView";
 import { NetworkView } from "@/features/network/NetworkView";
-import { ProfileViewPlaceholder } from "@/features/profile/ProfileViewPlaceholder";
+import { ProfileView } from "@/features/profile/ProfileView";
 import type { GraphResponse } from "@/data";
 import type { CurrentAppUser } from "@/modules/auth";
 import styles from "./AppShell.module.css";
@@ -62,7 +62,7 @@ export function AppShell({ currentUser, initialGraph, initialView = "network" }:
         )}
         {profileHasMounted && (
           <div className="app-view-pane" hidden={activeView !== "profile"}>
-            <ProfileViewPlaceholder currentUser={currentUser} />
+            <ProfileView currentUser={currentUser} />
           </div>
         )}
       </div>

@@ -1,0 +1,415 @@
+.root {
+  position: relative;
+  min-height: calc(100dvh - var(--nav-height));
+  padding: 24px 20px 36px;
+  background-image: linear-gradient(rgba(36, 39, 41, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(36, 39, 41, 0.05) 1px, transparent 1px);
+  background-size: 42px 42px;
+}
+
+.header {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: center;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.avatar {
+  display: grid;
+  width: 64px;
+  height: 64px;
+  overflow: hidden;
+  place-items: center;
+  border: 2px solid var(--accent);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--accent);
+  font-size: 20px;
+  font-weight: 800;
+}
+
+.avatarImage {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.identity {
+  min-width: 0;
+}
+
+.identity h1,
+.identity p {
+  margin: 0;
+}
+
+.identity h1 {
+  overflow: hidden;
+  font-size: 28px;
+  line-height: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.identity p:not(:global(.eyebrow)) {
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.editLink {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.5);
+  color: var(--text);
+}
+
+.editLink:focus-visible,
+.savedLink:focus-visible,
+.addEntry:focus-visible,
+.journalRow:focus-visible,
+.loadError:focus-visible,
+.journalError:focus-visible,
+.loadMore:focus-visible,
+.signOut:focus-visible {
+  outline: 1px solid rgba(209, 74, 50, 0.5);
+  outline-offset: 3px;
+}
+
+.loadError,
+.journalError {
+  width: 100%;
+  border: 1px solid rgba(209, 74, 50, 0.32);
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: rgba(244, 216, 208, 0.54);
+  color: var(--accent);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  text-align: left;
+}
+
+.loadError {
+  margin-top: 12px;
+}
+
+.savedRail {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.savedLink {
+  display: grid;
+  min-width: 0;
+  min-height: 42px;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+  gap: 7px;
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0 10px;
+  background: rgba(255, 255, 255, 0.38);
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.savedLink svg {
+  flex: 0 0 auto;
+}
+
+.savedLink span {
+  overflow: hidden;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 11px;
+  font-weight: 750;
+  line-height: 1;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.savedLink strong {
+  color: var(--text);
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 13px;
+}
+
+.methodBreakdown {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  gap: 4px;
+  min-height: 68px;
+  padding: 7px 0 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.methodBreakdown > p {
+  margin: 0;
+}
+
+.methodStrip,
+.methodStripLoading {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.methodStat {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+}
+
+.methodStat img,
+.methodFallback {
+  width: 30px;
+  height: 30px;
+}
+
+.methodStat strong {
+  min-width: 12px;
+  color: var(--accent);
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 12px;
+}
+
+.methodStripLoading span {
+  height: 34px;
+  border-radius: 6px;
+  background: rgba(216, 214, 204, 0.45);
+}
+
+.compactEmpty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.journal {
+  margin-top: 22px;
+}
+
+.journalHeading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 14px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.journalHeading h2,
+.journalHeading p {
+  margin: 0;
+}
+
+.journalHeading h2 {
+  margin-top: 4px;
+  font-size: 25px;
+  line-height: 1;
+}
+
+.addEntry {
+  display: inline-flex;
+  min-height: 36px;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid rgba(209, 74, 50, 0.4);
+  border-radius: 8px;
+  padding: 0 10px;
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 750;
+  text-decoration: none;
+}
+
+.journalRows,
+.journalLoading {
+  display: grid;
+}
+
+.journalRow {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: 76px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+  text-decoration: none;
+}
+
+.videoTile {
+  position: relative;
+  display: grid;
+  width: 76px;
+  height: 52px;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: rgba(36, 39, 41, 0.84);
+  color: var(--bg);
+}
+
+.videoTile small {
+  position: absolute;
+  right: 4px;
+  bottom: 3px;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 9px;
+}
+
+.journalCopy {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.journalCopy time {
+  color: var(--accent);
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.journalCopy strong,
+.journalCopy small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.journalCopy strong {
+  font-size: 15px;
+  line-height: 1.2;
+}
+
+.journalCopy small {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.journalLoading span {
+  height: 76px;
+  border-bottom: 1px solid var(--border);
+  background: linear-gradient(90deg, transparent, rgba(216, 214, 204, 0.4), transparent);
+}
+
+.journalError {
+  margin-top: 12px;
+}
+
+.journalEmpty {
+  padding: 20px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.journalEmpty p {
+  margin: 0 0 9px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.journalEmpty a {
+  color: var(--accent);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.loadMore {
+  min-height: 40px;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+  text-align: left;
+}
+
+.loadMore:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
+.account {
+  margin-top: 26px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.account p {
+  margin: 0 0 10px;
+}
+
+.signOut {
+  min-height: 42px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0 14px;
+  background: rgba(255, 255, 255, 0.44);
+  color: var(--muted);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 650;
+}
+
+.signOut:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
+.account .signOutError {
+  margin: 9px 0 0;
+  color: var(--accent);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+@media (max-width: 360px) {
+  .root {
+    padding-inline: 14px;
+  }
+
+  .savedRail {
+    gap: 6px;
+  }
+
+  .savedLink {
+    grid-template-columns: 16px minmax(0, 1fr) auto;
+    gap: 5px;
+    padding-inline: 7px;
+  }
+
+  .savedLink span {
+    font-size: 10px;
+  }
+
+  .methodStat img,
+  .methodFallback {
+    width: 27px;
+    height: 27px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .journalLoading span {
+    background: rgba(216, 214, 204, 0.42);
+  }
+}

@@ -1,0 +1,493 @@
+.page {
+  position: relative;
+  min-height: 100dvh;
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 22px 20px 118px;
+  overflow-x: hidden;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.page > *:not(:global(.notebook-grid)):not(:global(.bottom-nav)) {
+  position: relative;
+  z-index: 1;
+}
+
+.routeHeader {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 24px;
+}
+
+.routeHeader p {
+  margin: 0;
+}
+
+.back {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 0;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.42);
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  font-size: 28px;
+  line-height: 1;
+  text-decoration: none;
+}
+
+.back:focus-visible,
+.fileButton:focus-within,
+.field input:focus-visible,
+.field textarea:focus-visible,
+.field select:focus-visible,
+.primaryAction:focus-visible,
+.secondaryAction:focus-visible,
+.deleteButton:focus-visible,
+.sheetActions button:focus-visible {
+  outline: 1px solid rgba(209, 74, 50, 0.5);
+  outline-offset: 3px;
+}
+
+.pageHeading {
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--border);
+}
+
+.pageHeading h1,
+.pageHeading p {
+  margin: 0;
+}
+
+.pageHeading h1 {
+  font-size: 36px;
+  line-height: 0.98;
+}
+
+.pageHeading p {
+  margin-top: 7px;
+  color: var(--muted);
+  font-size: 16px;
+}
+
+.uploadForm {
+  display: grid;
+  gap: 20px;
+  padding-top: 20px;
+}
+
+.videoField {
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.38);
+}
+
+.videoPreview,
+.videoPlaceholder {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  background: var(--graphite);
+}
+
+.videoPreview {
+  object-fit: contain;
+}
+
+.videoPlaceholder {
+  display: grid;
+  place-content: center;
+  gap: 8px;
+  color: rgba(245, 244, 239, 0.78);
+  text-align: center;
+}
+
+.videoPlaceholder svg {
+  margin: 0 auto;
+}
+
+.videoPlaceholder span {
+  font-size: 13px;
+}
+
+.fileActions {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  min-height: 50px;
+  padding: 8px 10px;
+  border-top: 1px solid var(--border);
+}
+
+.fileButton {
+  display: inline-flex;
+  min-height: 34px;
+  align-items: center;
+  border: 1px solid rgba(209, 74, 50, 0.42);
+  border-radius: 7px;
+  padding: 0 10px;
+  color: var(--accent);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.fileButton input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  opacity: 0;
+}
+
+.fileActions > span {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.field {
+  display: grid;
+  gap: 7px;
+}
+
+.field > span {
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.field > span small {
+  margin-left: 4px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 450;
+}
+
+.field input,
+.field textarea,
+.field select {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.55);
+  color: var(--text);
+  font: inherit;
+  font-size: 15px;
+}
+
+.field input,
+.field select {
+  min-height: 46px;
+  padding: 0 12px;
+}
+
+.field textarea {
+  resize: vertical;
+  padding: 11px 12px;
+  line-height: 1.4;
+}
+
+.field :disabled,
+.fileButton:has(input:disabled) {
+  cursor: wait;
+  opacity: 0.58;
+}
+
+.progressBlock {
+  display: grid;
+  gap: 8px;
+  border-top: 1px solid var(--border);
+  padding-top: 14px;
+}
+
+.progressCopy {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.progressCopy strong {
+  color: var(--accent);
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+}
+
+.progressBlock progress {
+  width: 100%;
+  height: 7px;
+  overflow: hidden;
+  border: 0;
+  border-radius: 2px;
+  background: var(--surface-muted);
+}
+
+.progressBlock progress::-webkit-progress-bar {
+  background: var(--surface-muted);
+}
+
+.progressBlock progress::-webkit-progress-value {
+  background: var(--accent);
+}
+
+.progressBlock progress::-moz-progress-bar {
+  background: var(--accent);
+}
+
+.formError {
+  margin: 0;
+  border-left: 2px solid var(--accent);
+  padding: 2px 0 2px 10px;
+  color: var(--accent);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.formActions {
+  display: grid;
+  grid-template-columns: 1fr 1.35fr;
+  gap: 10px;
+  padding-top: 4px;
+}
+
+.primaryAction,
+.secondaryAction,
+.deleteButton {
+  min-height: 46px;
+  border-radius: 8px;
+  padding: 0 14px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 750;
+}
+
+.primaryAction {
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: white;
+}
+
+.secondaryAction {
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.4);
+  color: var(--muted);
+}
+
+.primaryAction:disabled,
+.secondaryAction:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
+.sheetOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  background: rgba(23, 23, 23, 0.4);
+}
+
+.discardSheet,
+.deleteSheet {
+  position: fixed;
+  right: 0;
+  bottom: var(--nav-height);
+  left: 0;
+  z-index: 100;
+  max-width: 480px;
+  margin: 0 auto;
+  border: 1px solid var(--border);
+  border-bottom: 0;
+  border-radius: 8px 8px 0 0;
+  padding: 10px 20px 20px;
+  background: var(--surface);
+}
+
+.discardSheet h2,
+.discardSheet p,
+.deleteSheet h2,
+.deleteSheet p {
+  margin: 0;
+}
+
+.discardSheet h2,
+.deleteSheet h2 {
+  margin-top: 16px;
+  font-size: 22px;
+}
+
+.discardSheet p,
+.deleteSheet p {
+  margin-top: 7px;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.sheetActions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.sheetActions button {
+  min-height: 44px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.sheetActions button[data-danger="true"] {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: white;
+}
+
+.sheetActions button:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
+.skeletonTitle,
+.skeletonCopy,
+.uploadSkeleton > span {
+  display: block;
+  border-radius: 6px;
+  background: rgba(216, 214, 204, 0.55);
+}
+
+.skeletonTitle {
+  width: 48%;
+  height: 36px;
+}
+
+.skeletonCopy {
+  width: 72%;
+  height: 17px;
+  margin-top: 10px;
+}
+
+.uploadSkeleton {
+  display: grid;
+  gap: 20px;
+  padding-top: 20px;
+}
+
+.uploadSkeleton .skeletonVideo {
+  width: 100%;
+  height: 240px;
+}
+
+.uploadSkeleton > span:not(.skeletonVideo) {
+  width: 100%;
+  height: 46px;
+}
+
+/* Dedicated entry page */
+.entryVideo {
+  display: block;
+  width: calc(100% + 40px);
+  max-height: 58dvh;
+  margin: 0 -20px;
+  background: var(--graphite);
+  object-fit: contain;
+}
+
+.entryMeta {
+  display: grid;
+  gap: 18px;
+  padding: 20px 0 24px;
+  border-bottom: 1px solid var(--border);
+}
+
+.entryDate {
+  margin: 0;
+  color: var(--accent);
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 13px;
+  font-weight: 750;
+  text-transform: uppercase;
+}
+
+.entryCaption {
+  margin: 0;
+  font-size: 19px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
+
+.linkedDrill {
+  display: grid;
+  gap: 5px;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.linkedDrill span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.linkedDrill strong {
+  font-size: 15px;
+}
+
+.deleteSection {
+  margin-top: 34px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+}
+
+.deleteButton {
+  width: 100%;
+  border: 1px solid rgba(209, 74, 50, 0.55);
+  background: transparent;
+  color: var(--accent);
+}
+
+.deleteError {
+  margin: 10px 0 0;
+  color: var(--accent);
+  font-size: 13px;
+}
+
+@media (max-width: 360px) {
+  .page {
+    padding-inline: 16px;
+  }
+
+  .entryVideo {
+    width: calc(100% + 32px);
+    margin-inline: -16px;
+  }
+
+  .fileActions {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeletonTitle,
+  .skeletonCopy,
+  .uploadSkeleton > span {
+    animation: none;
+  }
+}

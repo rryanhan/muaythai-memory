@@ -12,6 +12,16 @@ const checks: Array<{ path: string; method?: string; body?: BodyInit; headers?: 
     headers: { "content-type": "application/json" },
   },
   { path: "/api/capture/transcribe", method: "POST", body: new FormData() },
+  { path: "/api/profile", method: "PATCH", body: new FormData() },
+  { path: "/api/journal" },
+  {
+    path: "/api/journal/uploads",
+    method: "POST",
+    body: JSON.stringify({}),
+    headers: { "content-type": "application/json" },
+  },
+  { path: "/api/journal/00000000-0000-4000-8000-000000000000" },
+  { path: "/api/journal/00000000-0000-4000-8000-000000000000/complete", method: "POST" },
 ];
 
 async function main() {

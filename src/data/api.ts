@@ -4,4 +4,6 @@ export * from "./api-core";
 export * from "./capture";
 export * from "./drills";
 export * from "./graph";
+export * from "./journal";
+export * from "./profile";
 export * from "./taxonomy";

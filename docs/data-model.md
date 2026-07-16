@@ -125,6 +125,22 @@ Examples:
 
 Custom Tags should be searchable and filterable. They should be hidden from the graph by default unless the user turns on the Custom Tags layer.
 
+## Progress Journal
+
+Progress Journal entries are private, user-owned training records. Journal v1
+stores one video per entry with a required training date, optional caption, and
+optional link to an owned Drill.
+
+Journal metadata lives in Postgres:
+
+- `journal_entries`: owner, linked drill, date, caption, lifecycle status, timestamps
+- `journal_media`: entry relationship, private Storage path, MIME type, byte size, duration
+
+Uploads begin as `uploading` and become visible only after the private Storage
+object is confirmed and the entry moves to `ready`. Deleting an entry permanently
+removes both its database records and video. Video bytes never pass through the
+Next server and are never public.
+
 ## Network View Data
 
 The default Network View should show:

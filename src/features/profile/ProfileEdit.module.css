@@ -1,0 +1,250 @@
+.page {
+  overflow-x: hidden;
+}
+
+.form {
+  display: grid;
+  gap: 22px;
+  margin-top: 22px;
+}
+
+.photoSection {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 18px;
+  align-items: end;
+}
+
+.photoSection p {
+  margin: 0 0 8px;
+}
+
+.avatar {
+  display: grid;
+  width: 92px;
+  height: 92px;
+  overflow: hidden;
+  place-items: center;
+  border: 2px solid var(--accent);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--accent);
+  font-size: 25px;
+  font-weight: 800;
+}
+
+.avatarImage {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.photoActions {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.fileButton,
+.photoActions button {
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0 11px;
+  background: rgba(255, 255, 255, 0.58);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.fileButton input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+}
+
+.photoActions > p {
+  flex-basis: 100%;
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.fields {
+  display: grid;
+  gap: 14px;
+  border-top: 1px solid var(--border);
+  padding-top: 18px;
+}
+
+.fields label {
+  display: grid;
+  gap: 7px;
+}
+
+.fields label span {
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.fields input {
+  width: 100%;
+  min-height: 46px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0 13px;
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--text);
+  font: inherit;
+  font-size: 16px;
+}
+
+.fields input[readonly] {
+  background: rgba(236, 234, 227, 0.6);
+  color: var(--muted);
+}
+
+.fields input:focus,
+.fileButton:focus-within {
+  border-color: rgba(209, 74, 50, 0.58);
+  outline: 1px solid rgba(209, 74, 50, 0.18);
+}
+
+.error {
+  margin: 0;
+  border-left: 2px solid var(--accent);
+  padding: 9px 0 9px 12px;
+  color: var(--accent);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.actions {
+  display: grid;
+  grid-template-columns: 0.8fr 1.2fr;
+  gap: 8px;
+  border-top: 1px solid var(--border);
+  padding-top: 18px;
+}
+
+.actions button {
+  min-height: 46px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.65);
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 800;
+}
+
+.actions button:last-child {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--surface);
+}
+
+.actions button:disabled {
+  cursor: default;
+  opacity: 0.46;
+}
+
+.discardBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  background: rgba(24, 25, 26, 0.38);
+}
+
+.discardSheet {
+  position: fixed;
+  z-index: 81;
+  right: 0;
+  bottom: var(--nav-height);
+  left: 0;
+  max-width: 480px;
+  margin: 0 auto;
+  border: 1px solid var(--border);
+  border-radius: 8px 8px 0 0;
+  padding: 12px 20px 20px;
+  background: var(--surface);
+}
+
+.discardSheet h2,
+.discardSheet p {
+  margin: 0;
+}
+
+.discardSheet h2 {
+  margin-top: 10px;
+  font-size: 24px;
+}
+
+.discardSheet p {
+  margin-top: 8px;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.discardActions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.discardActions button {
+  min-height: 44px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.65);
+  color: var(--text);
+  font: inherit;
+  font-weight: 750;
+}
+
+.discardActions button:last-child {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.loading {
+  display: grid;
+  gap: 22px;
+  margin-top: 22px;
+}
+
+.loadingPhoto,
+.loadingField,
+.loadingButton {
+  border-radius: 8px;
+  background: rgba(216, 214, 204, 0.56);
+}
+
+.loadingPhoto {
+  width: 92px;
+  height: 92px;
+  border-radius: 50%;
+}
+
+.loadingField {
+  height: 46px;
+}
+
+.loadingButton {
+  height: 46px;
+}
+
+@media (max-width: 350px) {
+  .photoSection {
+    grid-template-columns: 1fr;
+  }
+}

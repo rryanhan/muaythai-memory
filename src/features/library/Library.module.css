@@ -140,64 +140,6 @@
   border-top: 1px dashed var(--border);
 }
 
-.view :global(.library-row) {
-  border-bottom: 1px solid var(--border);
-}
-
-.view :global(.library-row) a,
-.view :global(.library-row) button {
-  display: block;
-  width: 100%;
-  border: 0;
-  padding: 17px 0;
-  background: transparent;
-  color: inherit;
-  text-decoration: none;
-  text-align: left;
-  cursor: pointer;
-}
-
-.view :global(.library-row) a:focus-visible,
-.view :global(.library-row) button:focus-visible {
-  outline: 1px solid rgba(209, 74, 50, 0.38);
-  outline-offset: 3px;
-}
-
-.view :global(.library-row) a:active,
-.view :global(.library-row) button:active {
-  opacity: 0.76;
-  transform: translateY(1px);
-}
-
-.view :global(.library-row) h2 {
-  margin: 0;
-  font-size: 20px;
-  line-height: 1.1;
-}
-
-.view :global(.library-row-tags) {
-  display: flex;
-  flex-wrap: wrap;
-  margin-top: 8px;
-  color: var(--accent);
-  font-family: "IBM Plex Mono", ui-monospace, monospace;
-  font-size: 12px;
-  font-weight: 800;
-  letter-spacing: 0.04em;
-  line-height: 1.35;
-  text-transform: uppercase;
-}
-
-.view :global(.library-row-tag):not(:last-child)::after {
-  margin: 0 8px;
-  color: rgba(209, 74, 50, 0.46);
-  content: "•";
-}
-
-.view :global(.library-row-tag) {
-  white-space: nowrap;
-}
-
 .view :global(.library-list)[data-refreshing="true"] {
   opacity: 0.66;
 }

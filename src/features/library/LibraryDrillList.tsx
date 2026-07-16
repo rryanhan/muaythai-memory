@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import type { DrillSummary } from "@/data";
+import styles from "./LibraryDrillList.module.css";
 
 export function LibraryDrillRow({ drill }: { drill: DrillSummary }) {
   const router = useRouter();
@@ -15,13 +16,13 @@ export function LibraryDrillRow({ drill }: { drill: DrillSummary }) {
   }
 
   return (
-    <article className="library-row">
+    <article className={styles.row}>
       <Link href={href} prefetch onFocus={prefetchDetail} onPointerEnter={prefetchDetail} onTouchStart={prefetchDetail}>
         <h2>{drill.title}</h2>
         {visibleTags.length > 0 && (
-          <span className="library-row-tags" aria-label={`Tags: ${visibleTags.map((tag) => tag.name).join(", ")}`}>
+          <span className={styles.tags} aria-label={`Tags: ${visibleTags.map((tag) => tag.name).join(", ")}`}>
             {visibleTags.map((tag) => (
-              <span key={tag.id} className="library-row-tag">
+              <span key={tag.id} className={styles.tag}>
                 {tag.name}
               </span>
             ))}
