@@ -272,15 +272,13 @@
   text-transform: uppercase;
 }
 
-.form :global(.add-drill-tag-index) div,
-.form :global(.add-drill-inline-tokens) {
+.form :global(.add-drill-tag-index) div {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
 }
 
-.form :global(.add-drill-tag-index) button,
-.form :global(.add-drill-inline-tokens) button {
+.form :global(.add-drill-tag-index) button {
   min-height: 30px;
   border: 0;
   border-radius: 5px;
@@ -294,9 +292,61 @@
   text-transform: uppercase;
 }
 
-.form :global(.add-drill-tag-index) button[data-selected="true"],
-.form :global(.add-drill-inline-tokens) button[data-selected="true"] {
+.form :global(.add-drill-tag-index) button[data-selected="true"] {
   background: rgba(244, 216, 208, 0.72);
+}
+
+.form :global(.add-drill-saved-list-tokens) {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0;
+}
+
+.form :global(.add-drill-saved-list-tokens) button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 28px;
+  border: 0;
+  border-radius: 5px;
+  padding: 0 7px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.form :global(.add-drill-saved-list-tokens .saved-list-icon) {
+  flex: 0 0 auto;
+  color: var(--accent);
+}
+
+.form :global(.add-drill-saved-list-tokens) button:not(:last-child) {
+  margin-right: 11px;
+}
+
+.form :global(.add-drill-saved-list-tokens) button:not(:last-child)::after {
+  position: absolute;
+  top: 50%;
+  right: -8px;
+  color: rgba(100, 100, 95, 0.42);
+  font-weight: 700;
+  content: "|";
+  transform: translateY(-52%);
+}
+
+.form :global(.add-drill-saved-list-tokens) button:hover {
+  background: rgba(37, 109, 133, 0.055);
+}
+
+.form :global(.add-drill-saved-list-tokens) button[data-selected="true"] {
+  background: rgba(244, 216, 208, 0.72);
+  color: var(--accent);
+  font-weight: 800;
 }
 
 .form :global(.add-drill-error) {

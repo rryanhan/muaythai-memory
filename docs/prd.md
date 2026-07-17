@@ -138,15 +138,12 @@ Clicking a node in the Network View should open the relevant information:
 
 ### Drill States
 
-The app should support lightweight ways to mark drills the user cares about:
+The app should support two Saved Lists for drills the user cares about:
 
-- Starred
-- Focus
-- Try in sparring
-- Needs cleanup
-- Archived
+- Favourite
+- Drill Back In
 
-These should be more reliable than relying only on custom tags.
+These remain separate from custom tags because they power persistent collection views.
 
 ### Training Plans
 

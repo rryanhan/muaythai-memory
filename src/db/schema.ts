@@ -95,8 +95,8 @@ export const tags = pgTable(
   }),
 );
 
-// Status Tags are separate from normal tags because they drive product states
-// such as Starred, Drill Back In, Needs Cleanup, and Archived.
+// Saved Lists are separate from normal tags because Favourite and Drill Back In
+// drive persistent collection views rather than technique taxonomy.
 export const statusTags = pgTable(
   "status_tags",
   {

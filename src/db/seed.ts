@@ -116,6 +116,16 @@ async function seedStatusTags() {
         },
       });
   }
+
+  const activeStatusSlugs = statusTagSeeds.map((status) => status.slug);
+
+  await db
+    .update(statusTags)
+    .set({
+      active: false,
+      updatedAt: new Date(),
+    })
+    .where(notInArray(statusTags.slug, activeStatusSlugs));
 }
 
 async function assertSeedCounts() {

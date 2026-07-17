@@ -1,3 +1,5 @@
+import { config } from "dotenv";
+import { createClient } from "@supabase/supabase-js";
 import {
   ApiError,
   buildDrillsApiPath,
@@ -7,6 +9,9 @@ import {
   getGraph,
   getTaxonomy,
 } from "./api";
+import type { ApiClientOptions } from "./types";
+
+config({ path: ".env.local" });
 
 // Verifies the frontend data layer against a running local Next server. This
 // catches query-string mistakes, backend response drift, and parked fields like
@@ -18,13 +23,20 @@ function expect(condition: boolean, message: string) {
 }
 
 async function main() {
-  const taxonomy = await getTaxonomy({ baseUrl });
+  const clientOptions: ApiClientOptions = {
+    baseUrl,
+    headers: await getAuthenticatedHeaders(),
+  };
+  const taxonomy = await getTaxonomy(clientOptions);
   const standardTagNames = new Set(taxonomy.standardTags.map((tag) => tag.name));
   const methodNames = new Set(taxonomy.trainingMethods.map((method) => method.name));
+  const statusBySlug = new Map(taxonomy.statusTags.map((status) => [status.slug, status.name]));
 
   expect(taxonomy.trainingMethods.length === 5, `Expected 5 training methods, got ${taxonomy.trainingMethods.length}`);
   expect(taxonomy.standardTags.length === 28, `Expected 28 standard tags, got ${taxonomy.standardTags.length}`);
-  expect(taxonomy.statusTags.length === 6, `Expected 6 status tags, got ${taxonomy.statusTags.length}`);
+  expect(taxonomy.statusTags.length === 2, `Expected 2 Saved Lists, got ${taxonomy.statusTags.length}`);
+  expect(statusBySlug.get("starred") === "Favourite", "Favourite should retain the starred backend slug.");
+  expect(statusBySlug.get("drill-back-in") === "Drill Back In", "Drill Back In should remain active.");
   expect(methodNames.has("Clinch"), "Clinch should be a Training Method.");
   expect(!standardTagNames.has("Clinch"), "Clinch should not be a standard tag.");
   expect(standardTagNames.has("Shadowboxing"), "Shadowboxing should be a standard tag.");
@@ -59,24 +71,24 @@ async function main() {
     `Unexpected drills query path: ${drillsPath}`,
   );
 
-  const allDrills = await getDrills({}, { baseUrl });
+  const allDrills = await getDrills({}, clientOptions);
   expect(allDrills.total > 0, "Expected drills from API.");
 
   // Exercise the three major filter families the UI will share: method, tag,
   // and status.
   const padUppercutDrills = await getDrills(
     { methodSlugs: ["pad-work"], tagSlugs: ["uppercut"], tagMode: "any" },
-    { baseUrl },
+    clientOptions,
   );
   expect(padUppercutDrills.total > 0, "Expected Pad Work + Uppercut filter to return drills.");
 
-  const starredDrills = await getDrills({ statusTagSlugs: ["starred"] }, { baseUrl });
-  expect(starredDrills.total > 0, "Expected Starred status filter to return drills.");
+  const starredDrills = await getDrills({ statusTagSlugs: ["starred"] }, clientOptions);
+  expect(starredDrills.total > 0, "Expected Favourite filter to return drills.");
 
   const firstDrill = allDrills.drills[0];
   if (!firstDrill) throw new Error("Expected at least one drill.");
 
-  const drillDetail = await getDrill(firstDrill.id, { baseUrl });
+  const drillDetail = await getDrill(firstDrill.id, clientOptions);
   expect(drillDetail.steps.length > 0, "Expected drill detail to include steps.");
   expect(!JSON.stringify(drillDetail).includes("coreIdea"), "Core Idea should not appear in frontend drill data.");
 
@@ -85,7 +97,7 @@ async function main() {
   const graph = await getGraph(
     { methodSlugs: ["pad-work"], tagSlugs: ["uppercut"], tagMode: "any" },
     { showTags: true },
-    { baseUrl },
+    clientOptions,
   );
   const graphNodeIds = new Set(graph.nodes.map((node) => node.id));
   expect(graph.nodes.length > 0, "Expected graph nodes from API.");
@@ -96,6 +108,62 @@ async function main() {
   console.log(
     `API data verification passed: ${allDrills.total} drills, ${taxonomy.standardTags.length} standard tags, ${graph.nodes.length} graph nodes.`,
   );
+}
+
+async function getAuthenticatedHeaders(): Promise<HeadersInit> {
+  const configuredCookie = process.env.API_VERIFY_COOKIE?.trim();
+  if (configuredCookie) return { cookie: configuredCookie };
+
+  const email = process.env.API_VERIFY_EMAIL?.trim().toLowerCase();
+  if (!email) {
+    throw new Error("Set API_VERIFY_EMAIL or API_VERIFY_COOKIE to verify protected API responses.");
+  }
+
+  const supabaseUrl = requireEnvironment("NEXT_PUBLIC_SUPABASE_URL");
+  const publishableKey =
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? requireEnvironment("NEXT_PUBLIC_SUPABASE_ANON_KEY");
+  const adminClient = createClient(supabaseUrl, requireEnvironment("SUPABASE_SERVICE_ROLE_KEY"), {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+  const authClient = createClient(supabaseUrl, publishableKey, {
+    auth: { autoRefreshToken: false, detectSessionInUrl: false, persistSession: false },
+  });
+  const { data: linkData, error: linkError } = await adminClient.auth.admin.generateLink({
+    type: "magiclink",
+    email,
+  });
+  if (linkError || !linkData.properties.hashed_token) {
+    throw new Error(`Could not create an API verification session${linkError ? `: ${linkError.message}` : "."}`);
+  }
+
+  const { data: verificationData, error: verificationError } = await authClient.auth.verifyOtp({
+    type: "magiclink",
+    token_hash: linkData.properties.hashed_token,
+  });
+  if (verificationError || !verificationData.session) {
+    throw new Error(
+      `Could not verify the API session${verificationError ? `: ${verificationError.message}` : "."}`,
+    );
+  }
+
+  const projectRef = new URL(supabaseUrl).hostname.split(".")[0];
+  if (!projectRef) throw new Error("Could not derive the Supabase project reference.");
+
+  return { cookie: encodeSessionCookie(`sb-${projectRef}-auth-token`, verificationData.session) };
+}
+
+function encodeSessionCookie(name: string, session: object): string {
+  const encodedValue = `base64-${Buffer.from(JSON.stringify(session), "utf8").toString("base64url")}`;
+  const chunks = encodedValue.match(/.{1,3180}/g) ?? [];
+
+  if (chunks.length <= 1) return `${name}=${encodedValue}`;
+  return chunks.map((chunk, index) => `${name}.${index}=${chunk}`).join("; ");
+}
+
+function requireEnvironment(name: string): string {
+  const value = process.env[name];
+  if (!value) throw new Error(`${name} is required for authenticated API verification.`);
+  return value;
 }
 
 main().catch((error) => {

@@ -6,10 +6,12 @@ import { useRouter } from "next/navigation";
 import { badgeByIconKey } from "@/components/shared/context-badges";
 import skeletonStyles from "@/components/shared/Skeleton.module.css";
 import captureStyles from "@/features/capture/Capture.module.css";
+import { SavedListToken } from "@/features/shared/SavedListToken";
+import { getBuiltInStatusFilters } from "@/features/shared/tag-filter-helpers";
 import type { ApiError } from "@/data/api-core";
 import { createDrill, updateDrill } from "@/data/drills";
 import { getTaxonomy } from "@/data/taxonomy";
-import type { DrillDetail, StatusTagDto, TrainingMethodDto } from "@/data/types";
+import type { DrillDetail, TrainingMethodDto } from "@/data/types";
 import { AddDrillSkeleton } from "./AddDrillSkeleton";
 import {
   hasPendingDrillCleanup,
@@ -104,7 +106,7 @@ export function AddDrillForm({
   const taxonomy = taxonomyQuery.data;
   const standardTagCategories = taxonomy?.tagCategories ?? [];
   const customTags = taxonomy?.customTags ?? [];
-  const statusTags = taxonomy?.statusTags ?? [];
+  const savedLists = useMemo(() => getBuiltInStatusFilters(taxonomy?.statusTags ?? []), [taxonomy?.statusTags]);
   const selectedMethods = useMemo(() => new Set(trainingMethodSlugs), [trainingMethodSlugs]);
   const selectedTags = useMemo(() => new Set(tagSlugs), [tagSlugs]);
   const selectedStatuses = useMemo(() => new Set(statusTagSlugs), [statusTagSlugs]);
@@ -220,6 +222,20 @@ export function AddDrillForm({
 
   return (
     <form className={`${styles.form} ${cleanupState ? captureStyles.scope : ""}`} onSubmit={handleSubmit}>
+      <section className="add-drill-section add-drill-saved-list-section">
+        <p className="eyebrow">Saved Lists</p>
+        <div className="add-drill-saved-list-tokens">
+          {savedLists.map((option) => (
+            <SavedListToken
+              key={option.id}
+              option={option}
+              selected={selectedStatuses.has(option.slug)}
+              onToggle={(slug) => setStatusTagSlugs((current) => toggleSlug(current, slug))}
+            />
+          ))}
+        </div>
+      </section>
+
       {textFieldsPending ? (
         <CaptureTextLoading />
       ) : (
@@ -337,20 +353,6 @@ export function AddDrillForm({
         </div>
       </section>
 
-      <section className="add-drill-section">
-        <p className="eyebrow">Saved Lists</p>
-        <div className="add-drill-inline-tokens">
-          {statusTags.map((status) => (
-            <StatusToken
-              key={status.id}
-              status={status}
-              selected={selectedStatuses.has(status.slug)}
-              onToggle={() => setStatusTagSlugs((current) => toggleSlug(current, status.slug))}
-            />
-          ))}
-        </div>
-      </section>
-
       {cleanupState && cleanupState.status !== "idle" && !(textFieldsPending && cleanupState.status === "pending") && (
         <CleanupState
           state={cleanupState}
@@ -405,22 +407,6 @@ function TagToken({ label, selected, onToggle }: { label: string; selected: bool
   return (
     <button type="button" data-selected={selected} onClick={onToggle}>
       {label}
-    </button>
-  );
-}
-
-function StatusToken({
-  status,
-  selected,
-  onToggle,
-}: {
-  status: StatusTagDto;
-  selected: boolean;
-  onToggle: () => void;
-}) {
-  return (
-    <button type="button" data-selected={selected} onClick={onToggle}>
-      {status.name}
     </button>
   );
 }

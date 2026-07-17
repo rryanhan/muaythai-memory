@@ -554,7 +554,7 @@
   cursor: pointer;
 }
 
-.filterSheet :global(.library-saved-list-icon) {
+.filterSheet :global(.saved-list-icon) {
   flex: 0 0 auto;
   color: var(--accent);
 }

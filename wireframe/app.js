@@ -90,9 +90,9 @@ const profileDemo = {
 
 const profileCollectionConfigs = {
   starred: {
-    label: "Starred",
+    label: "Favourite",
     title: "Favourite Drills",
-    status: "Starred",
+    status: "Favourite",
   },
   review: {
     label: "To Review",

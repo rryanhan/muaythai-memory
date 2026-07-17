@@ -1,15 +1,15 @@
 "use client";
 
 import type { Dispatch, ReactNode, SetStateAction } from "react";
-import { CaretDown, Star, Target } from "@phosphor-icons/react";
+import { CaretDown } from "@phosphor-icons/react";
 import { Drawer } from "vaul";
 import type { GraphOptions, TagDto, TaxonomyResponse } from "@/data";
+import { SavedListToken } from "@/features/shared/SavedListToken";
 import {
   filterBuiltInStatuses,
   filterTagCategories,
   filterTags,
   getBuiltInStatusFilters,
-  type BuiltInStatusFilter,
 } from "@/features/shared/tag-filter-helpers";
 import { normalizeKeyword } from "./network-helpers";
 import { defaultNetworkLayerOptions, emptyNetworkFilters, type NetworkFilters } from "./types";
@@ -172,12 +172,10 @@ export function NetworkControlsSheet({
                       {filteredBuiltInStatuses.length > 0 && (
                         <TagGroup title="Saved Lists">
                           {filteredBuiltInStatuses.map((status) => (
-                            <TagTokenButton
+                            <SavedListToken
                               key={status.id}
-                              icon={<SavedListIcon icon={status.icon} />}
-                              label={status.label}
+                              option={status}
                               selected={selectedStatusSet.has(status.slug)}
-                              slug={status.slug}
                               onToggle={toggleStatus}
                             />
                           ))}
@@ -253,13 +251,11 @@ function TagGroup({ children, title }: { children: ReactNode; title: string }) {
 }
 
 function TagTokenButton({
-  icon,
   label,
   selected,
   slug,
   onToggle,
 }: {
-  icon?: ReactNode;
   label: string;
   selected: boolean;
   slug: string;
@@ -267,14 +263,7 @@ function TagTokenButton({
 }) {
   return (
     <button type="button" data-selected={selected} onClick={() => onToggle(slug)}>
-      {icon}
       {label}
     </button>
   );
-}
-
-function SavedListIcon({ icon }: { icon: BuiltInStatusFilter["icon"] }) {
-  const Icon = icon === "target" ? Target : Star;
-
-  return <Icon aria-hidden="true" className="network-saved-list-icon" size={15} weight="bold" />;
 }

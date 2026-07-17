@@ -54,8 +54,8 @@ The Network View has a vertical three-icon action rail on the bottom right.
 Top icon: Network Controls
 
 - Opens graph settings and filters.
-- Controls graph layers such as Tags, Core Ideas, Custom Tags, Status, and Training Plans.
-- Controls filters such as Focus-only or Starred-only.
+- Controls graph layers such as Tags, Custom Tags, and Saved Lists.
+- Controls filters such as Favourite and Drill Back In.
 
 Middle icon: Search
 
@@ -132,10 +132,8 @@ Low-fidelity panel:
 │ [ ] Training Plans      │
 │                         │
 │ Filters                 │
-│ [ ] Starred only        │
-│ [ ] Focus only          │
-│ [ ] Try in sparring     │
-│ [ ] Needs cleanup       │
+│ [ ] Favourite           │
+│ [ ] Drill Back In       │
 │                         │
 │ [Reset view]            │
 └─────────────────────────┘

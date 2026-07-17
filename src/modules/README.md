@@ -9,7 +9,7 @@ These folders are internal boundaries inside one modular monolith. They are not 
 - `taxonomy`: Training Methods, Tags, Tag Categories, Status Tags.
 - `drills`: saved drill content and drill relationships.
 - `graph`: graph-ready read models.
-- `profile`: Starred, Drill Back In, and profile collections.
+- `profile`: Favourite, Drill Back In, and profile collections.
 - `capture`: voice memo and AI draft flow later.
 
 Reuse modules when they represent the same product concept. Keep workflows separate.

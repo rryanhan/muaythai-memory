@@ -93,24 +93,20 @@ Possible later fields if we bring this back:
 - `secondaryCoreIdeas`
 - `coreIdeaConfidence`
 
-## Status
+## Saved Lists (Status Tags)
 
-Status markers are user-set workflow labels. They are separate from Custom Tags because they drive common app states and collection views.
+Saved Lists are user-set collection markers. They are separate from Custom Tags because they drive persistent Profile and filter views.
 
-First-pass Status markers:
+Active Saved Lists:
 
-- `Starred`
+- `Favourite` (`starred` remains the stable backend slug)
 - `Drill Back In`
-- `Focus`
-- `Try in sparring`
-- `Needs cleanup`
-- `Archived`
 
 First-pass storage:
 
 - `status`: array of strings
 
-Status should not be generated as part of the default AI capture output. The user can add or remove Status after a Drill is saved.
+Saved Lists should not be generated as part of the default AI capture output. The user can add or remove them while creating or editing a Drill.
 
 ## Custom Tag
 

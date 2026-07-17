@@ -25,11 +25,14 @@ async function main() {
 
   const methodNames = new Set(methods.map((method) => method.name));
   const standardTagNames = new Set(standardTags.map((tag) => tag.name));
+  const statusBySlug = new Map(statuses.map((status) => [status.slug, status.name]));
 
   expect(methods.length === trainingMethodSeeds.length, `Expected ${trainingMethodSeeds.length} training methods, got ${methods.length}`);
   expect(categories.length === tagCategorySeeds.length, `Expected ${tagCategorySeeds.length} tag categories, got ${categories.length}`);
   expect(standardTags.length === standardTagSeeds.length, `Expected ${standardTagSeeds.length} standard tags, got ${standardTags.length}`);
   expect(statuses.length === statusTagSeeds.length, `Expected ${statusTagSeeds.length} status tags, got ${statuses.length}`);
+  expect(statusBySlug.get("starred") === "Favourite", "Favourite should retain the starred backend slug");
+  expect(statusBySlug.get("drill-back-in") === "Drill Back In", "Drill Back In should remain active");
 
   expect(methodNames.has("Clinch"), "Expected Clinch to exist as a Training Method");
   expect(!standardTagNames.has("Clinch"), "Clinch should not be a standard tag");

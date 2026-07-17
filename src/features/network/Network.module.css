@@ -645,7 +645,7 @@
   cursor: pointer;
 }
 
-.controlsSheet :global(.network-saved-list-icon) {
+.controlsSheet :global(.saved-list-icon) {
   flex: 0 0 auto;
   color: var(--accent);
 }

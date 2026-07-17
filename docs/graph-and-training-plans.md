@@ -82,7 +82,7 @@ Potential Network View modes:
 
 - Method View: emphasizes Pad Work, Bag Work, Partner Drill, Clinch, and Technical Work.
 - Tag View: emphasizes concrete Tags such as Jab, Teep, Slip, Pivot, Sweep, and Feint. Broad labels such as Boxing or Footwork are browse groups, not stored tags.
-- Focus View: emphasizes starred, active, frequently accessed, or recently practiced drills.
+- Focus View: emphasizes favourite, active, frequently accessed, or recently practiced drills.
 - Plan View: shows drills grouped into a Training Plan.
 
 Current graph-mode direction:

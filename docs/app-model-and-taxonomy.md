@@ -233,22 +233,14 @@ Rules:
 
 Status markers are built-in labels that support common training behaviors. They are separate from tags because they drive workflows and visual states.
 
-Status is not part of the MVP AI capture output. It can be added by the user after a drill is saved.
+Saved Lists are not part of the MVP AI capture output. They can be added by the user while creating or editing a drill.
 
-First-pass markers:
+Active Saved Lists:
 
-- Starred
+- Favourite
 - Drill Back In
-- Focus
-- Try in sparring
-- Needs cleanup
-- Archived
 
-Status should affect how drills are displayed:
+Saved Lists affect how drills are collected and filtered:
 
-- Starred can show a star or favorites view.
+- Favourite powers the Favourites collection while retaining `starred` as its backend slug.
 - Drill Back In can power a review queue for drills the user wants to revisit soon.
-- Focus can show a ring, glow, or active-focus view.
-- Try in sparring can power a sparring-prep view.
-- Needs cleanup can power an editing/review queue.
-- Archived can hide drills by default.

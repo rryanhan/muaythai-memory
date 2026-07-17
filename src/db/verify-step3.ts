@@ -27,11 +27,14 @@ async function main() {
   const taxonomy = taxonomyResponseSchema.parse(await getTaxonomy(owner.id));
   const standardTagNames = new Set(taxonomy.standardTags.map((tag) => tag.name));
   const methodNames = new Set(taxonomy.trainingMethods.map((method) => method.name));
+  const statusBySlug = new Map(taxonomy.statusTags.map((status) => [status.slug, status.name]));
 
   expect(taxonomy.trainingMethods.length === 5, `Expected 5 training methods, got ${taxonomy.trainingMethods.length}`);
   expect(taxonomy.tagCategories.length === 10, `Expected 10 tag categories, got ${taxonomy.tagCategories.length}`);
   expect(taxonomy.standardTags.length === 28, `Expected 28 standard tags, got ${taxonomy.standardTags.length}`);
-  expect(taxonomy.statusTags.length === 6, `Expected 6 status tags, got ${taxonomy.statusTags.length}`);
+  expect(taxonomy.statusTags.length === 2, `Expected 2 Saved Lists, got ${taxonomy.statusTags.length}`);
+  expect(statusBySlug.get("starred") === "Favourite", "Favourite must retain the starred backend slug.");
+  expect(statusBySlug.get("drill-back-in") === "Drill Back In", "Drill Back In must remain active.");
   expect(methodNames.has("Clinch"), "Clinch must remain a Training Method.");
   expect(!standardTagNames.has("Clinch"), "Clinch must not be a standard tag.");
   expect(!methodNames.has("Shadowboxing"), "Shadowboxing must not be a Training Method.");
@@ -75,10 +78,10 @@ async function main() {
   );
 
   const starred = await listDrills(owner.id, { statusTagSlugs: ["starred"] });
-  expect(starred.total > 0, "Expected Starred status filter to return drills.");
+  expect(starred.total > 0, "Expected Favourite filter to return drills.");
   expect(
     starred.drills.every((drill) => drill.statusTags.some((status) => status.slug === "starred")),
-    "Starred status filter returned a drill without Starred.",
+    "Favourite filter returned a drill without the starred backend status.",
   );
 
   const graph = graphResponseSchema.parse(

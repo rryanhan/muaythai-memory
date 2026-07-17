@@ -51,10 +51,6 @@ export const standardTagSeeds = [
 ] as const;
 
 export const statusTagSeeds = [
-  { name: "Starred", slug: "starred", sortOrder: 10 },
+  { name: "Favourite", slug: "starred", sortOrder: 10 },
   { name: "Drill Back In", slug: "drill-back-in", sortOrder: 20 },
-  { name: "Focus", slug: "focus", sortOrder: 30 },
-  { name: "Try in sparring", slug: "try-in-sparring", sortOrder: 40 },
-  { name: "Needs cleanup", slug: "needs-cleanup", sortOrder: 50 },
-  { name: "Archived", slug: "archived", sortOrder: 60 },
 ] as const;

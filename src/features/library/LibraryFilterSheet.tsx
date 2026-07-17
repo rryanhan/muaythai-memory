@@ -1,9 +1,8 @@
 "use client";
 
-import type { ReactNode } from "react";
-import { Star, Target } from "@phosphor-icons/react";
 import { Drawer } from "vaul";
 import type { TagDto, TaxonomyResponse } from "@/data";
+import { SavedListToken } from "@/features/shared/SavedListToken";
 import {
   filterBuiltInStatuses,
   filterTagCategories,
@@ -128,12 +127,10 @@ export function LibraryFilterSheet({
                         <h3>Saved Lists</h3>
                         <div>
                           {filteredBuiltInStatuses.map((status) => (
-                            <FilterTokenButton
+                            <SavedListToken
                               key={status.id}
-                              icon={<SavedListIcon icon={status.icon} />}
-                              label={status.label}
+                              option={status}
                               selected={draftStatusSet.has(status.slug)}
-                              slug={status.slug}
                               onToggle={onToggleStatusTag}
                             />
                           ))}
@@ -208,13 +205,11 @@ export function LibraryFilterSheet({
 }
 
 function FilterTokenButton({
-  icon,
   label,
   selected,
   slug,
   onToggle,
 }: {
-  icon?: ReactNode;
   label: string;
   selected: boolean;
   slug: string;
@@ -222,14 +217,7 @@ function FilterTokenButton({
 }) {
   return (
     <button type="button" data-selected={selected} onClick={() => onToggle(slug)}>
-      {icon}
       {label}
     </button>
   );
-}
-
-function SavedListIcon({ icon }: { icon: BuiltInStatusFilter["icon"] }) {
-  const Icon = icon === "target" ? Target : Star;
-
-  return <Icon aria-hidden="true" className="library-saved-list-icon" size={15} weight="bold" />;
 }

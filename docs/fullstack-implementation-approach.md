@@ -189,7 +189,7 @@ Capture should produce a draft. It should not silently create a saved drill unti
 
 Owns:
 
-- Starred drills.
+- Favourite drills.
 - Drill Back In queue.
 - Display name and profile avatar.
 - Progress journal entries.
@@ -277,10 +277,8 @@ Status Tags should not be normal training tags.
 
 Examples:
 
-- Starred.
+- Favourite (`starred` backend slug).
 - Drill Back In.
-- Needs Cleanup.
-- Archived.
 
 They control app states and profile sections, so they deserve their own table and join table.
 
@@ -604,10 +602,10 @@ Mobile interaction should stay immediate.
 
 Use optimistic updates for:
 
-- Starred.
+- Favourite.
 - Drill Back In.
 - Tag add/remove.
-- Status add/remove.
+- Saved List add/remove.
 
 If a save fails, revert and show a clear message.
 
@@ -644,7 +642,7 @@ If a save fails, revert and show a clear message.
 
 - Build Profile overview and profile editing.
 - Persist the public profile avatar in Supabase Storage.
-- Show Starred and Drill Back In collections and Training Method totals.
+- Show Favourite and Drill Back In collections and Training Method totals.
 - Add progress journal entries.
 - Add optional linked drill.
 - Add private, signed, resumable video uploads.

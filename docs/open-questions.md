@@ -36,9 +36,8 @@ Resolved for now:
 
 ## Review And Memory Loop
 
-- Does the app need an explicit revisit loop, or should memory be driven by search, starring, focus markers, and training plans?
-- Should "Try in sparring" be a built-in marker?
-- Should "Focus" represent current training priority?
+- Does Drill Back In need scheduling or reminders beyond its current saved collection?
+- Should future training plans remain separate from Saved Lists?
 
 ## Later Systems
 
