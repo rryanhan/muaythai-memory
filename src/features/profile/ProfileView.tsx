@@ -186,7 +186,12 @@ function JournalEntryRow({ entry }: { entry: JournalEntrySummary }) {
   return (
     <Link className={styles.journalRow} href={`/journal/${entry.id}`} prefetch>
       <span className={styles.videoTile} aria-hidden="true">
-        <Play size={21} weight="fill" />
+        {entry.posterUrl ? (
+          <img src={entry.posterUrl} alt="" loading="lazy" />
+        ) : (
+          <span className={styles.videoFallback} />
+        )}
+        <Play className={styles.videoPlay} size={16} weight="fill" />
         {entry.durationMs !== null && <small>{formatDuration(entry.durationMs)}</small>}
       </span>
       <span className={styles.journalCopy}>

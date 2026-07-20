@@ -3,6 +3,7 @@ import {
   deleteDrillResponseSchema,
   drillDetailResponseSchema,
   drillListResponseSchema,
+  updateSavedListResponseSchema,
 } from "@/modules/drills/contracts";
 import type {
   ApiClientOptions,
@@ -11,6 +12,8 @@ import type {
   DrillFilterInput,
   DrillListResponse,
   UpdateDrillInput,
+  UpdateSavedListInput,
+  UpdateSavedListResponse,
 } from "./types";
 import { fetchJson } from "./api-core";
 import { appendQueryString, buildDrillSearchParams } from "./filter-query";
@@ -72,6 +75,24 @@ export async function deleteDrill(id: string, options: ApiClientOptions = {}): P
     { method: "DELETE" },
   );
   return response.deletedId;
+}
+
+export async function updateDrillSavedList(
+  id: string,
+  input: UpdateSavedListInput,
+  options: ApiClientOptions = {},
+): Promise<UpdateSavedListResponse> {
+  const drillId = z.string().uuid().parse(id);
+  return fetchJson(
+    `/api/drills/${encodeURIComponent(drillId)}/saved-lists`,
+    updateSavedListResponseSchema,
+    options,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    },
+  );
 }
 
 export function buildDrillsApiPath(filters: DrillFilterInput = {}): string {

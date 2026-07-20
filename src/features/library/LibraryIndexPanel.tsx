@@ -1,9 +1,11 @@
 "use client";
 
-import { ListBullets, Microphone, Plus } from "@phosphor-icons/react";
+import { ListBullets } from "@phosphor-icons/react/ListBullets";
+import { Microphone } from "@phosphor-icons/react/Microphone";
+import { Plus } from "@phosphor-icons/react/Plus";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import type { TrainingMethodDto } from "@/data";
 import { badgeByIconKey } from "@/components/shared/context-badges";
 import type { TaxonomyLoadState } from "./types";
@@ -26,6 +28,7 @@ export function LibraryIndexPanel({
   onRetry,
 }: LibraryIndexPanelProps) {
   const router = useRouter();
+  const panelRef = useRef<HTMLElement>(null);
 
   function prefetchAddDrill() {
     router.prefetch("/drills/new");
@@ -40,8 +43,22 @@ export function LibraryIndexPanel({
     prefetchCaptureDraft();
   }, []);
 
+  useEffect(() => {
+    const panel = panelRef.current;
+    if (!panel) return;
+
+    panel.scrollTop = 0;
+    panel.querySelector<HTMLButtonElement>("button")?.focus({ preventScroll: true });
+  }, []);
+
   return (
-    <aside className="library-index-panel" aria-label="Training Method index">
+    <aside
+      ref={panelRef}
+      className="library-index-panel"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Training Method index"
+    >
       <header>
         <p className="eyebrow">Index</p>
         <button type="button" onClick={onClose}>

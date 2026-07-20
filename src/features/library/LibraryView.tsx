@@ -1,6 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { FunnelSimple } from "@phosphor-icons/react/FunnelSimple";
+import { MagnifyingGlass } from "@phosphor-icons/react/MagnifyingGlass";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { getDrills, getTaxonomy, type TagDto } from "@/data";
 import { badgeByIconKey } from "@/components/shared/context-badges";
@@ -81,6 +83,35 @@ export function LibraryView() {
   const pageSubtitle = drillListState.status === "loading" ? "Loading drills" : formatDrillCount(total);
   const pageBadge = selectedMethod?.iconKey ? badgeByIconKey[selectedMethod.iconKey] : undefined;
 
+  useEffect(() => {
+    if (!indexOpen) return;
+
+    const root = document.documentElement;
+    const body = document.body;
+    const previousRootOverflow = root.style.overflow;
+    const previousBodyOverflow = body.style.overflow;
+    const previousRootOverscroll = root.style.overscrollBehavior;
+    const previousBodyOverscroll = body.style.overscrollBehavior;
+
+    root.style.overflow = "hidden";
+    body.style.overflow = "hidden";
+    root.style.overscrollBehavior = "none";
+    body.style.overscrollBehavior = "none";
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") setIndexOpen(false);
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      root.style.overflow = previousRootOverflow;
+      body.style.overflow = previousBodyOverflow;
+      root.style.overscrollBehavior = previousRootOverscroll;
+      body.style.overscrollBehavior = previousBodyOverscroll;
+    };
+  }, [indexOpen]);
+
   function setKeyword(keyword: string) {
     setFilters((current) => ({ ...current, keyword }));
   }
@@ -159,14 +190,22 @@ export function LibraryView() {
       </button>
 
       {indexOpen && (
-        <LibraryIndexPanel
-          methods={methods}
-          selectedMethodSlug={filters.methodSlug}
-          taxonomyState={taxonomyState}
-          onSelectMethod={setMethod}
-          onClose={() => setIndexOpen(false)}
-          onRetry={() => void taxonomyQuery.refetch()}
-        />
+        <>
+          <button
+            type="button"
+            className="library-index-backdrop"
+            aria-label="Close Training Method index"
+            onClick={() => setIndexOpen(false)}
+          />
+          <LibraryIndexPanel
+            methods={methods}
+            selectedMethodSlug={filters.methodSlug}
+            taxonomyState={taxonomyState}
+            onSelectMethod={setMethod}
+            onClose={() => setIndexOpen(false)}
+            onRetry={() => void taxonomyQuery.refetch()}
+          />
+        </>
       )}
 
       <header className="library-header">
@@ -180,7 +219,7 @@ export function LibraryView() {
         </div>
         <div className="library-search-row">
           <label className="library-search">
-            <span className="search-mark" aria-hidden="true" />
+            <MagnifyingGlass size={22} weight="regular" aria-hidden="true" />
             <input
               aria-label="Search drills by keyword"
               placeholder="Search for keyword"
@@ -194,7 +233,7 @@ export function LibraryView() {
             data-active={tagPanelOpen || filters.tagSlugs.length > 0 || filters.statusTagSlugs.length > 0}
             onClick={() => handleTagPanelOpenChange(!tagPanelOpen)}
           >
-            <span className="rail-icon rail-icon-filter" aria-hidden="true" />
+            <FunnelSimple size={24} weight="regular" aria-hidden="true" />
           </button>
         </div>
         {hasFilters && (

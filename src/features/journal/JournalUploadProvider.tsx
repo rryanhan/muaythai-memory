@@ -17,14 +17,16 @@ import {
   completeJournalEntryUpload,
   createJournalUpload,
   deleteJournalEntry,
+  uploadJournalEntryPoster,
   type JournalUploadIntentResponse,
 } from "@/data";
+import { createVideoPoster } from "./create-video-poster";
 import { uploadJournalVideo, validateJournalVideoFile } from "./upload-journal-video";
 import styles from "./JournalMedia.module.css";
 
 type UploadPhase = "idle" | "creating" | "uploading" | "completing" | "error" | "ready";
 type UploadRailPhase = Exclude<UploadPhase, "idle"> | "draft";
-type FailedStage = "intent" | "upload" | "complete" | null;
+type FailedStage = "intent" | "upload" | "poster" | "complete" | null;
 
 type JournalDraft = {
   file: File | null;
@@ -71,6 +73,9 @@ export function JournalUploadProvider({ children }: { children: ReactNode }) {
   const abortRef = useRef<AbortController | null>(null);
   const intentRef = useRef<JournalUploadIntentResponse | null>(null);
   const previewUrlRef = useRef<string | null>(null);
+  const posterFileRef = useRef<File | null>(null);
+  const posterPromiseRef = useRef<Promise<File | null> | null>(null);
+  const posterGenerationRef = useRef(0);
   const busy = phase === "creating" || phase === "uploading" || phase === "completing";
   const hasDraftChanges = Boolean(
     draft.file || draft.caption.trim() || draft.drillId || draft.occurredOn !== localToday(),
@@ -97,6 +102,9 @@ export function JournalUploadProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const resetDraft = useCallback(() => {
+    posterGenerationRef.current += 1;
+    posterFileRef.current = null;
+    posterPromiseRef.current = null;
     if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
     previewUrlRef.current = null;
     setDraft(emptyDraft());
@@ -142,7 +150,7 @@ export function JournalUploadProvider({ children }: { children: ReactNode }) {
         setIntent(nextIntent);
       }
 
-      if (failedStage !== "complete") {
+      if (failedStage !== "complete" && failedStage !== "poster") {
         currentStage = "upload";
         setPhase("uploading");
         await uploadJournalVideo({
@@ -150,6 +158,14 @@ export function JournalUploadProvider({ children }: { children: ReactNode }) {
           intent: nextIntent,
           signal: controller.signal,
           onProgress: setProgress,
+        });
+      }
+
+      const poster = posterFileRef.current ?? await posterPromiseRef.current;
+      if (poster && failedStage !== "complete") {
+        currentStage = "poster";
+        await uploadJournalEntryPoster(nextIntent.entryId, poster, {
+          requestInit: { signal: controller.signal },
         });
       }
 
@@ -191,9 +207,17 @@ export function JournalUploadProvider({ children }: { children: ReactNode }) {
     hasWork,
     setFile(file) {
       validateJournalVideoFile(file);
+      const generation = posterGenerationRef.current + 1;
+      posterGenerationRef.current = generation;
+      posterFileRef.current = null;
       if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
       const previewUrl = URL.createObjectURL(file);
       previewUrlRef.current = previewUrl;
+      const posterPromise = createVideoPoster(file).then((poster) => {
+        if (posterGenerationRef.current === generation) posterFileRef.current = poster;
+        return poster;
+      });
+      posterPromiseRef.current = posterPromise;
       setDraft((current) => ({ ...current, file, previewUrl, durationMs: null }));
       setError(null);
       setFailedStage(null);

@@ -1,5 +1,6 @@
 "use client";
 
+import { MagnifyingGlass } from "@phosphor-icons/react/MagnifyingGlass";
 import { Drawer } from "vaul";
 import type { TagDto, TaxonomyResponse } from "@/data";
 import { SavedListToken } from "@/features/shared/SavedListToken";
@@ -98,7 +99,7 @@ export function LibraryFilterSheet({
           <section className="library-filter-sheet-section" aria-label="Tags">
             <p className="eyebrow">Tags</p>
             <label className="library-filter-search">
-              <span className="search-mark" aria-hidden="true" />
+              <MagnifyingGlass size={20} weight="regular" aria-hidden="true" />
               <input
                 type="search"
                 aria-label="Search tags"

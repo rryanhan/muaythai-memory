@@ -4,6 +4,7 @@ import {
   deleteJournalEntryResponseSchema,
   journalDetailResponseSchema,
   journalListResponseSchema,
+  journalPosterUploadResponseSchema,
   journalPreviewResponseSchema,
   journalUploadIntentResponseSchema,
   updateJournalEntryInputSchema,
@@ -68,6 +69,23 @@ export async function completeJournalEntryUpload(
     }),
   );
   return response.entry;
+}
+
+export async function uploadJournalEntryPoster(
+  id: string,
+  poster: File,
+  options: ApiClientOptions = {},
+): Promise<void> {
+  const formData = new FormData();
+  formData.set("poster", poster);
+  await requestWithReadableError(
+    () => fetchJson(
+      `/api/journal/${encodeURIComponent(id)}/poster`,
+      journalPosterUploadResponseSchema,
+      options,
+      { method: "POST", body: formData },
+    ),
+  );
 }
 
 export async function updateJournalEntry(

@@ -1,7 +1,8 @@
 "use client";
 
 import type { Dispatch, ReactNode, SetStateAction } from "react";
-import { CaretDown } from "@phosphor-icons/react";
+import { CaretDown } from "@phosphor-icons/react/CaretDown";
+import { MagnifyingGlass } from "@phosphor-icons/react/MagnifyingGlass";
 import { Drawer } from "vaul";
 import type { GraphOptions, TagDto, TaxonomyResponse } from "@/data";
 import { SavedListToken } from "@/features/shared/SavedListToken";
@@ -135,7 +136,7 @@ export function NetworkControlsSheet({
             <p className="section-label">Tag Filter</p>
             <div className="network-tag-filter">
               <label className="network-filter-search">
-                <span className="search-mark" aria-hidden="true" />
+                <MagnifyingGlass size={20} weight="regular" aria-hidden="true" />
                 <input
                   type="search"
                   aria-label="Search tags"

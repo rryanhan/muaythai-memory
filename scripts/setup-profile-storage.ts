@@ -7,6 +7,7 @@ import {
 } from "@/modules/profile/avatar";
 import {
   JOURNAL_MEDIA_BUCKET,
+  JOURNAL_POSTER_MIME_TYPES,
   JOURNAL_VIDEO_MAX_BYTES,
   JOURNAL_VIDEO_MIME_TYPES,
 } from "@/modules/journal/constants";
@@ -32,7 +33,7 @@ async function main() {
       options: {
         public: false,
         fileSizeLimit: JOURNAL_VIDEO_MAX_BYTES,
-        allowedMimeTypes: [...JOURNAL_VIDEO_MIME_TYPES],
+        allowedMimeTypes: [...JOURNAL_VIDEO_MIME_TYPES, ...JOURNAL_POSTER_MIME_TYPES],
       },
     },
   ];

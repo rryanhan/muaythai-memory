@@ -15,6 +15,8 @@ import {
   updateDrillInputSchema,
   type CreateDrillInput,
   type DrillDetail,
+  type UpdateSavedListInput,
+  type UpdateSavedListResponse,
   type UpdateDrillInput,
 } from "./contracts";
 import { getDrillById } from "./queries";
@@ -47,6 +49,16 @@ export class DeleteDrillValidationError extends Error {
   constructor() {
     super("Drill not found.");
     this.name = "DeleteDrillValidationError";
+  }
+}
+
+export class SavedListMutationError extends Error {
+  readonly status: 400 | 404;
+
+  constructor(message: string, status: 400 | 404) {
+    super(message);
+    this.name = "SavedListMutationError";
+    this.status = status;
   }
 }
 
@@ -213,6 +225,53 @@ export async function deleteDrill(userId: string, id: string): Promise<string> {
 
   if (!deletedDrill) throw new DeleteDrillValidationError();
   return deletedDrill.id;
+}
+
+/** Applies one Saved List relationship without replacing the drill's other list state. */
+export async function setDrillSavedList(
+  userId: string,
+  drillId: string,
+  input: UpdateSavedListInput,
+): Promise<UpdateSavedListResponse> {
+  return db.transaction(async (tx) => {
+    const [ownedDrill] = await tx
+      .select({ id: drills.id })
+      .from(drills)
+      .where(and(eq(drills.id, drillId), eq(drills.userId, userId)))
+      .limit(1);
+
+    if (!ownedDrill) {
+      throw new SavedListMutationError("Drill not found.", 404);
+    }
+
+    const [status] = await tx
+      .select({
+        id: statusTags.id,
+        name: statusTags.name,
+        slug: statusTags.slug,
+        sortOrder: statusTags.sortOrder,
+      })
+      .from(statusTags)
+      .where(and(eq(statusTags.slug, input.slug), eq(statusTags.active, true)))
+      .limit(1);
+
+    if (!status) {
+      throw new SavedListMutationError("Saved List is not active.", 400);
+    }
+
+    if (input.selected) {
+      await tx
+        .insert(drillStatusTags)
+        .values({ drillId, statusTagId: status.id })
+        .onConflictDoNothing();
+    } else {
+      await tx
+        .delete(drillStatusTags)
+        .where(and(eq(drillStatusTags.drillId, drillId), eq(drillStatusTags.statusTagId, status.id)));
+    }
+
+    return { drillId, status, selected: input.selected };
+  });
 }
 
 async function getActiveTrainingMethodsBySlug(slugs: string[]) {

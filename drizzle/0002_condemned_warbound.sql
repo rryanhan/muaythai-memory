@@ -1,0 +1,1 @@
+ALTER TABLE "journal_media" ADD COLUMN "poster_path" text;

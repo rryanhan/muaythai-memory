@@ -57,6 +57,19 @@ export const deleteDrillResponseSchema = z.object({
   deletedId: z.string().uuid(),
 });
 
+export const savedListSlugSchema = z.enum(["starred", "drill-back-in"]);
+
+export const updateSavedListInputSchema = z.object({
+  slug: savedListSlugSchema,
+  selected: z.boolean(),
+});
+
+export const updateSavedListResponseSchema = z.object({
+  drillId: z.string().uuid(),
+  status: statusTagDtoSchema,
+  selected: z.boolean(),
+});
+
 export const createDrillInputSchema = z.object({
   title: z.string().trim().min(1),
   summary: z
@@ -88,6 +101,9 @@ export type DrillDetail = z.infer<typeof drillDetailSchema>;
 export type DrillListResponse = z.infer<typeof drillListResponseSchema>;
 export type DrillDetailResponse = z.infer<typeof drillDetailResponseSchema>;
 export type DeleteDrillResponse = z.infer<typeof deleteDrillResponseSchema>;
+export type SavedListSlug = z.infer<typeof savedListSlugSchema>;
+export type UpdateSavedListInput = z.infer<typeof updateSavedListInputSchema>;
+export type UpdateSavedListResponse = z.infer<typeof updateSavedListResponseSchema>;
 export type CreateDrillInput = z.input<typeof createDrillInputSchema>;
 export type UpdateDrillInput = z.input<typeof updateDrillInputSchema>;
 

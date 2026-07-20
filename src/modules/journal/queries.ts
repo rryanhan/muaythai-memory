@@ -53,6 +53,7 @@ export async function listJournalEntries(
       drillTitle: drills.title,
       durationMs: journalMedia.durationMs,
       mimeType: journalMedia.mimeType,
+      posterPath: journalMedia.posterPath,
     })
     .from(journalEntries)
     .innerJoin(journalMedia, eq(journalMedia.journalEntryId, journalEntries.id))
@@ -72,8 +73,10 @@ export async function listJournalEntries(
   const visibleRows = rows.slice(0, limit);
   const lastRow = visibleRows.at(-1);
 
+  const posterUrls = await signPosterPaths(visibleRows.map((row) => row.posterPath));
+
   return {
-    entries: visibleRows.map(toSummary),
+    entries: visibleRows.map((row) => toSummary(row, row.posterPath ? posterUrls.get(row.posterPath) ?? null : null)),
     nextCursor: hasMore && lastRow
       ? encodeJournalCursor({ occurredOn: lastRow.occurredOn, createdAt: lastRow.createdAt, id: lastRow.id })
       : null,
@@ -103,6 +106,7 @@ export async function getJournalPreviewForDrill(
         durationMs: journalMedia.durationMs,
         mimeType: journalMedia.mimeType,
         storagePath: journalMedia.storagePath,
+        posterPath: journalMedia.posterPath,
       })
       .from(journalEntries)
       .innerJoin(journalMedia, eq(journalMedia.journalEntryId, journalEntries.id))
@@ -132,16 +136,18 @@ export async function getJournalPreviewForDrill(
   const total = totalRows[0]?.value ?? 0;
   if (!latest) return { entry: null, total };
 
-  const { data, error } = await createSupabaseAdminClient().storage
-    .from(JOURNAL_MEDIA_BUCKET)
-    .createSignedUrl(latest.storagePath, JOURNAL_PLAYBACK_URL_SECONDS);
+  const bucket = createSupabaseAdminClient().storage.from(JOURNAL_MEDIA_BUCKET);
+  const [{ data, error }, posterUrl] = await Promise.all([
+    bucket.createSignedUrl(latest.storagePath, JOURNAL_PLAYBACK_URL_SECONDS),
+    signPosterPath(latest.posterPath),
+  ]);
   if (error || !data?.signedUrl) {
     throw new Error(`Journal playback URL failed: ${error?.message ?? "No URL returned."}`);
   }
 
   return {
     entry: {
-      ...toSummary(latest),
+      ...toSummary(latest, posterUrl),
       playbackUrl: data.signedUrl,
     },
     total,
@@ -161,14 +167,15 @@ export async function getJournalEntryById(userId: string, id: string): Promise<J
   const row = await getOwnedJournalRow(userId, id, "ready");
   if (!row) return null;
 
-  const supabase = createSupabaseAdminClient();
-  const { data, error } = await supabase.storage
-    .from(JOURNAL_MEDIA_BUCKET)
-    .createSignedUrl(row.storagePath, JOURNAL_PLAYBACK_URL_SECONDS);
+  const bucket = createSupabaseAdminClient().storage.from(JOURNAL_MEDIA_BUCKET);
+  const [{ data, error }, posterUrl] = await Promise.all([
+    bucket.createSignedUrl(row.storagePath, JOURNAL_PLAYBACK_URL_SECONDS),
+    signPosterPath(row.posterPath),
+  ]);
   if (error || !data?.signedUrl) throw new Error(`Journal playback URL failed: ${error?.message ?? "No URL returned."}`);
 
   return {
-    ...toSummary(row),
+    ...toSummary(row, posterUrl),
     playbackUrl: data.signedUrl,
   };
 }
@@ -193,6 +200,7 @@ export async function getOwnedJournalRow(
       durationMs: journalMedia.durationMs,
       mimeType: journalMedia.mimeType,
       sizeBytes: journalMedia.sizeBytes,
+      posterPath: journalMedia.posterPath,
     })
     .from(journalEntries)
     .innerJoin(journalMedia, eq(journalMedia.journalEntryId, journalEntries.id))
@@ -218,7 +226,7 @@ function toSummary(row: {
   drillTitle: string | null;
   durationMs: number | null;
   mimeType: string;
-}): JournalEntrySummary {
+}, posterUrl: string | null = null): JournalEntrySummary {
   return {
     id: row.id,
     occurredOn: row.occurredOn,
@@ -226,8 +234,34 @@ function toSummary(row: {
     drill: row.drillId && row.drillTitle ? { id: row.drillId, title: row.drillTitle } : null,
     durationMs: row.durationMs,
     mimeType: row.mimeType as JournalEntrySummary["mimeType"],
+    posterUrl,
     createdAt: row.createdAt,
   };
+}
+
+async function signPosterPaths(paths: Array<string | null>): Promise<Map<string, string>> {
+  const uniquePaths = [...new Set(paths.filter((path): path is string => Boolean(path)))];
+  if (uniquePaths.length === 0) return new Map();
+
+  const { data, error } = await createSupabaseAdminClient().storage
+    .from(JOURNAL_MEDIA_BUCKET)
+    .createSignedUrls(uniquePaths, JOURNAL_PLAYBACK_URL_SECONDS);
+  if (error || !data) return new Map();
+
+  return new Map(
+    data
+      .filter((entry): entry is typeof entry & { path: string; signedUrl: string } => Boolean(entry.path && entry.signedUrl))
+      .map((entry) => [entry.path, entry.signedUrl]),
+  );
+}
+
+async function signPosterPath(path: string | null): Promise<string | null> {
+  if (!path) return null;
+  const { data, error } = await createSupabaseAdminClient().storage
+    .from(JOURNAL_MEDIA_BUCKET)
+    .createSignedUrl(path, JOURNAL_PLAYBACK_URL_SECONDS);
+  if (error || !data?.signedUrl) return null;
+  return data.signedUrl;
 }
 
 export function encodeJournalCursor(cursor: JournalCursor): string {

@@ -222,6 +222,7 @@ export const journalMedia = pgTable(
     mimeType: varchar("mime_type", { length: 96 }).notNull(),
     sizeBytes: integer("size_bytes").notNull(),
     durationMs: integer("duration_ms"),
+    posterPath: text("poster_path"),
     ...timestamps,
   },
   (table) => ({

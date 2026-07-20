@@ -130,7 +130,7 @@ optional link to an owned Drill.
 Journal metadata lives in Postgres:
 
 - `journal_entries`: owner, linked drill, date, caption, lifecycle status, timestamps
-- `journal_media`: entry relationship, private Storage path, MIME type, byte size, duration
+- `journal_media`: entry relationship, private video path, optional private poster-frame path, MIME type, byte size, duration
 
 Uploads begin as `uploading` and become visible only after the private Storage
 object is confirmed and the entry moves to `ready`. Deleting an entry permanently

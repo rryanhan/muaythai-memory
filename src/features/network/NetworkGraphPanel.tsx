@@ -2,10 +2,21 @@
 
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type Dispatch, type SetStateAction } from "react";
 import Link from "next/link";
-import { getDrill, type GraphOptions, type GraphResponse, type TagDto, type TaxonomyResponse } from "@/data";
+import { MagnifyingGlass } from "@phosphor-icons/react/MagnifyingGlass";
+import { Microphone } from "@phosphor-icons/react/Microphone";
+import { SlidersHorizontal } from "@phosphor-icons/react/SlidersHorizontal";
+import {
+  getDrill,
+  type GraphOptions,
+  type GraphResponse,
+  type TagDto,
+  type TaxonomyResponse,
+  type UpdateSavedListResponse,
+} from "@/data";
 import { badgeByIconKey } from "@/components/shared/context-badges";
 import { DrillDetailSheet } from "@/features/drills/DrillDetailSheet";
 import { getBuiltInStatusFilters, type BuiltInStatusFilter } from "@/features/shared/tag-filter-helpers";
+import { updateStatusTags } from "@/features/shared/saved-list-state";
 import { NetworkControlsSheet } from "./NetworkControlsSheet";
 import { NetworkForceGraph } from "./NetworkForceGraph";
 import {
@@ -237,6 +248,24 @@ export function NetworkGraphPanel({
     }
   }
 
+  function handleDetailSavedListChange(result: UpdateSavedListResponse) {
+    setDetailLoadState((current) => {
+      if (current.status !== "loaded" || current.drill.id !== result.drillId) return current;
+
+      return {
+        status: "loaded",
+        drill: {
+          ...current.drill,
+          statusTags: updateStatusTags(current.drill.statusTags, result.status, result.selected),
+        },
+      };
+    });
+
+    // Saved List state only changes visible graph data when its node layer or
+    // a Saved List filter is active.
+    if (layerOptions.showStatusTags || filters.statusTagSlugs.length > 0) onRetry();
+  }
+
   const visibleDetailState =
     selectedDrillId && detailLoadState.status === "idle"
       ? ({ status: "loading", drillId: selectedDrillId } as const)
@@ -355,7 +384,7 @@ export function NetworkGraphPanel({
             applySearchDraft();
           }}
         >
-          <span className="search-mark" aria-hidden="true" />
+          <MagnifyingGlass size={24} weight="regular" aria-hidden="true" />
           <input
             ref={searchInputRef}
             aria-label="Search keyword"
@@ -397,7 +426,7 @@ export function NetworkGraphPanel({
           data-active={controlsOpen}
           onClick={() => setControlsOpen((open) => !open)}
         >
-          <span className="rail-icon rail-icon-filter" aria-hidden="true" />
+          <SlidersHorizontal size={25} weight="regular" aria-hidden="true" />
         </button>
         <button
           type="button"
@@ -406,7 +435,7 @@ export function NetworkGraphPanel({
           data-active={searchOpen}
           onClick={toggleSearch}
         >
-          <span className="rail-icon rail-icon-search" aria-hidden="true" />
+          <MagnifyingGlass size={26} weight="regular" aria-hidden="true" />
         </button>
         <Link
           className="record-button"
@@ -414,7 +443,7 @@ export function NetworkGraphPanel({
           aria-label="Capture drill"
           prefetch
         >
-          <span className="rail-icon rail-icon-record" aria-hidden="true" />
+          <Microphone size={27} weight="regular" aria-hidden="true" />
         </Link>
       </div>
 
@@ -426,6 +455,7 @@ export function NetworkGraphPanel({
           onOpenChange={setDetailOpen}
           onAnimationEnd={handleDetailAnimationEnd}
           onRetry={() => setDetailRetryNonce((current) => current + 1)}
+          onSavedListChange={handleDetailSavedListChange}
         />
       )}
     </>

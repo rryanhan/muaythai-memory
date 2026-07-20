@@ -47,6 +47,7 @@ export const journalEntrySummarySchema = z.object({
   drill: journalDrillSchema.nullable(),
   durationMs: z.number().int().nonnegative().nullable(),
   mimeType: z.enum(JOURNAL_VIDEO_MIME_TYPES),
+  posterUrl: z.string().url().nullable(),
   createdAt: z.coerce.date(),
 });
 
@@ -79,6 +80,10 @@ export const journalUploadIntentResponseSchema = z.object({
 
 export const completeJournalUploadResponseSchema = z.object({
   entry: journalEntryDetailSchema,
+});
+
+export const journalPosterUploadResponseSchema = z.object({
+  uploaded: z.literal(true),
 });
 
 export const deleteJournalEntryResponseSchema = z.object({

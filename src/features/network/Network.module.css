@@ -428,6 +428,11 @@
   color: var(--muted);
 }
 
+.view :global(.network-search-popover) svg,
+.controlsSheet :global(.network-filter-search) svg {
+  flex: 0 0 auto;
+}
+
 .controlsBackdrop {
   position: fixed;
   inset: 0;
@@ -528,16 +533,6 @@
   border-radius: 8px;
   padding: 0 14px;
   background: var(--bg);
-}
-
-.controlsSheet :global(.network-filter-search) :global(.search-mark) {
-  width: 18px;
-  height: 18px;
-}
-
-.controlsSheet :global(.network-filter-search) :global(.search-mark)::after {
-  right: -5px;
-  width: 8px;
 }
 
 .controlsSheet :global(.network-filter-search) input {
@@ -704,106 +699,6 @@
   color: var(--muted);
   cursor: default;
   opacity: 0.56;
-}
-
-.view :global(.rail-icon) {
-  position: relative;
-  width: 24px;
-  height: 24px;
-  color: currentColor;
-}
-
-.view :global(.rail-icon-filter)::before,
-.view :global(.rail-icon-filter)::after {
-  position: absolute;
-  left: 3px;
-  width: 18px;
-  height: 2px;
-  border-radius: 999px;
-  background: currentColor;
-  content: "";
-}
-
-.view :global(.rail-icon-filter)::before {
-  top: 7px;
-}
-
-.view :global(.rail-icon-filter)::after {
-  bottom: 7px;
-}
-
-.view :global(.rail-icon-search) {
-  border: 2px solid currentColor;
-  border-radius: 999px;
-}
-
-.view :global(.rail-icon-search)::after {
-  position: absolute;
-  right: -5px;
-  bottom: 1px;
-  width: 9px;
-  height: 2px;
-  border-radius: 999px;
-  background: currentColor;
-  transform: rotate(45deg);
-  content: "";
-}
-
-.view :global(.rail-icon-record) {
-  border: 2px solid currentColor;
-  border-radius: 999px;
-}
-
-.view :global(.rail-icon-record)::after {
-  position: absolute;
-  left: 9px;
-  bottom: -6px;
-  width: 2px;
-  height: 6px;
-  background: currentColor;
-  content: "";
-}
-
-.view :global(.search-mark) {
-  position: relative;
-  flex: 0 0 auto;
-  width: 22px;
-  height: 22px;
-  border: 2px solid var(--text);
-  border-radius: 999px;
-}
-
-.view :global(.search-mark)::after {
-  position: absolute;
-  right: -6px;
-  bottom: 0;
-  width: 10px;
-  height: 2px;
-  border-radius: 999px;
-  background: var(--text);
-  transform: rotate(45deg);
-  content: "";
-}
-
-.controlsSheet :global(.search-mark) {
-  position: relative;
-  flex: 0 0 auto;
-  width: 22px;
-  height: 22px;
-  border: 2px solid var(--text);
-  border-radius: 999px;
-}
-
-.controlsSheet :global(.search-mark)::after {
-  position: absolute;
-  right: -6px;
-  bottom: 0;
-  width: 10px;
-  height: 2px;
-  border-radius: 999px;
-  background: var(--text);
-  transform: rotate(45deg);
-  content: "";
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -1,4 +1,5 @@
 import type { StatusTagDto, TagDto, TaxonomyResponse } from "@/data";
+import { savedListDefinitions } from "./saved-list-config";
 
 export type BuiltInStatusFilter = {
   id: string;
@@ -9,18 +10,6 @@ export type BuiltInStatusFilter = {
 };
 
 export type BuiltInStatusSource = Pick<StatusTagDto, "id" | "name" | "slug" | "sortOrder">;
-
-const builtInStatusDisplayNames: Record<string, string> = {
-  starred: "Favourite",
-  "drill-back-in": "Drill Back In",
-};
-
-const builtInStatusIcons: Record<string, BuiltInStatusFilter["icon"]> = {
-  starred: "star",
-  "drill-back-in": "target",
-};
-
-const builtInStatusSlugs = ["starred", "drill-back-in"];
 
 // Shared tag/status filtering for Library and Network picker surfaces.
 export function filterTagCategories(
@@ -56,16 +45,12 @@ export function filterBuiltInStatuses(
 }
 
 export function getBuiltInStatusFilters(statusTags: StatusTagDto[]): BuiltInStatusFilter[] {
-  return builtInStatusSlugs
-    .map((slug) => statusTags.find((status) => status.slug === slug))
-    .filter((status): status is StatusTagDto => Boolean(status))
-    .map((status) => ({
-      id: status.id,
-      icon: builtInStatusIcons[status.slug] ?? "star",
-      label: builtInStatusDisplayNames[status.slug] ?? status.name,
-      slug: status.slug,
-      sortOrder: status.sortOrder,
-    }))
+  return savedListDefinitions
+    .map((definition): BuiltInStatusFilter | null => {
+      const status = statusTags.find((candidate) => candidate.slug === definition.slug);
+      return status ? { ...definition, id: status.id, sortOrder: status.sortOrder } : null;
+    })
+    .filter((status): status is BuiltInStatusFilter => status !== null)
     .sort((first, second) => first.sortOrder - second.sortOrder);
 }
 

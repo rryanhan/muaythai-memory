@@ -4,6 +4,12 @@ const checks: Array<{ path: string; method?: string; body?: BodyInit; headers?: 
   { path: "/api/taxonomy" },
   { path: "/api/drills" },
   { path: "/api/drills/00000000-0000-4000-8000-000000000000" },
+  {
+    path: "/api/drills/00000000-0000-4000-8000-000000000000/saved-lists",
+    method: "PATCH",
+    body: JSON.stringify({ slug: "starred", selected: true }),
+    headers: { "content-type": "application/json" },
+  },
   { path: "/api/graph" },
   {
     path: "/api/capture/draft",

@@ -4,14 +4,24 @@ import { and, asc, eq, isNull } from "drizzle-orm";
 import { db, postgresClient } from "./client";
 import {
   drillSteps,
+  drillStatusTags,
   drillTags,
   drillTrainingMethods,
   drills,
+  statusTags,
   tags,
   trainingMethods,
   users,
 } from "./schema";
-import { DeleteDrillValidationError, UpdateDrillValidationError, deleteDrill, updateDrill } from "@/modules/drills/mutations";
+import {
+  DeleteDrillValidationError,
+  SavedListMutationError,
+  UpdateDrillValidationError,
+  deleteDrill,
+  setDrillSavedList,
+  updateDrill,
+} from "@/modules/drills/mutations";
+import type { UpdateSavedListInput } from "@/modules/drills/contracts";
 import { getDrillById, listDrills } from "@/modules/drills/queries";
 import { getMuayThaiGraph } from "@/modules/graph/queries";
 import { getTaxonomy } from "@/modules/taxonomy/queries";
@@ -113,10 +123,75 @@ async function main() {
     await expectUpdateNotFound(userA.id, drillB.id, method.slug, standardTag.slug);
     await expectForeignCustomTagRejected(userA.id, drillA.id, method.slug, customTagB.slug);
     await expectDeleteNotFound(userA.id, drillB.id);
-    console.log("Auth ownership verification passed for drills, graph, custom tags, update, and delete.");
+    await expectSavedListIsolationAndIdempotence(userA.id, userB.id, drillA.id, drillB.id);
+    console.log("Auth ownership verification passed for drills, graph, custom tags, Saved Lists, update, and delete.");
   } finally {
     await db.delete(users).where(eq(users.id, userA.id));
     await db.delete(users).where(eq(users.id, userB.id));
+  }
+}
+
+async function expectSavedListIsolationAndIdempotence(
+  userId: string,
+  foreignUserId: string,
+  drillId: string,
+  foreignDrillId: string,
+) {
+  await Promise.all([
+    setDrillSavedList(userId, drillId, { slug: "starred", selected: true }),
+    setDrillSavedList(userId, drillId, { slug: "drill-back-in", selected: true }),
+  ]);
+  await Promise.all([
+    setDrillSavedList(userId, drillId, { slug: "starred", selected: true }),
+    setDrillSavedList(userId, drillId, { slug: "drill-back-in", selected: true }),
+  ]);
+
+  const selectedRelationships = await db
+    .select({ slug: statusTags.slug })
+    .from(drillStatusTags)
+    .innerJoin(statusTags, eq(statusTags.id, drillStatusTags.statusTagId))
+    .where(eq(drillStatusTags.drillId, drillId));
+  expect(selectedRelationships.length === 2, "Saved List selection should be independent and idempotent.");
+
+  await setDrillSavedList(userId, drillId, { slug: "starred", selected: false });
+  await setDrillSavedList(userId, drillId, { slug: "starred", selected: false });
+  const remainingRelationships = await db
+    .select({ slug: statusTags.slug })
+    .from(drillStatusTags)
+    .innerJoin(statusTags, eq(statusTags.id, drillStatusTags.statusTagId))
+    .where(eq(drillStatusTags.drillId, drillId));
+  expect(
+    remainingRelationships.length === 1 && remainingRelationships[0]?.slug === "drill-back-in",
+    "Deselecting Favourite must not replace Drill Back In state.",
+  );
+
+  await expectSavedListError(
+    () => setDrillSavedList(userId, foreignDrillId, { slug: "starred", selected: true }),
+    404,
+    "Cross-user Saved List changes must return 404.",
+  );
+  await expectSavedListError(
+    () => setDrillSavedList(foreignUserId, drillId, { slug: "starred", selected: true }),
+    404,
+    "Reverse cross-user Saved List changes must return 404.",
+  );
+  await expectSavedListError(
+    () => setDrillSavedList(
+      userId,
+      drillId,
+      { slug: "archived", selected: true } as unknown as UpdateSavedListInput,
+    ),
+    400,
+    "Retired Saved List slugs must return 400.",
+  );
+}
+
+async function expectSavedListError(operation: () => Promise<unknown>, status: 400 | 404, message: string) {
+  try {
+    await operation();
+    throw new Error(message);
+  } catch (error) {
+    expect(error instanceof SavedListMutationError && error.status === status, message);
   }
 }
 

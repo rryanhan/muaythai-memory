@@ -1,9 +1,11 @@
 "use client";
 
 import { useRef, type PointerEvent } from "react";
+import Link from "next/link";
 import { Drawer } from "vaul";
-import type { DrillDetail } from "@/data";
+import type { DrillDetail, UpdateSavedListResponse } from "@/data";
 import { DrillDetailContent } from "@/features/drills/DrillDetailContent";
+import { SavedListActions } from "@/features/shared/SavedListActions";
 import styles from "./DrillDetail.module.css";
 
 type DrillDetailLoadState =
@@ -18,6 +20,7 @@ type DrillDetailSheetProps = {
   onOpenChange: (open: boolean) => void;
   onAnimationEnd: (open: boolean) => void;
   onRetry: () => void;
+  onSavedListChange?: (result: UpdateSavedListResponse) => void;
 };
 
 export function DrillDetailSheet({
@@ -27,6 +30,7 @@ export function DrillDetailSheet({
   onOpenChange,
   onAnimationEnd,
   onRetry,
+  onSavedListChange,
 }: DrillDetailSheetProps) {
   const handleDragStartYRef = useRef<number | null>(null);
 
@@ -83,9 +87,18 @@ export function DrillDetailSheet({
             <Drawer.Title asChild>
               <p className="eyebrow">Drill Detail</p>
             </Drawer.Title>
-            <Drawer.Close asChild>
-              <button type="button">Close</button>
-            </Drawer.Close>
+            {state.status === "loaded" && (
+              <div className={styles.sheetHeaderActions}>
+                <SavedListActions
+                  drillId={state.drill.id}
+                  statusTags={state.drill.statusTags}
+                  onSuccess={onSavedListChange}
+                />
+                <Link className={styles.sheetEdit} href={`/drills/${state.drill.id}/edit`} prefetch>
+                  Edit
+                </Link>
+              </div>
+            )}
           </header>
           <Drawer.Description className="sr-only">{getSheetDescription(state)}</Drawer.Description>
 
@@ -107,7 +120,9 @@ export function DrillDetailSheet({
               </div>
             )}
 
-            {state.status === "loaded" && <DrillDetailContent drill={state.drill} badgeByIconKey={badgeByIconKey} />}
+            {state.status === "loaded" && (
+              <DrillDetailContent drill={state.drill} badgeByIconKey={badgeByIconKey} />
+            )}
           </div>
         </Drawer.Content>
       </Drawer.Portal>

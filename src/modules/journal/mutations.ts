@@ -18,6 +18,7 @@ import {
   type UpdateJournalEntryInput,
 } from "./contracts";
 import { getJournalEntryById, getOwnedJournalRow } from "./queries";
+import { uploadJournalPosterObject } from "./poster";
 
 export class JournalMutationError extends Error {
   readonly status: number;
@@ -116,6 +117,27 @@ export async function completeJournalUpload(userId: string, entryId: string): Pr
   return entry;
 }
 
+export async function saveJournalPoster(userId: string, entryId: string, file: File): Promise<void> {
+  const current = await getOwnedJournalRow(userId, entryId);
+  if (!current) throw new JournalMutationError("Journal entry not found.", 404);
+  if (current.status !== "uploading") {
+    throw new JournalMutationError("Journal poster can only be added while the video is uploading.", 409);
+  }
+
+  const posterPath = await uploadJournalPosterObject(userId, entryId, file);
+  try {
+    const [updated] = await db
+      .update(journalMedia)
+      .set({ posterPath, updatedAt: new Date() })
+      .where(eq(journalMedia.journalEntryId, entryId))
+      .returning({ id: journalMedia.id });
+    if (!updated) throw new JournalMutationError("Journal entry not found.", 404);
+  } catch (error) {
+    await createSupabaseAdminClient().storage.from(JOURNAL_MEDIA_BUCKET).remove([posterPath]).catch(() => undefined);
+    throw error;
+  }
+}
+
 export async function updateJournalEntry(
   userId: string,
   entryId: string,
@@ -151,7 +173,8 @@ export async function deleteJournalEntry(userId: string, entryId: string): Promi
   if (!current) throw new JournalMutationError("Journal entry not found.", 404);
 
   const supabase = createSupabaseAdminClient();
-  const { error } = await supabase.storage.from(JOURNAL_MEDIA_BUCKET).remove([current.storagePath]);
+  const paths = [current.storagePath, current.posterPath].filter((path): path is string => Boolean(path));
+  const { error } = await supabase.storage.from(JOURNAL_MEDIA_BUCKET).remove(paths);
   if (error) throw new JournalMutationError("Journal video could not be removed. Try again.", 503);
 
   const [deleted] = await db
@@ -165,7 +188,7 @@ export async function deleteJournalEntry(userId: string, entryId: string): Promi
 export async function cleanupAbandonedJournalUploads(now = new Date()): Promise<{ removed: number; failed: number }> {
   const cutoff = new Date(now.getTime() - JOURNAL_ABANDONED_UPLOAD_HOURS * 60 * 60 * 1000);
   const rows = await db
-    .select({ id: journalEntries.id, storagePath: journalMedia.storagePath })
+    .select({ id: journalEntries.id, storagePath: journalMedia.storagePath, posterPath: journalMedia.posterPath })
     .from(journalEntries)
     .innerJoin(journalMedia, eq(journalMedia.journalEntryId, journalEntries.id))
     .where(and(eq(journalEntries.status, "uploading"), lt(journalEntries.createdAt, cutoff)));
@@ -176,7 +199,8 @@ export async function cleanupAbandonedJournalUploads(now = new Date()): Promise<
   let failed = 0;
 
   for (const row of rows) {
-    const { error } = await bucket.remove([row.storagePath]);
+    const paths = [row.storagePath, row.posterPath].filter((path): path is string => Boolean(path));
+    const { error } = await bucket.remove(paths);
     if (error) {
       failed += 1;
       continue;

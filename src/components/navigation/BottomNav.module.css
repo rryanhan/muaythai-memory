@@ -10,7 +10,7 @@
   gap: 8px;
   height: var(--nav-height);
   border-top: 1px solid var(--border);
-  padding: 10px 12px 12px;
+  padding: 5px 12px max(4px, env(safe-area-inset-bottom, 0px));
   background: rgba(245, 244, 239, 0.92);
   backdrop-filter: blur(14px);
 }
@@ -35,7 +35,7 @@
 
 .button[data-active="true"]::after {
   position: absolute;
-  bottom: 8px;
+  bottom: 3px;
   width: 4px;
   height: 4px;
   border-radius: 50%;

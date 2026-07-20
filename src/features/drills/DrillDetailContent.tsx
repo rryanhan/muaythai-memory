@@ -26,23 +26,20 @@ export function DrillDetailContent({ drill, badgeByIconKey }: DrillDetailContent
 
       {summary && <p className="drill-detail-summary">{summary}</p>}
 
-      <div className="drill-detail-tags" aria-label="Drill tags">
-        {drill.tags.map((tag) => (
-          <span key={tag.id} className="drill-detail-chip">
-            {tag.name}
-          </span>
-        ))}
-        {drill.customTags.map((tag) => (
-          <span key={tag.id} className="drill-detail-chip drill-detail-chip-custom">
-            {tag.name}
-          </span>
-        ))}
-        {drill.statusTags.map((status) => (
-          <span key={status.id} className="drill-detail-chip drill-detail-chip-status">
-            {status.name}
-          </span>
-        ))}
-      </div>
+      {(drill.tags.length > 0 || drill.customTags.length > 0) && (
+        <div className="drill-detail-tags" aria-label="Drill tags">
+          {drill.tags.map((tag) => (
+            <span key={tag.id} className="drill-detail-chip">
+              {tag.name}
+            </span>
+          ))}
+          {drill.customTags.map((tag) => (
+            <span key={tag.id} className="drill-detail-chip drill-detail-chip-custom">
+              {tag.name}
+            </span>
+          ))}
+        </div>
+      )}
 
       <section className="drill-detail-section">
         <h3>Steps</h3>

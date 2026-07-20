@@ -8,6 +8,7 @@ import {
   getDrills,
   getGraph,
   getTaxonomy,
+  updateDrillSavedList,
 } from "./api";
 import type { ApiClientOptions } from "./types";
 
@@ -92,6 +93,8 @@ async function main() {
   expect(drillDetail.steps.length > 0, "Expected drill detail to include steps.");
   expect(!JSON.stringify(drillDetail).includes("coreIdea"), "Core Idea should not appear in frontend drill data.");
 
+  await verifySavedListEndpoint(firstDrill.id, drillDetail.statusTags.map((status) => status.slug), clientOptions);
+
   // The graph check makes sure every edge points to a node the renderer will
   // actually receive.
   const graph = await getGraph(
@@ -108,6 +111,58 @@ async function main() {
   console.log(
     `API data verification passed: ${allDrills.total} drills, ${taxonomy.standardTags.length} standard tags, ${graph.nodes.length} graph nodes.`,
   );
+}
+
+async function verifySavedListEndpoint(
+  drillId: string,
+  initialStatusSlugs: string[],
+  clientOptions: ApiClientOptions,
+) {
+  const initialFavourite = initialStatusSlugs.includes("starred");
+  const initialDrillBackIn = initialStatusSlugs.includes("drill-back-in");
+  const nextFavourite = !initialFavourite;
+  const nextDrillBackIn = !initialDrillBackIn;
+
+  try {
+    await Promise.all([
+      updateDrillSavedList(drillId, { slug: "starred", selected: nextFavourite }, clientOptions),
+      updateDrillSavedList(drillId, { slug: "drill-back-in", selected: nextDrillBackIn }, clientOptions),
+    ]);
+    await Promise.all([
+      updateDrillSavedList(drillId, { slug: "starred", selected: nextFavourite }, clientOptions),
+      updateDrillSavedList(drillId, { slug: "drill-back-in", selected: nextDrillBackIn }, clientOptions),
+    ]);
+
+    const updatedDrill = await getDrill(drillId, clientOptions);
+    const updatedSlugs = new Set(updatedDrill.statusTags.map((status) => status.slug));
+    expect(updatedSlugs.has("starred") === nextFavourite, "Favourite quick action should be idempotent.");
+    expect(updatedSlugs.has("drill-back-in") === nextDrillBackIn, "Drill Back In quick action should be independent.");
+
+    const retiredResponse = await fetch(
+      new URL(`/api/drills/${drillId}/saved-lists`, baseUrl),
+      {
+        method: "PATCH",
+        headers: { "content-type": "application/json", ...clientOptions.headers },
+        body: JSON.stringify({ slug: "archived", selected: true }),
+      },
+    );
+    expect(retiredResponse.status === 400, "Retired Saved List slugs should return 400.");
+
+    const malformedResponse = await fetch(
+      new URL(`/api/drills/${drillId}/saved-lists`, baseUrl),
+      {
+        method: "PATCH",
+        headers: { "content-type": "application/json", ...clientOptions.headers },
+        body: "{",
+      },
+    );
+    expect(malformedResponse.status === 400, "Malformed Saved List requests should return 400.");
+  } finally {
+    await Promise.all([
+      updateDrillSavedList(drillId, { slug: "starred", selected: initialFavourite }, clientOptions),
+      updateDrillSavedList(drillId, { slug: "drill-back-in", selected: initialDrillBackIn }, clientOptions),
+    ]);
+  }
 }
 
 async function getAuthenticatedHeaders(): Promise<HeadersInit> {

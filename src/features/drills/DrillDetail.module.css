@@ -96,6 +96,36 @@
   gap: 12px;
 }
 
+.sheetHeaderActions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.sheetEdit {
+  border: 1px solid rgba(209, 74, 50, 0.36);
+  border-radius: 6px;
+  padding: 6px 8px;
+  background: rgba(255, 255, 255, 0.42);
+  color: var(--accent);
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+
+.sheetEdit:focus-visible {
+  outline: 1px solid rgba(209, 74, 50, 0.48);
+  outline-offset: 2px;
+}
+
+.sheetEdit:active {
+  transform: translateY(1px);
+}
+
 .content :global(.drill-detail-title-row) h2,
 .content :global(.drill-detail-title-row) p,
 .content :global(.drill-detail-summary),
@@ -142,12 +172,6 @@
   border-color: rgba(37, 109, 133, 0.24);
   background: rgba(37, 109, 133, 0.08);
   color: var(--teal);
-}
-
-.content :global(.drill-detail-chip-status) {
-  border-color: rgba(209, 74, 50, 0.32);
-  background: rgba(244, 216, 208, 0.5);
-  color: var(--accent);
 }
 
 .content :global(.drill-detail-section) {

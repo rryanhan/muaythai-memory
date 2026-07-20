@@ -13,6 +13,9 @@ import type {
   DrillSummary,
   FilterMode,
   UpdateDrillInput,
+  UpdateSavedListInput,
+  UpdateSavedListResponse,
+  SavedListSlug,
 } from "@/modules/drills/contracts";
 import type { GraphEdge, GraphNode, GraphOptions, GraphResponse } from "@/modules/graph/contracts";
 import type {
@@ -58,11 +61,14 @@ export type {
   ProfileDto,
   ProfileResponse,
   StatusTagDto,
+  SavedListSlug,
   TagCategoryDto,
   TagDto,
   TaxonomyResponse,
   TrainingMethodDto,
   UpdateDrillInput,
+  UpdateSavedListInput,
+  UpdateSavedListResponse,
   UpdateJournalEntryInput,
 };
 

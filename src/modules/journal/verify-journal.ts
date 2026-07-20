@@ -82,6 +82,7 @@ async function verifyOwnershipAndVisibility() {
     const listB = await listJournalEntries(userB);
     assert.deepEqual(listA.entries.map((entry) => entry.id), [readyA]);
     assert.deepEqual(listB.entries.map((entry) => entry.id), [readyB]);
+    assert.equal(listA.entries[0]?.posterUrl, null);
     assert.equal(listA.entries[0]?.drill?.id, drillA);
     assert.deepEqual((await listJournalEntries(userA, { drillId: drillA })).entries.map((entry) => entry.id), [readyA]);
     assert.deepEqual((await listJournalEntries(userA, { drillId: drillB })).entries, []);

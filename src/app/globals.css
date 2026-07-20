@@ -10,7 +10,7 @@
   --teal: #256d85;
   --graphite: #242729;
   --radius: 8px;
-  --nav-height: 72px;
+  --nav-height: calc(64px + env(safe-area-inset-bottom, 0px));
 }
 
 /* Vaul's package CSS is not exported cleanly for Turbopack, so this is the

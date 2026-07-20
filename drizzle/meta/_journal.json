@@ -15,6 +15,13 @@
       "when": 1784187158804,
       "tag": "0001_square_maverick",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1784521851687,
+      "tag": "0002_condemned_warbound",
+      "breakpoints": true
     }
   ]
 }

@@ -1,4 +1,7 @@
 import type { ReactNode } from "react";
+import { MagnifyingGlass } from "@phosphor-icons/react/MagnifyingGlass";
+import { Microphone } from "@phosphor-icons/react/Microphone";
+import { SlidersHorizontal } from "@phosphor-icons/react/SlidersHorizontal";
 
 const loadingMethods = [
   { label: "Pad Work", left: "45%", top: "39%" },
@@ -79,13 +82,13 @@ export function NetworkGraphLoading() {
 
       <div className="network-action-rail network-action-rail-loading" aria-hidden="true">
         <button type="button" aria-label="Network controls" disabled>
-          <span className="rail-icon rail-icon-filter" aria-hidden="true" />
+          <SlidersHorizontal size={25} weight="regular" aria-hidden="true" />
         </button>
         <button type="button" aria-label="Search network" disabled>
-          <span className="rail-icon rail-icon-search" aria-hidden="true" />
+          <MagnifyingGlass size={26} weight="regular" aria-hidden="true" />
         </button>
         <button type="button" className="record-button" aria-label="Record drill" disabled>
-          <span className="rail-icon rail-icon-record" aria-hidden="true" />
+          <Microphone size={27} weight="regular" aria-hidden="true" />
         </button>
       </div>
     </>
