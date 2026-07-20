@@ -16,6 +16,9 @@ if (!connectionString) {
 // once multiple Next workers/dev servers are alive.
 const client = postgres(connectionString, {
   max: Number(process.env.DATABASE_POOL_MAX ?? 3),
+  // Supabase's transaction pooler does not support prepared statements. This
+  // also keeps the client safe for short-lived serverless function instances.
+  prepare: false,
 });
 
 export const db = drizzle(client, { schema });

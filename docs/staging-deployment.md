@@ -1,0 +1,50 @@
+# Staging Deployment
+
+The stable staging app is deployed to:
+
+`https://muaythai-memory-staging.vercel.app`
+
+## Vercel
+
+The local repository is linked to the `muaythai-memory-staging` Vercel project.
+Production environment variables are configured in Vercel; secret values stay
+out of the repository.
+
+Deploy the current checkout with:
+
+```bash
+npx vercel@latest --prod --yes
+```
+
+Required production variables:
+
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `DATABASE_POOLER_URL`
+- `DATABASE_POOL_MAX=1`
+- `NEXT_PUBLIC_APP_URL=https://muaythai-memory-staging.vercel.app`
+- `CAPTURE_DRAFT_PROVIDER=openai`
+- `OPENAI_API_KEY`
+- `OPENAI_CAPTURE_MODEL`
+
+Use Supabase's transaction pooler on port `6543` for
+`DATABASE_POOLER_URL`. The Postgres client disables prepared statements for
+compatibility with transaction pooling.
+
+## Supabase Auth
+
+Add this exact URL to the Supabase Auth redirect allow list:
+
+`https://muaythai-memory-staging.vercel.app/auth/confirm`
+
+The staging root can be used as the Supabase Site URL while staging is the main
+host. Keep the local callback URL in the allow list for local development.
+
+## Capture
+
+Hosted text cleanup uses OpenAI. Local Ollama and whisper.cpp addresses are not
+reachable from Vercel. Voice transcription therefore requires a separately
+hosted Whisper endpoint or a cloud transcription provider before it is enabled
+for remote testers.
