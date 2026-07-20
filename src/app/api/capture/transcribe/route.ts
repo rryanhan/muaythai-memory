@@ -33,10 +33,10 @@ export async function POST(request: NextRequest) {
       sizeBytes: audio.size,
     });
 
-    const whisperStartedAt = performance.now();
+    const providerStartedAt = performance.now();
     const transcript = await transcribeCaptureAudio(audio, { signal: request.signal });
-    logTranscriptionTiming(requestId, "whisper-complete", requestStartedAt, {
-      whisperMs: elapsedMilliseconds(whisperStartedAt),
+    logTranscriptionTiming(requestId, "provider-complete", requestStartedAt, {
+      providerMs: elapsedMilliseconds(providerStartedAt),
       mimeType: audio.type || "unknown",
       sizeBytes: audio.size,
     });

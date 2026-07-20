@@ -349,6 +349,7 @@ async function verifyTranscriptionProvider() {
   };
 
   const transcript = await transcribeCaptureAudio(audio, {
+    provider: "whisper-local",
     fetcher,
     serverUrl: "http://127.0.0.1:8080/inference",
   });
@@ -363,6 +364,7 @@ async function verifyTranscriptionProvider() {
   await assert.rejects(
     () =>
       transcribeCaptureAudio(audio, {
+        provider: "whisper-local",
         signal: controller.signal,
         serverUrl: "http://127.0.0.1:8080/inference",
         fetcher: async (_input, init) => {
@@ -376,6 +378,7 @@ async function verifyTranscriptionProvider() {
   await assert.rejects(
     () =>
       transcribeCaptureAudio(audio, {
+        provider: "whisper-local",
         serverUrl: "http://127.0.0.1:8080/inference",
         fetcher: async () => {
           throw new TypeError("connection refused");
@@ -387,6 +390,7 @@ async function verifyTranscriptionProvider() {
   await assert.rejects(
     () =>
       transcribeCaptureAudio(audio, {
+        provider: "whisper-local",
         serverUrl: "http://127.0.0.1:8080/inference",
         fetcher: async () => {
           const timeout = new Error("timed out");
@@ -395,6 +399,56 @@ async function verifyTranscriptionProvider() {
         },
       }),
     (error: unknown) => error instanceof CaptureTranscriptionError && error.status === 504,
+  );
+
+  const openAIRequest: {
+    body: FormData | null;
+    authorization: string | null;
+    url: string;
+  } = { body: null, authorization: null, url: "" };
+  const openAITranscript = await transcribeCaptureAudio(audio, {
+    provider: "openai",
+    apiKey: "test-api-key",
+    model: "gpt-4o-mini-transcribe",
+    fetcher: async (input, init) => {
+      openAIRequest.url = String(input);
+      openAIRequest.body = init?.body instanceof FormData ? init.body : null;
+      openAIRequest.authorization = new Headers(init?.headers).get("authorization");
+      return new Response(JSON.stringify({ text: "  jab, cross, low kick  " }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    },
+  });
+  assert.equal(openAITranscript, "jab, cross, low kick");
+  assert.equal(openAIRequest.url, "https://api.openai.com/v1/audio/transcriptions");
+  assert.equal(openAIRequest.authorization, "Bearer test-api-key");
+  assert.ok(openAIRequest.body, "OpenAI request should use multipart form data.");
+  assert.equal(openAIRequest.body.get("model"), "gpt-4o-mini-transcribe");
+  assert.equal(openAIRequest.body.get("language"), "en");
+  assert.match(String(openAIRequest.body.get("prompt")), /Muay Thai/);
+
+  await assert.rejects(
+    () =>
+      transcribeCaptureAudio(audio, {
+        provider: "openai",
+        apiKey: "",
+      }),
+    (error: unknown) => error instanceof CaptureTranscriptionError && error.status === 503,
+  );
+
+  await assert.rejects(
+    () =>
+      transcribeCaptureAudio(audio, {
+        provider: "openai",
+        apiKey: "test-api-key",
+        fetcher: async () =>
+          new Response(JSON.stringify({ error: { message: "rate limited" } }), { status: 429 }),
+      }),
+    (error: unknown) =>
+      error instanceof CaptureTranscriptionError &&
+      error.status === 503 &&
+      error.message.includes("rate limited"),
   );
 }
 

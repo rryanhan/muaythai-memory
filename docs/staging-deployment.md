@@ -44,7 +44,8 @@ host. Keep the local callback URL in the allow list for local development.
 
 ## Capture
 
-Hosted text cleanup uses OpenAI. Local Ollama and whisper.cpp addresses are not
-reachable from Vercel. Voice transcription therefore requires a separately
-hosted Whisper endpoint or a cloud transcription provider before it is enabled
-for remote testers.
+Hosted text cleanup and voice transcription use OpenAI. Local Ollama and
+whisper.cpp addresses are not reachable from Vercel. Configure staging with
+`CAPTURE_TRANSCRIPTION_PROVIDER=openai` and
+`OPENAI_TRANSCRIPTION_MODEL=gpt-4o-mini-transcribe`; both capture operations use
+the server-only `OPENAI_API_KEY`.

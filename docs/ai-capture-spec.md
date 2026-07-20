@@ -12,13 +12,13 @@ Voice capture at `/capture/new?mode=voice&from=network|library` waits for the us
 - The browser prefers MP4, then WebM/Opus, then WebM. Ogg/Opus is accepted as an additional browser fallback.
 - A live, request-scoped rolling trace visualizes roughly two seconds of microphone input as one continuous line crossing a center baseline. It does not modify the recording or persist waveform data.
 - `POST /api/capture/transcribe` accepts one WebM, MP4, or Ogg recording up to 12 MB.
-- Local development uses a private `whisper-server` with the `small.en` model and a fixed Muay Thai vocabulary prompt.
+- Local development can use a private `whisper-server` with the `small.en` model. Hosted environments use OpenAI transcription because they cannot reach a developer machine's loopback address. Both providers receive the same fixed Muay Thai vocabulary prompt.
 - Audio bytes and the raw transcript remain request/session-only. Neither is saved to Postgres or object storage.
 - Microphone permission is requested only after the user taps Record.
 - Cancelling microphone permission or an active recording discards the attempt and resets the timer to `0:00`.
 - Stopping a recording freezes its duration and enters a bounded `Finalizing` state while the browser flushes its last audio chunk. Finalization waits at most five seconds.
 - If finalization times out after producing audio, the partial completed recording is retained for retry. A timeout without any audio becomes a recorder error.
-- Browser upload and transcription wait at most 190 seconds; the Whisper request itself remains capped at 180 seconds so its server error can surface first.
+- Browser upload and transcription wait at most 190 seconds; the provider request remains capped at 180 seconds so its server error can surface first.
 - Cancelling transcription, no-speech results, timeouts, and transcription failures keep completed audio in memory so the user can transcribe, record again, or discard it. Explicit Discard clears the in-memory audio and resets the recorder.
 - Recording and transcription attempts carry session identities so late browser events cannot begin duplicate work.
 - Development logs may report request IDs, elapsed stage times, MIME type, and byte size. They never log audio bytes or transcript text.
@@ -33,6 +33,15 @@ npm run whisper:serve
 ```
 
 Run Whisper in a separate terminal from Next.js. Phone microphone testing requires localhost or a secure HTTPS origin such as the development Cloudflare tunnel.
+
+Hosted setup:
+
+```bash
+CAPTURE_TRANSCRIPTION_PROVIDER=openai
+OPENAI_TRANSCRIPTION_MODEL=gpt-4o-mini-transcribe
+```
+
+Hosted transcription also requires the server-only `OPENAI_API_KEY` environment variable.
 
 ## Active Output
 
@@ -64,7 +73,7 @@ Core Idea, Status Tags, Custom Tag creation, confidence scores, training plans, 
 ## Hybrid Flow
 
 1. The client records a voice memo or accepts a typed note while active taxonomy loads.
-2. Voice mode sends the recording to local Whisper and receives an ephemeral transcript.
+2. Voice mode sends the recording to the configured transcription provider and receives an ephemeral transcript.
 3. A deterministic parser immediately selects explicit Training Methods and standard Tags only.
 4. Those taxonomy controls become editable while title, summary, notes, and steps show a `Cleaning up...` state.
 5. Ollama or OpenAI produces title, a required factual summary, optional notes, and ordered steps from the original note or transcript.

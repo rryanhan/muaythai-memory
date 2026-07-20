@@ -8,7 +8,9 @@ export const MAX_CAPTURE_AUDIO_BYTES = 12 * 1024 * 1024;
 export const CAPTURE_TRANSCRIPTION_TIMEOUT_MS = 180_000;
 
 const supportedAudioTypes = new Set(["audio/mp4", "audio/ogg", "audio/webm"]);
-const whisperResponseSchema = z.object({ text: z.string() });
+const transcriptionResponseSchema = z.object({ text: z.string() });
+
+export type CaptureTranscriptionProviderName = "whisper-local" | "openai";
 
 export type CaptureAudioMetadata = {
   size: number;
@@ -19,6 +21,9 @@ export type TranscribeCaptureAudioOptions = {
   signal?: AbortSignal;
   fetcher?: typeof fetch;
   serverUrl?: string;
+  provider?: CaptureTranscriptionProviderName;
+  apiKey?: string;
+  model?: string;
 };
 
 export type CaptureTranscriptionProviderOptions = {
@@ -35,13 +40,25 @@ export async function transcribeCaptureAudio(
 ): Promise<string> {
   validateCaptureAudioMetadata(audio);
 
-  const provider = process.env.CAPTURE_TRANSCRIPTION_PROVIDER?.trim() || "whisper-local";
-  if (provider !== "whisper-local") {
+  const provider =
+    options.provider ??
+    process.env.CAPTURE_TRANSCRIPTION_PROVIDER?.trim() ??
+    "whisper-local";
+  if (provider !== "whisper-local" && provider !== "openai") {
     throw new CaptureTranscriptionError(
       `Unknown transcription provider: ${provider}.`,
       503,
-      "Set CAPTURE_TRANSCRIPTION_PROVIDER to whisper-local.",
+      "Set CAPTURE_TRANSCRIPTION_PROVIDER to whisper-local or openai.",
     );
+  }
+
+  if (provider === "openai") {
+    const openAIProvider = new OpenAITranscriptionProvider({
+      fetcher: options.fetcher,
+      apiKey: options.apiKey,
+      model: options.model,
+    });
+    return openAIProvider.transcribe(audio, { signal: options.signal });
   }
 
   const whisperProvider = new WhisperServerTranscriptionProvider({
@@ -49,6 +66,103 @@ export async function transcribeCaptureAudio(
     serverUrl: options.serverUrl,
   });
   return whisperProvider.transcribe(audio, { signal: options.signal });
+}
+
+export class OpenAITranscriptionProvider implements CaptureTranscriptionProvider {
+  private readonly fetcher: typeof fetch;
+  private readonly apiKey: string;
+  private readonly model: string;
+
+  constructor(
+    options: Pick<TranscribeCaptureAudioOptions, "fetcher" | "apiKey" | "model"> = {},
+  ) {
+    this.fetcher = options.fetcher ?? fetch;
+    this.apiKey =
+      options.apiKey === undefined
+        ? process.env.OPENAI_API_KEY?.trim() || ""
+        : options.apiKey.trim();
+    this.model =
+      options.model?.trim() ||
+      process.env.OPENAI_TRANSCRIPTION_MODEL?.trim() ||
+      "gpt-4o-mini-transcribe";
+  }
+
+  async transcribe(
+    audio: File,
+    options: CaptureTranscriptionProviderOptions = {},
+  ): Promise<string> {
+    if (!this.apiKey) {
+      throw new CaptureTranscriptionError(
+        "Hosted transcription is not configured.",
+        503,
+        "Set OPENAI_API_KEY in the deployed environment.",
+      );
+    }
+
+    const formData = new FormData();
+    formData.append("file", audio, audio.name || `capture.${extensionForMimeType(audio.type)}`);
+    formData.append("model", this.model);
+    formData.append("response_format", "json");
+    formData.append("language", "en");
+    formData.append("prompt", MUAY_THAI_TRANSCRIPTION_PROMPT);
+
+    let response: Response;
+    try {
+      response = await this.fetcher("https://api.openai.com/v1/audio/transcriptions", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${this.apiKey}` },
+        body: formData,
+        signal: transcriptionSignal(options.signal),
+      });
+    } catch (error) {
+      if (options.signal?.aborted) throw new CaptureTranscriptionCancelledError();
+      if (isTimeoutError(error)) {
+        throw new CaptureTranscriptionError(
+          "Transcription took too long.",
+          504,
+          "Try a shorter memo or retry in a moment.",
+        );
+      }
+
+      throw new CaptureTranscriptionError(
+        "The app could not reach the transcription service.",
+        503,
+        "Check the deployment connection and try again.",
+      );
+    }
+
+    if (!response.ok) {
+      if (response.status === 401 || response.status === 403) {
+        throw new CaptureTranscriptionError(
+          "Hosted transcription credentials are unavailable.",
+          503,
+        );
+      }
+      if (response.status === 429) {
+        throw new CaptureTranscriptionError(
+          "Hosted transcription is temporarily rate limited.",
+          503,
+          "Wait a moment and retry the recording.",
+        );
+      }
+      throw new CaptureTranscriptionError(
+        "The transcription service could not process this recording.",
+        response.status === 413 ? 413 : response.status === 415 ? 415 : 502,
+      );
+    }
+
+    let payload: unknown;
+    try {
+      payload = await response.json();
+    } catch {
+      throw new CaptureTranscriptionError(
+        "The transcription service returned an unreadable response.",
+        502,
+      );
+    }
+
+    return parseTranscriptionTranscript(payload, "The transcription service");
+  }
 }
 
 export class WhisperServerTranscriptionProvider implements CaptureTranscriptionProvider {
@@ -78,12 +192,7 @@ export class WhisperServerTranscriptionProvider implements CaptureTranscriptionP
       response = await this.fetcher(this.serverUrl, {
         method: "POST",
         body: formData,
-        signal: options.signal
-          ? AbortSignal.any([
-              options.signal,
-              AbortSignal.timeout(CAPTURE_TRANSCRIPTION_TIMEOUT_MS),
-            ])
-          : AbortSignal.timeout(CAPTURE_TRANSCRIPTION_TIMEOUT_MS),
+        signal: transcriptionSignal(options.signal),
       });
     } catch (error) {
       if (options.signal?.aborted) throw new CaptureTranscriptionCancelledError();
@@ -139,9 +248,13 @@ export function validateCaptureAudioMetadata(audio: CaptureAudioMetadata): void 
 }
 
 export function parseWhisperTranscript(payload: unknown): string {
-  const result = whisperResponseSchema.safeParse(payload);
+  return parseTranscriptionTranscript(payload, "Whisper");
+}
+
+function parseTranscriptionTranscript(payload: unknown, providerLabel: string): string {
+  const result = transcriptionResponseSchema.safeParse(payload);
   if (!result.success) {
-    throw new CaptureTranscriptionError("Whisper returned an unreadable response.", 502);
+    throw new CaptureTranscriptionError(`${providerLabel} returned an unreadable response.`, 502);
   }
 
   const transcript = result.data.text.trim();
@@ -152,6 +265,12 @@ export function parseWhisperTranscript(payload: unknown): string {
     );
   }
   return transcript;
+}
+
+function transcriptionSignal(signal?: AbortSignal): AbortSignal {
+  return signal
+    ? AbortSignal.any([signal, AbortSignal.timeout(CAPTURE_TRANSCRIPTION_TIMEOUT_MS)])
+    : AbortSignal.timeout(CAPTURE_TRANSCRIPTION_TIMEOUT_MS);
 }
 
 export function normalizeCaptureMimeType(value: string): string {

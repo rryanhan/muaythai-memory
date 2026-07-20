@@ -473,7 +473,7 @@ export function VoiceCapturePanel({
     requesting: "Allow microphone access to begin",
     recording: "Listening for your drill note",
     finalizing: "Preparing the recorded audio",
-    transcribing: "Processing the recording locally",
+    transcribing: "Processing the recording",
     recorded: recordedNotice ?? "Recording kept for this session",
     error: errorMessage ?? "Recording could not continue",
   }[status];
@@ -564,7 +564,7 @@ export function VoiceCapturePanel({
           )}
           {status === "transcribing" && (
             <button type="button" className={styles.voiceProgressCommand} disabled>
-              Transcribing locally
+              Transcribing
             </button>
           )}
           {status === "recorded" && (
