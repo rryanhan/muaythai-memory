@@ -95,6 +95,12 @@
   font-weight: 700;
 }
 
+.fields label span small {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 450;
+}
+
 .fields input {
   width: 100%;
   min-height: 46px;
@@ -227,6 +233,113 @@
 .loadingButton {
   border-radius: 8px;
   background: rgba(216, 214, 204, 0.56);
+}
+
+.cropBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  background: rgba(24, 25, 26, 0.42);
+}
+
+.cropSheet {
+  position: fixed;
+  z-index: 91;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  display: grid;
+  max-width: 480px;
+  max-height: min(760px, 92dvh);
+  gap: 16px;
+  margin: 0 auto;
+  overflow: hidden auto;
+  border: 1px solid var(--border);
+  border-radius: 8px 8px 0 0;
+  padding: 12px 18px calc(18px + env(safe-area-inset-bottom, 0px));
+  background: var(--surface);
+}
+
+.cropHeader {
+  display: grid;
+  gap: 8px;
+}
+
+.cropHeader p,
+.cropHeader h2,
+.cropHeader > p {
+  margin: 0;
+}
+
+.cropHeader h2 {
+  margin-top: 4px;
+  font-size: 25px;
+  line-height: 1;
+}
+
+.cropHeader > p {
+  max-width: 42ch;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.cropStage {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1;
+  overflow: hidden;
+  border: 1px solid rgba(245, 244, 239, 0.2);
+  border-radius: 8px;
+  background: var(--graphite);
+}
+
+.zoomControl {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) 24px;
+  gap: 10px;
+  align-items: center;
+  color: var(--muted);
+}
+
+.zoomControl input {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+.cropError {
+  margin: 0;
+  border-left: 2px solid var(--accent);
+  padding-left: 10px;
+  color: var(--accent);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.cropActions {
+  display: grid;
+  grid-template-columns: 0.8fr 1.2fr;
+  gap: 8px;
+}
+
+.cropActions button {
+  min-height: 46px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.65);
+  color: var(--text);
+  font: inherit;
+  font-weight: 800;
+}
+
+.cropActions button:last-child {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--surface);
+}
+
+.cropActions button:disabled {
+  opacity: 0.48;
 }
 
 .loadingPhoto {

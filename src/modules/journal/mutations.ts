@@ -88,6 +88,9 @@ export async function completeJournalUpload(userId: string, entryId: string): Pr
     if (!readyEntry) throw new JournalMutationError("Journal entry not found.", 404);
     return readyEntry;
   }
+  if (!current.posterPath) {
+    throw new JournalMutationError("Choose a journal cover before completing the upload.", 409);
+  }
 
   const supabase = createSupabaseAdminClient();
   const bucket = supabase.storage.from(JOURNAL_MEDIA_BUCKET);
@@ -132,6 +135,12 @@ export async function saveJournalPoster(userId: string, entryId: string, file: F
       .where(eq(journalMedia.journalEntryId, entryId))
       .returning({ id: journalMedia.id });
     if (!updated) throw new JournalMutationError("Journal entry not found.", 404);
+    if (current.posterPath && current.posterPath !== posterPath) {
+      await createSupabaseAdminClient().storage
+        .from(JOURNAL_MEDIA_BUCKET)
+        .remove([current.posterPath])
+        .catch(() => undefined);
+    }
   } catch (error) {
     await createSupabaseAdminClient().storage.from(JOURNAL_MEDIA_BUCKET).remove([posterPath]).catch(() => undefined);
     throw error;

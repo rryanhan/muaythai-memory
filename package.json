@@ -34,6 +34,7 @@
     "profile:verify": "tsx src/modules/profile/verify-profile.ts",
     "journal:verify": "tsx src/modules/journal/verify-journal.ts",
     "journal:cleanup": "tsx scripts/cleanup-journal-uploads.ts",
+    "journal:backfill-posters": "tsx scripts/backfill-journal-posters.ts",
     "storage:setup": "tsx scripts/setup-profile-storage.ts",
     "whisper:setup": "bash scripts/setup-local-whisper.sh",
     "whisper:serve": "bash scripts/start-local-whisper.sh"
@@ -53,6 +54,7 @@
     "postgres": "latest",
     "react": "latest",
     "react-dom": "latest",
+    "react-easy-crop": "^6.2.2",
     "tus-js-client": "^4.3.1",
     "vaul": "^1.1.2",
     "zod": "latest"

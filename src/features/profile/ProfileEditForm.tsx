@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { updateProfile } from "@/data/profile";
 import type { CurrentAppUser } from "@/modules/auth";
+import { AvatarCropSheet } from "./AvatarCropSheet";
 import { ProfileAvatar } from "./ProfileAvatar";
 import styles from "./ProfileEdit.module.css";
 
@@ -22,6 +23,7 @@ export function ProfileEditForm({ initialProfile, onDirtyChange, onCancel, onSav
   const [lastName, setLastName] = useState(initialProfile.lastName ?? "");
   const [location, setLocation] = useState(initialProfile.location ?? "");
   const [avatar, setAvatar] = useState<File | null>(null);
+  const [cropSource, setCropSource] = useState<File | null>(null);
   const [removeAvatar, setRemoveAvatar] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
@@ -69,8 +71,7 @@ export function ProfileEditForm({ initialProfile, onDirtyChange, onCancel, onSav
     }
 
     setErrorMessage(null);
-    setAvatar(file);
-    setRemoveAvatar(false);
+    setCropSource(file);
   }
 
   function removePhoto() {
@@ -140,15 +141,15 @@ export function ProfileEditForm({ initialProfile, onDirtyChange, onCancel, onSav
           />
         </label>
         <label>
-          <span>First name optional</span>
+          <span>First name <small>(optional)</small></span>
           <input value={firstName} maxLength={80} autoComplete="given-name" onChange={(event) => setFirstName(event.target.value)} />
         </label>
         <label>
-          <span>Last name optional</span>
+          <span>Last name <small>(optional)</small></span>
           <input value={lastName} maxLength={80} autoComplete="family-name" onChange={(event) => setLastName(event.target.value)} />
         </label>
         <label>
-          <span>Location optional</span>
+          <span>Location <small>(optional)</small></span>
           <input value={location} maxLength={120} autoComplete="address-level2" onChange={(event) => setLocation(event.target.value)} />
         </label>
         <label>
@@ -163,6 +164,22 @@ export function ProfileEditForm({ initialProfile, onDirtyChange, onCancel, onSav
         <button type="button" disabled={pending} onClick={onCancel}>Cancel</button>
         <button type="submit" disabled={pending || !dirty}>{pending ? "Saving..." : "Save profile"}</button>
       </div>
+
+      {cropSource && (
+        <AvatarCropSheet
+          file={cropSource}
+          onCancel={() => {
+            setCropSource(null);
+            resetFileInput();
+          }}
+          onUsePhoto={(croppedAvatar) => {
+            setAvatar(croppedAvatar);
+            setRemoveAvatar(false);
+            setCropSource(null);
+            resetFileInput();
+          }}
+        />
+      )}
     </form>
   );
 }

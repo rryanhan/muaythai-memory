@@ -103,6 +103,125 @@
   font-variant-numeric: tabular-nums;
 }
 
+.coverBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  background: rgba(24, 25, 26, 0.42);
+}
+
+.coverSheet {
+  position: fixed;
+  z-index: 91;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  display: grid;
+  max-width: 480px;
+  max-height: min(760px, 92dvh);
+  gap: 15px;
+  margin: 0 auto;
+  overflow: hidden auto;
+  border: 1px solid var(--border);
+  border-radius: 8px 8px 0 0;
+  padding: 12px 18px calc(18px + env(safe-area-inset-bottom, 0px));
+  background: var(--surface);
+}
+
+.coverHeader {
+  display: grid;
+  gap: 7px;
+}
+
+.coverHeader p,
+.coverHeader h2 {
+  margin: 0;
+}
+
+.coverHeader h2 {
+  margin-top: 4px;
+  font-size: 25px;
+  line-height: 1;
+}
+
+.coverHeader > p {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.coverStage {
+  display: grid;
+  width: 100%;
+  aspect-ratio: 4 / 5;
+  max-height: 52dvh;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid rgba(245, 244, 239, 0.18);
+  border-radius: 8px;
+  background: var(--graphite);
+}
+
+.coverStage video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.coverTimeline {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) 36px;
+  gap: 8px;
+  align-items: center;
+}
+
+.coverTimeline span {
+  color: var(--muted);
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 10px;
+  text-align: center;
+}
+
+.coverTimeline input {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+.coverError {
+  margin: 0;
+  border-left: 2px solid var(--accent);
+  padding-left: 10px;
+  color: var(--accent);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.coverActions {
+  display: grid;
+  grid-template-columns: 0.8fr 1.2fr;
+  gap: 8px;
+}
+
+.coverActions button {
+  min-height: 46px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.65);
+  color: var(--text);
+  font: inherit;
+  font-weight: 800;
+}
+
+.coverActions button:last-child {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--surface);
+}
+
+.coverActions button:disabled {
+  opacity: 0.48;
+}
+
 .uploadRail {
   position: fixed;
   right: 12px;

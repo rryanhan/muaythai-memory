@@ -52,7 +52,7 @@ export function uploadJournalVideo({
         bucketName: JOURNAL_MEDIA_BUCKET,
         objectName: intent.upload.path,
         contentType: file.type,
-        cacheControl: "3600",
+        cacheControl: "31536000",
       },
       onError: (error) => finish(() => reject(error)),
       onProgress: (bytesUploaded, bytesTotal) => {

@@ -49,7 +49,15 @@ export default async function JournalEntryPage({ params, searchParams }: Journal
         <p className="eyebrow">Progress Journal</p>
         <Link className={styles.headerAction} href={editHref} prefetch>Edit</Link>
       </header>
-      <JournalVideoPlayer src={entry.playbackUrl} label="Journal entry video" />
+      <JournalVideoPlayer
+        src={entry.playbackUrl}
+        poster={entry.posterUrl}
+        label="Journal entry video"
+        autoPlay
+        loop
+        initialMuted
+        preload="auto"
+      />
       <section className={styles.entryMeta}>
         <p className={styles.entryDate}>
           <time dateTime={entry.occurredOn}>{formatJournalDate(entry.occurredOn)}</time>

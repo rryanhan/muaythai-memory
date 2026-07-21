@@ -202,12 +202,17 @@ Profile avatars use the public Supabase Storage bucket `profile-avatars`.
 Uploads pass through the authenticated Next API so the service-role key never
 reaches the browser. The API verifies JPEG, PNG, and WebP signatures, enforces a
 5 MB limit, and stores versioned objects under the authenticated user id. The
+Profile editor crops the selected image to a square 1024px WebP before upload.
 public URL is stored in `users.avatar_url`; replacing or removing an avatar
 cleans up superseded objects on a best-effort basis.
 
 Journal video uses a private `journal-media` bucket with one-hour signed reads
 and direct TUS resumable uploads. Upload intents are created by the authenticated
 Next API, but video bytes travel directly from the browser to Supabase Storage.
+The browser generates a versioned poster image before completion; ready entries
+created by the current upload flow always have a poster. Legacy ready entries
+without one can be repaired with `npm run journal:backfill-posters` on a machine
+with `ffmpeg` installed.
 Supabase Storage is the object store for both avatars and journal media; an AWS
 S3 bucket is not required.
 
@@ -462,6 +467,7 @@ GET    /api/journal
 POST   /api/journal/uploads
 GET    /api/journal/:id
 PATCH  /api/journal/:id
+POST   /api/journal/:id/poster
 POST   /api/journal/:id/complete
 DELETE /api/journal/:id
 GET    /api/drills/:id/journal-preview

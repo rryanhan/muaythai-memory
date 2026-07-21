@@ -91,13 +91,13 @@ export function JournalEditScreen({
         event.preventDefault();
         updateMutation.mutate();
       }}>
-        <JournalVideoPlayer src={entry.playbackUrl} label="Journal entry video" />
+        <JournalVideoPlayer src={entry.playbackUrl} poster={entry.posterUrl} label="Journal entry video" />
         <div className={styles.field}>
           <span>Training date</span>
           <JournalDatePicker value={occurredOn} disabled={updateMutation.isPending} onChange={setOccurredOn} />
         </div>
         <label className={styles.field}>
-          <span>Caption <small>Optional</small></span>
+          <span>Caption <small>(optional)</small></span>
           <textarea
             rows={4}
             maxLength={2000}
@@ -107,7 +107,7 @@ export function JournalEditScreen({
           />
         </label>
         <div className={styles.field}>
-          <span>Related drill <small>Optional</small></span>
+          <span>Related drill <small>(optional)</small></span>
           <JournalDrillPicker
             drills={drills}
             value={drillId}

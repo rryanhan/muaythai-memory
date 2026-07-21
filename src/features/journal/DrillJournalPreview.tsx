@@ -28,7 +28,11 @@ export function DrillJournalPreview({ drillId }: { drillId: string }) {
         </div>
         {total > 1 && <Link href={`/drills/${drillId}/journal`} prefetch>View all {total}</Link>}
       </div>
-      <JournalVideoPlayer src={entry.playbackUrl} label="Latest training clip for this drill" />
+      <JournalVideoPlayer
+        src={entry.playbackUrl}
+        poster={entry.posterUrl}
+        label="Latest training clip for this drill"
+      />
       <div className={styles.relatedClipMeta}>
         <time dateTime={entry.occurredOn}>{formatJournalDate(entry.occurredOn)}</time>
         {entry.caption && <p>{entry.caption}</p>}

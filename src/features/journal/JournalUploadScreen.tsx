@@ -7,6 +7,7 @@ import { useQuery } from "@tanstack/react-query";
 import { RoutedBottomNav } from "@/components/navigation/RoutedBottomNav";
 import { getDrills, type DrillFilterInput } from "@/data";
 import { JournalDatePicker } from "./JournalDatePicker";
+import { JournalCoverEditor } from "./JournalCoverEditor";
 import { JournalDiscardSheet } from "./JournalDiscardSheet";
 import { JournalDrillPicker } from "./JournalDrillPicker";
 import { useJournalUpload } from "./JournalUploadProvider";
@@ -29,6 +30,7 @@ export function JournalUploadScreen() {
   const today = useMemo(localToday, []);
   const upload = useJournalUpload();
   const [selectionError, setSelectionError] = useState<string | null>(null);
+  const [coverEditorOpen, setCoverEditorOpen] = useState(false);
   const [discardOpen, setDiscardOpen] = useState(false);
   const [discarding, setDiscarding] = useState(false);
   const [pendingNavigation, setPendingNavigation] = useState<PendingNavigation>(null);
@@ -144,9 +146,20 @@ export function JournalUploadScreen() {
     if (!nextFile) return;
     try {
       upload.setFile(nextFile);
+      setCoverEditorOpen(false);
       setSelectionError(null);
     } catch (error) {
       setSelectionError(error instanceof Error ? error.message : "Choose a valid video.");
+    }
+  }
+
+  async function selectCoverImage(nextFile: File | null) {
+    if (!nextFile) return;
+    try {
+      await upload.setPosterImage(nextFile);
+      setSelectionError(null);
+    } catch (error) {
+      setSelectionError(error instanceof Error ? error.message : "Choose a valid cover image.");
     }
   }
 
@@ -173,6 +186,7 @@ export function JournalUploadScreen() {
           {upload.draft.previewUrl ? (
             <JournalVideoPlayer
               src={upload.draft.previewUrl}
+              poster={upload.draft.posterPreviewUrl}
               label="Selected journal video"
               onDuration={upload.setDurationMs}
               flush
@@ -197,6 +211,51 @@ export function JournalUploadScreen() {
           </div>
         </section>
 
+        {upload.draft.file && (
+          <section className={styles.coverField} aria-labelledby="journal-cover-title">
+            <div className={styles.coverFieldHeading}>
+              <div>
+                <span id="journal-cover-title">Cover</span>
+                <small>Shown in Progress Journal</small>
+              </div>
+              {upload.draft.posterStatus === "ready" && <strong>Ready</strong>}
+            </div>
+            <div className={styles.coverFieldBody}>
+              <div className={styles.coverPreview} data-state={upload.draft.posterStatus}>
+                {upload.draft.posterPreviewUrl ? (
+                  <img src={upload.draft.posterPreviewUrl} alt="Selected journal cover" />
+                ) : upload.draft.posterStatus === "generating" ? (
+                  <span>Finding a clear frame...</span>
+                ) : (
+                  <span>Choose a cover image</span>
+                )}
+              </div>
+              <div className={styles.coverCommands}>
+                {upload.draft.posterStatus === "ready" && (
+                  <button type="button" disabled={locked} onClick={() => setCoverEditorOpen(true)}>
+                    Adjust frame
+                  </button>
+                )}
+                <label>
+                  {upload.draft.posterStatus === "ready" ? "Use an image" : "Choose cover image"}
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    disabled={locked}
+                    onChange={(event) => {
+                      void selectCoverImage(event.target.files?.[0] ?? null);
+                      event.currentTarget.value = "";
+                    }}
+                  />
+                </label>
+                {upload.draft.posterStatus === "unavailable" && (
+                  <p>This browser could not read a video frame. Add a still image to continue.</p>
+                )}
+              </div>
+            </div>
+          </section>
+        )}
+
         <div className={styles.field}>
           <span>Training date</span>
           <JournalDatePicker
@@ -207,7 +266,7 @@ export function JournalUploadScreen() {
         </div>
 
         <label className={styles.field}>
-          <span>Caption <small>Optional</small></span>
+          <span>Caption <small>(optional)</small></span>
           <textarea
             rows={4}
             maxLength={2000}
@@ -219,7 +278,7 @@ export function JournalUploadScreen() {
         </label>
 
         <div className={styles.field}>
-          <span>Related drill <small>Optional</small></span>
+          <span>Related drill <small>(optional)</small></span>
           <JournalDrillPicker
             drills={drills}
             value={upload.draft.drillId}
@@ -248,7 +307,16 @@ export function JournalUploadScreen() {
           ) : (
             <button type="button" className={styles.secondaryAction} onClick={() => requestNavigation("/?view=profile")}>Cancel</button>
           )}
-          <button type="submit" className={styles.primaryAction} disabled={!upload.draft.file || upload.busy || !upload.draft.occurredOn}>
+          <button
+            type="submit"
+            className={styles.primaryAction}
+            disabled={
+              !upload.draft.file ||
+              upload.draft.posterStatus !== "ready" ||
+              upload.busy ||
+              !upload.draft.occurredOn
+            }
+          >
             {upload.phase === "error" ? "Retry upload" : upload.busy ? "Uploading..." : "Upload entry"}
           </button>
         </div>
@@ -256,6 +324,17 @@ export function JournalUploadScreen() {
 
       <RoutedBottomNav activeView="profile" onNavigate={(destination) => requestNavigation(destination)} />
       <JournalDiscardSheet open={discardOpen} pending={discarding} onStay={stay} onDiscard={() => void discard()} />
+      {coverEditorOpen && upload.draft.file && (
+        <JournalCoverEditor
+          file={upload.draft.file}
+          initialTimeSeconds={upload.draft.posterTimeSeconds}
+          onCancel={() => setCoverEditorOpen(false)}
+          onUseCover={(poster) => {
+            upload.setPreparedPoster(poster);
+            setCoverEditorOpen(false);
+          }}
+        />
+      )}
     </main>
   );
 }

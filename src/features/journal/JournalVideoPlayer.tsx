@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ArrowsOut } from "@phosphor-icons/react/ArrowsOut";
 import { Pause } from "@phosphor-icons/react/Pause";
 import { Play } from "@phosphor-icons/react/Play";
@@ -13,6 +13,11 @@ type JournalVideoPlayerProps = {
   label?: string;
   onDuration?: (durationMs: number) => void;
   flush?: boolean;
+  poster?: string | null;
+  autoPlay?: boolean;
+  loop?: boolean;
+  initialMuted?: boolean;
+  preload?: "none" | "metadata" | "auto";
 };
 
 export function JournalVideoPlayer({
@@ -20,19 +25,43 @@ export function JournalVideoPlayer({
   label = "Training video",
   onDuration,
   flush = false,
+  poster = null,
+  autoPlay = false,
+  loop = false,
+  initialMuted = false,
+  preload = "metadata",
 }: JournalVideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [playing, setPlaying] = useState(false);
-  const [muted, setMuted] = useState(false);
+  const [muted, setMuted] = useState(initialMuted);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [unavailable, setUnavailable] = useState(false);
+  const [autoplayBlocked, setAutoplayBlocked] = useState(false);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    setPlaying(false);
+    setCurrentTime(0);
+    setDuration(0);
+    setUnavailable(false);
+    setAutoplayBlocked(false);
+    setMuted(initialMuted);
+    if (video) video.muted = initialMuted;
+  }, [initialMuted, src]);
+
+  async function attemptAutoplay(video: HTMLVideoElement) {
+    if (!autoPlay || unavailable || video.readyState < HTMLMediaElement.HAVE_FUTURE_DATA) return;
+    video.muted = initialMuted;
+    setMuted(video.muted);
+    await video.play().catch(() => setAutoplayBlocked(true));
+  }
 
   async function togglePlayback() {
     const video = videoRef.current;
     if (!video || unavailable) return;
     if (video.paused) {
-      await video.play().catch(() => setUnavailable(true));
+      await video.play().catch(() => setAutoplayBlocked(true));
     } else {
       video.pause();
     }
@@ -72,7 +101,11 @@ export function JournalVideoPlayer({
           ref={videoRef}
           aria-label={label}
           playsInline
-          preload="metadata"
+          preload={preload}
+          poster={poster ?? undefined}
+          autoPlay={autoPlay}
+          loop={loop}
+          muted={muted}
           src={src}
           onClick={() => void togglePlayback()}
           onLoadedMetadata={(event) => {
@@ -81,8 +114,14 @@ export function JournalVideoPlayer({
             setDuration(seconds);
             onDuration?.(Math.round(seconds * 1000));
           }}
+          onCanPlay={(event) => {
+            void attemptAutoplay(event.currentTarget);
+          }}
           onTimeUpdate={(event) => setCurrentTime(event.currentTarget.currentTime)}
-          onPlay={() => setPlaying(true)}
+          onPlay={() => {
+            setPlaying(true);
+            setAutoplayBlocked(false);
+          }}
           onPause={() => setPlaying(false)}
           onEnded={() => setPlaying(false)}
           onError={() => setUnavailable(true)}
@@ -93,7 +132,7 @@ export function JournalVideoPlayer({
             <strong>Preview unavailable</strong>
             <span>This browser cannot play the selected video format.</span>
           </div>
-        ) : !playing ? (
+        ) : !playing && (!autoPlay || autoplayBlocked) ? (
           <button
             className={styles.playerCenterAction}
             type="button"

@@ -20,13 +20,18 @@ import {
   uploadJournalEntryPoster,
   type JournalUploadIntentResponse,
 } from "@/data";
-import { createVideoPoster } from "./create-video-poster";
+import {
+  createPosterFromImage,
+  createVideoPoster,
+  type GeneratedVideoPoster,
+} from "./create-video-poster";
 import { uploadJournalVideo, validateJournalVideoFile } from "./upload-journal-video";
 import styles from "./JournalMedia.module.css";
 
 type UploadPhase = "idle" | "creating" | "uploading" | "completing" | "error" | "ready";
 type UploadRailPhase = Exclude<UploadPhase, "idle"> | "draft";
 type FailedStage = "intent" | "upload" | "poster" | "complete" | null;
+type PosterStatus = "empty" | "generating" | "ready" | "unavailable";
 
 type JournalDraft = {
   file: File | null;
@@ -35,6 +40,9 @@ type JournalDraft = {
   caption: string;
   drillId: string;
   durationMs: number | null;
+  posterPreviewUrl: string | null;
+  posterTimeSeconds: number | null;
+  posterStatus: PosterStatus;
 };
 
 type JournalUploadContextValue = {
@@ -50,6 +58,8 @@ type JournalUploadContextValue = {
   setCaption: (value: string) => void;
   setDrillId: (value: string) => void;
   setDurationMs: (value: number | null) => void;
+  setPreparedPoster: (poster: GeneratedVideoPoster) => void;
+  setPosterImage: (file: File) => Promise<void>;
   startUpload: () => Promise<void>;
   cancelUpload: () => Promise<void>;
   discardWork: () => Promise<void>;
@@ -73,6 +83,7 @@ export function JournalUploadProvider({ children }: { children: ReactNode }) {
   const abortRef = useRef<AbortController | null>(null);
   const intentRef = useRef<JournalUploadIntentResponse | null>(null);
   const previewUrlRef = useRef<string | null>(null);
+  const posterPreviewUrlRef = useRef<string | null>(null);
   const posterFileRef = useRef<File | null>(null);
   const posterPromiseRef = useRef<Promise<File | null> | null>(null);
   const posterGenerationRef = useRef(0);
@@ -99,12 +110,30 @@ export function JournalUploadProvider({ children }: { children: ReactNode }) {
   useEffect(() => () => {
     abortRef.current?.abort();
     if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
+    if (posterPreviewUrlRef.current) URL.revokeObjectURL(posterPreviewUrlRef.current);
+  }, []);
+
+  const commitPoster = useCallback((poster: GeneratedVideoPoster, generation: number) => {
+    if (posterGenerationRef.current !== generation) return;
+    if (posterPreviewUrlRef.current) URL.revokeObjectURL(posterPreviewUrlRef.current);
+    const posterPreviewUrl = URL.createObjectURL(poster.file);
+    posterPreviewUrlRef.current = posterPreviewUrl;
+    posterFileRef.current = poster.file;
+    posterPromiseRef.current = Promise.resolve(poster.file);
+    setDraft((current) => ({
+      ...current,
+      posterPreviewUrl,
+      posterTimeSeconds: poster.timeSeconds,
+      posterStatus: "ready",
+    }));
   }, []);
 
   const resetDraft = useCallback(() => {
     posterGenerationRef.current += 1;
     posterFileRef.current = null;
     posterPromiseRef.current = null;
+    if (posterPreviewUrlRef.current) URL.revokeObjectURL(posterPreviewUrlRef.current);
+    posterPreviewUrlRef.current = null;
     if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
     previewUrlRef.current = null;
     setDraft(emptyDraft());
@@ -127,6 +156,11 @@ export function JournalUploadProvider({ children }: { children: ReactNode }) {
   const startUpload = useCallback(async () => {
     const file = draft.file;
     if (!file || busy) return;
+    const poster = posterFileRef.current ?? await posterPromiseRef.current;
+    if (!poster) {
+      setError("Choose a cover before uploading this journal entry.");
+      return;
+    }
     setError(null);
     setCompletedEntryId(null);
     const controller = new AbortController();
@@ -161,8 +195,7 @@ export function JournalUploadProvider({ children }: { children: ReactNode }) {
         });
       }
 
-      const poster = posterFileRef.current ?? await posterPromiseRef.current;
-      if (poster && failedStage !== "complete") {
+      if (failedStage !== "complete") {
         currentStage = "poster";
         await uploadJournalEntryPoster(nextIntent.entryId, poster, {
           requestInit: { signal: controller.signal },
@@ -210,15 +243,31 @@ export function JournalUploadProvider({ children }: { children: ReactNode }) {
       const generation = posterGenerationRef.current + 1;
       posterGenerationRef.current = generation;
       posterFileRef.current = null;
+      if (posterPreviewUrlRef.current) URL.revokeObjectURL(posterPreviewUrlRef.current);
+      posterPreviewUrlRef.current = null;
       if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
       const previewUrl = URL.createObjectURL(file);
       previewUrlRef.current = previewUrl;
       const posterPromise = createVideoPoster(file).then((poster) => {
-        if (posterGenerationRef.current === generation) posterFileRef.current = poster;
-        return poster;
+        if (poster) {
+          commitPoster(poster, generation);
+          return poster.file;
+        }
+        if (posterGenerationRef.current === generation) {
+          setDraft((current) => ({ ...current, posterStatus: "unavailable" }));
+        }
+        return null;
       });
       posterPromiseRef.current = posterPromise;
-      setDraft((current) => ({ ...current, file, previewUrl, durationMs: null }));
+      setDraft((current) => ({
+        ...current,
+        file,
+        previewUrl,
+        durationMs: null,
+        posterPreviewUrl: null,
+        posterTimeSeconds: null,
+        posterStatus: "generating",
+      }));
       setError(null);
       setFailedStage(null);
       setProgress(0);
@@ -237,6 +286,39 @@ export function JournalUploadProvider({ children }: { children: ReactNode }) {
     setDurationMs(value) {
       setDraft((current) => ({ ...current, durationMs: value }));
     },
+    setPreparedPoster(poster) {
+      if (busy) return;
+      const generation = posterGenerationRef.current + 1;
+      posterGenerationRef.current = generation;
+      commitPoster(poster, generation);
+    },
+    async setPosterImage(file) {
+      if (busy) return;
+      if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+        throw new Error("Use a JPEG, PNG, or WebP cover image.");
+      }
+      if (file.size === 0 || file.size > 5 * 1024 * 1024) {
+        throw new Error(file.size === 0 ? "Choose a non-empty cover image." : "Cover images must be 5 MB or smaller.");
+      }
+      const generation = posterGenerationRef.current + 1;
+      posterGenerationRef.current = generation;
+      const hadPoster = Boolean(posterFileRef.current);
+      setDraft((current) => ({ ...current, posterStatus: "generating" }));
+      const posterPromise = createPosterFromImage(file)
+        .then((poster) => {
+          commitPoster({ file: poster, timeSeconds: 0 }, generation);
+          setDraft((current) => ({ ...current, posterTimeSeconds: null }));
+          return poster;
+        })
+        .catch((error) => {
+          if (posterGenerationRef.current === generation) {
+            setDraft((current) => ({ ...current, posterStatus: hadPoster ? "ready" : "unavailable" }));
+          }
+          throw error;
+        });
+      posterPromiseRef.current = posterPromise;
+      await posterPromise;
+    },
     startUpload,
     async cancelUpload() {
       await discardWork();
@@ -248,7 +330,7 @@ export function JournalUploadProvider({ children }: { children: ReactNode }) {
       setError(null);
       setProgress(0);
     },
-  }), [busy, completedEntryId, discardWork, draft, error, hasWork, phase, progress, startUpload]);
+  }), [busy, commitPoster, completedEntryId, discardWork, draft, error, hasWork, phase, progress, startUpload]);
 
   return (
     <JournalUploadContext.Provider value={value}>
@@ -321,6 +403,9 @@ function emptyDraft(): JournalDraft {
     caption: "",
     drillId: "",
     durationMs: null,
+    posterPreviewUrl: null,
+    posterTimeSeconds: null,
+    posterStatus: "empty",
   };
 }
 

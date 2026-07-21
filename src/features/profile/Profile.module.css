@@ -279,7 +279,13 @@
 }
 
 .videoFallback {
-  background: rgba(36, 39, 41, 0.84);
+  display: grid;
+  place-items: center;
+  background-color: var(--surface-muted);
+  background-image: linear-gradient(rgba(36, 39, 41, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(36, 39, 41, 0.06) 1px, transparent 1px);
+  background-size: 16px 16px;
+  color: var(--accent);
 }
 
 .videoPlay {

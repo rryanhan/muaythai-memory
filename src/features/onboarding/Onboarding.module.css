@@ -36,6 +36,7 @@
 .fields { display: grid; gap: 13px; padding-top: 18px; border-top: 1px solid var(--border); }
 .fields label { display: grid; gap: 7px; }
 .fields label > span { color: var(--muted); font-size: 14px; font-weight: 750; }
+.fields label > span small { font-size: 12px; font-weight: 450; }
 .fields input, .fields textarea {
   width: 100%;
   min-height: 48px;

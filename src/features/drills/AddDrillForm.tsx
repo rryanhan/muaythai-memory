@@ -280,7 +280,7 @@ export function AddDrillForm({
               />
             </label>
             <label>
-              <span>Summary optional</span>
+              <span>Summary <small>(optional)</small></span>
               <textarea
                 value={summary}
                 onChange={(event) => {

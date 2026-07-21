@@ -161,6 +161,131 @@
   white-space: nowrap;
 }
 
+.coverField {
+  display: grid;
+  gap: 10px;
+  border-top: 1px solid var(--border);
+  padding-top: 14px;
+}
+
+.coverFieldHeading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.coverFieldHeading > div {
+  display: grid;
+  gap: 2px;
+}
+
+.coverFieldHeading span {
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.coverFieldHeading small,
+.coverFieldHeading strong {
+  color: var(--muted);
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 10px;
+  font-weight: 650;
+  text-transform: uppercase;
+}
+
+.coverFieldHeading strong {
+  color: var(--accent);
+}
+
+.coverFieldBody {
+  display: grid;
+  grid-template-columns: 108px minmax(0, 1fr);
+  gap: 12px;
+  align-items: stretch;
+}
+
+.coverPreview {
+  position: relative;
+  display: grid;
+  width: 108px;
+  aspect-ratio: 4 / 3;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background-color: var(--surface-muted);
+  background-image: linear-gradient(rgba(36, 39, 41, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(36, 39, 41, 0.05) 1px, transparent 1px);
+  background-size: 18px 18px;
+}
+
+.coverPreview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.coverPreview span {
+  padding: 8px;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.3;
+  text-align: center;
+}
+
+.coverPreview[data-state="generating"] span {
+  animation: journal-cover-pulse 1.4s ease-in-out infinite;
+}
+
+.coverCommands {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-content: start;
+  gap: 7px;
+}
+
+.coverCommands button,
+.coverCommands label {
+  display: inline-flex;
+  min-height: 36px;
+  align-items: center;
+  border: 1px solid rgba(209, 74, 50, 0.4);
+  border-radius: 7px;
+  padding: 0 10px;
+  background: rgba(255, 255, 255, 0.42);
+  color: var(--accent);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.coverCommands label input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  opacity: 0;
+}
+
+.coverCommands p {
+  flex-basis: 100%;
+  margin: 0;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+@keyframes journal-cover-pulse {
+  50% { opacity: 0.46; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .coverPreview[data-state="generating"] span { animation: none; }
+}
+
 .field {
   display: grid;
   gap: 7px;

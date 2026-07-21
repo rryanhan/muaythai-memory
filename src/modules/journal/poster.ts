@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import {
   JOURNAL_MEDIA_BUCKET,
@@ -23,9 +24,9 @@ export async function uploadJournalPosterObject(
 ): Promise<string> {
   const { bytes, mimeType } = await validateJournalPoster(file);
   const extension = mimeType === "image/webp" ? "webp" : "jpg";
-  const path = `${userId}/${entryId}/poster.${extension}`;
+  const path = `${userId}/${entryId}/poster-${randomUUID()}.${extension}`;
   const { error } = await createSupabaseAdminClient().storage.from(JOURNAL_MEDIA_BUCKET).upload(path, bytes, {
-    cacheControl: "3600",
+    cacheControl: "31536000",
     contentType: mimeType,
     upsert: true,
   });

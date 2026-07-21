@@ -130,10 +130,11 @@ optional link to an owned Drill.
 Journal metadata lives in Postgres:
 
 - `journal_entries`: owner, linked drill, date, caption, lifecycle status, timestamps
-- `journal_media`: entry relationship, private video path, optional private poster-frame path, MIME type, byte size, duration
+- `journal_media`: entry relationship, private video path, private poster-frame path, MIME type, byte size, duration
 
-Uploads begin as `uploading` and become visible only after the private Storage
-object is confirmed and the entry moves to `ready`. Deleting an entry permanently
+Uploads begin as `uploading` and become visible only after the private video and
+poster objects are confirmed and the entry moves to `ready`. The poster column
+remains nullable only for compatibility with legacy entries. Deleting an entry permanently
 removes both its database records and video. Video bytes never pass through the
 Next server and are never public.
 

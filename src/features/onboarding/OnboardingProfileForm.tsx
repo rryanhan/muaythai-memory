@@ -34,9 +34,9 @@ export function OnboardingProfileForm({ user, nextPath }: { user: CurrentAppUser
       <section className={styles.fields}>
         <label><span>Username</span><input autoCapitalize="none" autoCorrect="off" autoComplete="username" maxLength={30} value={username} onChange={(event) => setUsername(normalizeUsernameInput(event.target.value))} /></label>
         <p className={styles.privacy}><strong>Public later:</strong> your username will identify you when friend profiles arrive.</p>
-        <label><span>First name optional</span><input autoComplete="given-name" maxLength={80} value={firstName} onChange={(event) => setFirstName(event.target.value)} /></label>
-        <label><span>Last name optional</span><input autoComplete="family-name" maxLength={80} value={lastName} onChange={(event) => setLastName(event.target.value)} /></label>
-        <label><span>Location optional</span><input autoComplete="address-level2" maxLength={120} placeholder="Vancouver, BC" value={location} onChange={(event) => setLocation(event.target.value)} /></label>
+        <label><span>First name <small>(optional)</small></span><input autoComplete="given-name" maxLength={80} value={firstName} onChange={(event) => setFirstName(event.target.value)} /></label>
+        <label><span>Last name <small>(optional)</small></span><input autoComplete="family-name" maxLength={80} value={lastName} onChange={(event) => setLastName(event.target.value)} /></label>
+        <label><span>Location <small>(optional)</small></span><input autoComplete="address-level2" maxLength={120} placeholder="Vancouver, BC" value={location} onChange={(event) => setLocation(event.target.value)} /></label>
         <p className={styles.privacy}>Your name and location stay private until you choose otherwise.</p>
       </section>
       {error && <p className={styles.error} role="alert">{error}</p>}

@@ -1,11 +1,13 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { PencilSimple } from "@phosphor-icons/react/PencilSimple";
 import { Play } from "@phosphor-icons/react/Play";
 import { Plus } from "@phosphor-icons/react/Plus";
 import { Star } from "@phosphor-icons/react/Star";
 import { Target } from "@phosphor-icons/react/Target";
+import { VideoCamera } from "@phosphor-icons/react/VideoCamera";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { badgeByIconKey } from "@/components/shared/context-badges";
 import {
@@ -134,7 +136,9 @@ export function ProfileView({ currentUser }: ProfileViewProps) {
           </button>
         ) : journalEntries.length > 0 ? (
           <div className={styles.journalRows}>
-            {journalEntries.map((entry) => <JournalEntryRow key={entry.id} entry={entry} />)}
+            {journalEntries.map((entry, index) => (
+              <JournalEntryRow key={entry.id} entry={entry} eager={index < 2} priority={index === 0} />
+            ))}
             {journalQuery.hasNextPage && (
               <button
                 className={styles.loadMore}
@@ -182,14 +186,39 @@ function SavedListLink({
   );
 }
 
-function JournalEntryRow({ entry }: { entry: JournalEntrySummary }) {
+function JournalEntryRow({
+  entry,
+  eager,
+  priority,
+}: {
+  entry: JournalEntrySummary;
+  eager: boolean;
+  priority: boolean;
+}) {
+  const router = useRouter();
+  const href = `/journal/${entry.id}`;
+  const prefetch = () => router.prefetch(href);
+
   return (
-    <Link className={styles.journalRow} href={`/journal/${entry.id}`} prefetch>
+    <Link
+      className={styles.journalRow}
+      href={href}
+      prefetch
+      onFocus={prefetch}
+      onPointerEnter={prefetch}
+      onTouchStart={prefetch}
+    >
       <span className={styles.videoTile} aria-hidden="true">
         {entry.posterUrl ? (
-          <img src={entry.posterUrl} alt="" loading="lazy" />
+          <img
+            src={entry.posterUrl}
+            alt=""
+            loading={eager ? "eager" : "lazy"}
+            fetchPriority={priority ? "high" : "auto"}
+            decoding="async"
+          />
         ) : (
-          <span className={styles.videoFallback} />
+          <span className={styles.videoFallback}><VideoCamera size={20} weight="regular" /></span>
         )}
         <Play className={styles.videoPlay} size={16} weight="fill" />
         {entry.durationMs !== null && <small>{formatDuration(entry.durationMs)}</small>}

@@ -5,15 +5,33 @@ import { db, postgresClient } from "@/db/client";
 import { drills, journalEntries, journalMedia, users } from "@/db/schema";
 import { JOURNAL_VIDEO_MAX_BYTES } from "./constants";
 import { createJournalUploadInputSchema, journalDateSchema, updateJournalEntryInputSchema } from "./contracts";
-import { createJournalUploadIntent } from "./mutations";
+import { completeJournalUpload, createJournalUploadIntent } from "./mutations";
 import { decodeJournalCursor, encodeJournalCursor, getOwnedJournalRow, isOwnedDrill, listJournalEntries } from "./queries";
 import { validateJournalVideoFile } from "@/features/journal/upload-journal-video";
+import { scoreVideoFrame } from "@/features/journal/create-video-poster";
 
 async function main() {
   verifyContracts();
   verifyCursor();
+  verifyPosterScoring();
   await verifyOwnershipAndVisibility();
   console.log("Journal verification passed: validation, cursoring, ready visibility, drill ownership, and user isolation are stable.");
+}
+
+function verifyPosterScoring() {
+  const darkFrame = new Uint8ClampedArray(16 * 4);
+  const darkScore = scoreVideoFrame(darkFrame);
+  assert.equal(darkScore.usable, false);
+  assert.equal(darkScore.score, 0);
+
+  const detailedFrame = new Uint8ClampedArray(16 * 4);
+  for (let pixel = 0; pixel < 16; pixel += 1) {
+    const value = pixel % 2 === 0 ? 52 : 218;
+    detailedFrame.set([value, value, value, 255], pixel * 4);
+  }
+  const detailedScore = scoreVideoFrame(detailedFrame);
+  assert.equal(detailedScore.usable, true);
+  assert.ok(detailedScore.score > 0);
 }
 
 function verifyContracts() {
@@ -89,6 +107,7 @@ async function verifyOwnershipAndVisibility() {
     assert.equal(await isOwnedDrill(userA, drillA), true);
     assert.equal(await isOwnedDrill(userA, drillB), false);
     assert.equal(await getOwnedJournalRow(userB, readyA), null);
+    await assert.rejects(completeJournalUpload(userA, uploadingA), /Choose a journal cover/);
 
     await assert.rejects(
       createJournalUploadIntent(userA, {
