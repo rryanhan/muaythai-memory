@@ -1,7 +1,11 @@
 import OpenAI from "openai";
 import { zodTextFormat } from "openai/helpers/zod";
 import { modelCaptureDraftSchema, type ModelCaptureDraft } from "../contracts";
-import { CaptureDraftCancelledError, CaptureDraftConfigError, CaptureDraftGenerationError } from "../errors";
+import {
+  CaptureDraftCancelledError,
+  CaptureDraftConfigError,
+  CaptureDraftGenerationError,
+} from "../errors";
 import type { CaptureDraftProvider, CaptureDraftProviderInput } from "./types";
 
 export function createOpenAiCaptureProvider(): CaptureDraftProvider {
@@ -25,19 +29,22 @@ export function createOpenAiCaptureProvider(): CaptureDraftProvider {
             model,
             instructions: input.instructions,
             input: input.prompt,
+            reasoning: { effort: "minimal" },
             text: {
               format: zodTextFormat(modelCaptureDraftSchema, "muay_thai_drill_capture_cleanup"),
             },
-            max_output_tokens: 700,
+            max_output_tokens: 1_200,
           },
           { signal: input.signal },
         );
 
-        return modelCaptureDraftSchema.parse(JSON.parse(response.output_text));
+        return parseOpenAiCaptureResponse(response);
       } catch (error) {
         if (input.signal?.aborted) {
           throw new CaptureDraftCancelledError();
         }
+
+        if (error instanceof CaptureDraftGenerationError) throw error;
 
         const status = getHttpStatus(error);
 
@@ -58,6 +65,33 @@ export function createOpenAiCaptureProvider(): CaptureDraftProvider {
       }
     },
   };
+}
+
+type OpenAiCaptureResponse = {
+  status?: string;
+  output_text: string;
+  incomplete_details?: { reason?: string } | null;
+};
+
+export function parseOpenAiCaptureResponse(response: OpenAiCaptureResponse): ModelCaptureDraft {
+  if (response.status === "incomplete") {
+    const reason = response.incomplete_details?.reason;
+    throw new CaptureDraftGenerationError(
+      reason === "max_output_tokens"
+        ? "OpenAI ran out of output space while cleaning this drill. Try again."
+        : "OpenAI could not finish cleaning this drill. Try again.",
+    );
+  }
+
+  if (!response.output_text.trim()) {
+    throw new CaptureDraftGenerationError("OpenAI completed without returning a drill draft.");
+  }
+
+  try {
+    return modelCaptureDraftSchema.parse(JSON.parse(response.output_text));
+  } catch {
+    throw new CaptureDraftGenerationError("OpenAI returned an invalid drill draft.");
+  }
 }
 
 function getHttpStatus(error: unknown): number | null {

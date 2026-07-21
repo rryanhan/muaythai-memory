@@ -27,10 +27,12 @@ import {
 import { mergeDrillCleanup, type DrillDirtyFields } from "@/features/drills/cleanup-merge";
 import { modelCaptureDraftSchema } from "./contracts";
 import {
+  CaptureDraftGenerationError,
   CaptureTranscriptionCancelledError,
   CaptureTranscriptionError,
 } from "./errors";
 import { parseCaptureTranscript } from "./parser";
+import { parseOpenAiCaptureResponse } from "./providers/openai";
 import {
   MAX_CAPTURE_AUDIO_BYTES,
   normalizeCaptureMimeType,
@@ -50,6 +52,7 @@ const taxonomy = buildTaxonomy();
 
 verifyParser();
 verifyCaptureContract();
+verifyOpenAiCaptureResponse();
 verifyCleanupMerge();
 verifyRecorderRules();
 verifyVoiceTransitions();
@@ -127,6 +130,41 @@ function verifyCaptureContract() {
     modelCaptureDraftSchema.safeParse({ ...baseDraft, summary: "Practice the slip, uppercut, and exit sequence." }).success,
     true,
     "Model summary should accept a factual sentence.",
+  );
+}
+
+function verifyOpenAiCaptureResponse() {
+  const validDraft = {
+    title: "Jab Cross Low Kick",
+    summary: "Practice a jab-cross combination finishing with a rear low kick.",
+    notes: "Keep the right hand high.",
+    steps: ["Throw the jab.", "Throw the cross.", "Finish with the rear low kick."],
+  };
+
+  assert.deepEqual(
+    parseOpenAiCaptureResponse({
+      status: "completed",
+      output_text: JSON.stringify(validDraft),
+    }),
+    validDraft,
+  );
+  assert.throws(
+    () =>
+      parseOpenAiCaptureResponse({
+        status: "incomplete",
+        output_text: "",
+        incomplete_details: { reason: "max_output_tokens" },
+      }),
+    (error: unknown) =>
+      error instanceof CaptureDraftGenerationError && error.message.includes("output space"),
+  );
+  assert.throws(
+    () => parseOpenAiCaptureResponse({ status: "completed", output_text: "" }),
+    CaptureDraftGenerationError,
+  );
+  assert.throws(
+    () => parseOpenAiCaptureResponse({ status: "completed", output_text: "not json" }),
+    CaptureDraftGenerationError,
   );
 }
 
