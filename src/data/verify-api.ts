@@ -1,5 +1,6 @@
 import { config } from "dotenv";
 import { createClient } from "@supabase/supabase-js";
+import { getEnvironmentFilePath } from "@/config/environment-file";
 import {
   ApiError,
   buildDrillsApiPath,
@@ -12,7 +13,7 @@ import {
 } from "./api";
 import type { ApiClientOptions } from "./types";
 
-config({ path: ".env.local" });
+config({ path: getEnvironmentFilePath() });
 
 // Verifies the frontend data layer against a running local Next server. This
 // catches query-string mistakes, backend response drift, and parked fields like

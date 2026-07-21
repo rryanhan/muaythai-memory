@@ -1,5 +1,6 @@
 import { config } from "dotenv";
 import { eq } from "drizzle-orm";
+import { getEnvironmentFilePath } from "@/config/environment-file";
 import { getDrillById, listDrills } from "@/modules/drills/queries";
 import { graphResponseSchema } from "@/modules/graph/contracts";
 import { getMuayThaiGraph } from "@/modules/graph/queries";
@@ -8,7 +9,7 @@ import { getTaxonomy } from "@/modules/taxonomy/queries";
 import { db, postgresClient } from "./client";
 import { drills, users } from "./schema";
 
-config({ path: ".env.local" });
+config({ path: getEnvironmentFilePath() });
 
 // This script verifies the read model Step 3 needs before the frontend starts
 // replacing wireframe data with API calls.

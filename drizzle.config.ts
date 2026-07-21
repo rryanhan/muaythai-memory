@@ -1,8 +1,9 @@
 import { config } from "dotenv";
 import { defineConfig } from "drizzle-kit";
+import { getEnvironmentFilePath } from "./src/config/environment-file";
 import { getMigrationDatabaseUrl } from "./src/db/connection-config";
 
-config({ path: ".env.local" });
+config({ path: getEnvironmentFilePath() });
 
 const databaseUrl = getMigrationDatabaseUrl();
 

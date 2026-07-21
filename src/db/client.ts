@@ -1,10 +1,11 @@
 import { config } from "dotenv";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
+import { getEnvironmentFilePath } from "@/config/environment-file";
 import * as schema from "./schema";
 import { getRuntimeDatabaseConfig } from "./connection-config";
 
-config({ path: ".env.local" });
+config({ path: getEnvironmentFilePath() });
 
 const { connectionString, maxConnections } = getRuntimeDatabaseConfig();
 

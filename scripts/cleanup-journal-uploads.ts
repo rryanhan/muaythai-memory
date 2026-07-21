@@ -1,8 +1,9 @@
 import { config } from "dotenv";
+import { getEnvironmentFilePath } from "@/config/environment-file";
 import { postgresClient } from "@/db/client";
 import { cleanupAbandonedJournalUploads } from "@/modules/journal/mutations";
 
-config({ path: ".env.local" });
+config({ path: getEnvironmentFilePath() });
 
 async function main() {
   const result = await cleanupAbandonedJournalUploads();

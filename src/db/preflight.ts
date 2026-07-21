@@ -1,8 +1,9 @@
 import { config } from "dotenv";
 import postgres from "postgres";
+import { getEnvironmentFilePath } from "@/config/environment-file";
 import { getMigrationDatabaseUrl } from "./connection-config";
 
-config({ path: ".env.local" });
+config({ path: getEnvironmentFilePath() });
 
 const targetTables = [
   "users",

@@ -1,6 +1,7 @@
 import { config } from "dotenv";
 import { and, eq, isNull } from "drizzle-orm";
 import { z } from "zod";
+import { getEnvironmentFilePath } from "@/config/environment-file";
 import sampleDrillsJson from "../../sample-data/drills.json";
 import { db, postgresClient } from "./client";
 import {
@@ -15,7 +16,7 @@ import {
   users,
 } from "./schema";
 
-config({ path: ".env.local" });
+config({ path: getEnvironmentFilePath() });
 
 const DEV_USER_DISPLAY_NAME = "Dev Fighter";
 

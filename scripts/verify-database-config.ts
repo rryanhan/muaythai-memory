@@ -1,14 +1,17 @@
 import assert from "node:assert/strict";
 import { config } from "dotenv";
+import { verifyDeploymentEnvironment } from "../src/config/deployment-environment";
+import { getEnvironmentFilePath } from "../src/config/environment-file";
 import {
   describeDatabaseUrl,
   getMigrationDatabaseUrl,
   getRuntimeDatabaseConfig,
 } from "../src/db/connection-config";
 
-config({ path: ".env.local" });
+config({ path: getEnvironmentFilePath() });
 
 verifyConnectionRules();
+verifyEnvironmentIsolationRules();
 
 const runtime = getRuntimeDatabaseConfig();
 const migrationUrl = getMigrationDatabaseUrl();
@@ -55,4 +58,37 @@ function verifyConnectionRules() {
     /direct database host/,
   );
   assert.throws(() => getMigrationDatabaseUrl({}), /required for migrations/);
+}
+
+function verifyEnvironmentIsolationRules() {
+  const projectRef = "abcdefghijklmnopqrst";
+  const environment = {
+    DEPLOYMENT_ENVIRONMENT: "staging",
+    NEXT_PUBLIC_APP_URL: "https://staging.example.com",
+    NEXT_PUBLIC_SUPABASE_URL: `https://${projectRef}.supabase.co`,
+    NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "public-key",
+    SUPABASE_SERVICE_ROLE_KEY: "service-key",
+    DATABASE_POOLER_URL:
+      `postgresql://postgres.${projectRef}:password@aws-1-us-west-2.pooler.supabase.com:6543/postgres`,
+    DATABASE_DIRECT_URL:
+      `postgresql://postgres:password@db.${projectRef}.supabase.co:5432/postgres`,
+  };
+
+  assert.equal(
+    verifyDeploymentEnvironment("staging", environment).projectRef,
+    projectRef,
+  );
+  assert.throws(
+    () =>
+      verifyDeploymentEnvironment("staging", {
+        ...environment,
+        DATABASE_DIRECT_URL:
+          "postgresql://postgres:password@db.wrongprojectref.supabase.co:5432/postgres",
+      }),
+    /does not belong to Supabase project/,
+  );
+  assert.throws(
+    () => verifyDeploymentEnvironment("production", environment),
+    /Expected production configuration/,
+  );
 }

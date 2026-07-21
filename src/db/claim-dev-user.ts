@@ -1,10 +1,11 @@
 import { config } from "dotenv";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { and, eq } from "drizzle-orm";
+import { getEnvironmentFilePath } from "@/config/environment-file";
 import { db, postgresClient } from "./client";
 import { drills, tags, users } from "./schema";
 
-config({ path: ".env.local" });
+config({ path: getEnvironmentFilePath() });
 
 const DEV_USER_DISPLAY_NAME = "Dev Fighter";
 

@@ -1,4 +1,5 @@
 import { config } from "dotenv";
+import { getEnvironmentFilePath } from "@/config/environment-file";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import {
   PROFILE_AVATAR_BUCKET,
@@ -12,7 +13,7 @@ import {
   JOURNAL_VIDEO_MIME_TYPES,
 } from "@/modules/journal/constants";
 
-config({ path: ".env.local" });
+config({ path: getEnvironmentFilePath() });
 
 async function main() {
   const supabase = createSupabaseAdminClient();

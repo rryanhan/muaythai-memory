@@ -1,5 +1,6 @@
 import { config } from "dotenv";
 import { and, eq, isNull } from "drizzle-orm";
+import { getEnvironmentFilePath } from "@/config/environment-file";
 import { db, postgresClient } from "./client";
 import { statusTags, tagCategories, tags, trainingMethods } from "./schema";
 import {
@@ -9,7 +10,7 @@ import {
   trainingMethodSeeds,
 } from "../modules/taxonomy/seed-data";
 
-config({ path: ".env.local" });
+config({ path: getEnvironmentFilePath() });
 
 function expect(condition: boolean, message: string) {
   if (!condition) throw new Error(message);

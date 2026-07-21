@@ -9,8 +9,10 @@ BEGIN
   WHERE slug = 'kicking'
   LIMIT 1;
 
+  -- Fresh environments run schema migrations before taxonomy seeding. In that
+  -- case the seed creates these canonical tags after migrations complete.
   IF kicking_category_id IS NULL THEN
-    RAISE EXCEPTION 'Cannot add kick tags because the kicking category is missing';
+    RETURN;
   END IF;
 
   INSERT INTO tags (name, slug, category_id, kind, sort_order, active)

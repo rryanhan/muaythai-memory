@@ -10,6 +10,11 @@ The local repository is linked to the `muaythai-memory-staging` Vercel project.
 Production environment variables are configured in Vercel; secret values stay
 out of the repository.
 
+This Vercel project's `Production` target is the stable staging environment. It
+must only use the staging Supabase project documented in
+[`environments.md`](./environments.md). The separate `muaythai-memory` Vercel
+project is reserved for real production traffic.
+
 Deploy the current checkout with:
 
 ```bash
@@ -47,8 +52,9 @@ npm run db:verify-config
 Run migrations before deploying application code:
 
 ```bash
-npm run db:migrate
-npm run db:verify-taxonomy
+npm run env:verify:staging
+npm run db:migrate:staging
+APP_ENV_FILE=.env.staging.local npm run db:verify-taxonomy
 ```
 
 ## Supabase Auth

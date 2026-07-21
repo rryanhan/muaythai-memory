@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { config } from "dotenv";
 import { and, asc, eq, isNull } from "drizzle-orm";
+import { getEnvironmentFilePath } from "@/config/environment-file";
 import { db, postgresClient } from "./client";
 import {
   drillSteps,
@@ -28,7 +29,7 @@ import { getTaxonomy } from "@/modules/taxonomy/queries";
 import { safeInternalPath } from "@/lib/safe-internal-path";
 import { getAuthErrorMessage, getMagicLinkFailureMessage } from "@/features/auth/auth-error-messages";
 
-config({ path: ".env.local" });
+config({ path: getEnvironmentFilePath() });
 
 function expect(condition: boolean, message: string) {
   if (!condition) throw new Error(message);
