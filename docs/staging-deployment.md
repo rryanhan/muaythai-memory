@@ -33,6 +33,24 @@ Use Supabase's transaction pooler on port `6543` for
 `DATABASE_POOLER_URL`. The Postgres client disables prepared statements for
 compatibility with transaction pooling.
 
+Do not add `DATABASE_DIRECT_URL` to the Vercel runtime. Keep it in `.env.local`
+or protected CI secrets and use it only for Drizzle migrations. The direct
+connection normally uses port `5432`; `DATABASE_URL` remains a temporary local
+fallback for older environments.
+
+Verify connection roles without printing credentials:
+
+```bash
+npm run db:verify-config
+```
+
+Run migrations before deploying application code:
+
+```bash
+npm run db:migrate
+npm run db:verify-taxonomy
+```
+
 ## Supabase Auth
 
 Add this exact URL to the Supabase Auth redirect allow list:

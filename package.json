@@ -14,6 +14,7 @@
     "db:describe": "python3 scripts/check_db_connection.py --env DATABASE_POOLER_URL --describe",
     "db:check": "python3 scripts/check_db_connection.py --env DATABASE_POOLER_URL",
     "db:preflight": "tsx src/db/preflight.ts",
+    "db:verify-config": "tsx scripts/verify-database-config.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:seed": "tsx src/db/seed.ts",

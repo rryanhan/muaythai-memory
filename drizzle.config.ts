@@ -1,13 +1,10 @@
 import { config } from "dotenv";
 import { defineConfig } from "drizzle-kit";
+import { getMigrationDatabaseUrl } from "./src/db/connection-config";
 
 config({ path: ".env.local" });
 
-const databaseUrl = process.env.DATABASE_POOLER_URL ?? process.env.DATABASE_URL;
-
-if (!databaseUrl) {
-  throw new Error("DATABASE_POOLER_URL or DATABASE_URL is required for Drizzle.");
-}
+const databaseUrl = getMigrationDatabaseUrl();
 
 export default defineConfig({
   schema: "./src/db/schema.ts",

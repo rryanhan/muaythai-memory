@@ -1,5 +1,6 @@
 import { config } from "dotenv";
 import postgres from "postgres";
+import { getMigrationDatabaseUrl } from "./connection-config";
 
 config({ path: ".env.local" });
 
@@ -16,13 +17,7 @@ const targetTables = [
   "drill_status_tags",
 ];
 
-const connectionString = process.env.DATABASE_POOLER_URL ?? process.env.DATABASE_URL;
-
-if (!connectionString) {
-  throw new Error("DATABASE_POOLER_URL or DATABASE_URL is required.");
-}
-
-const sql = postgres(connectionString, { max: 1 });
+const sql = postgres(getMigrationDatabaseUrl(), { max: 1 });
 
 async function main() {
   const rows = await sql<{ table_name: string }[]>`
