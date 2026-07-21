@@ -1,13 +1,16 @@
 import { randomUUID } from "node:crypto";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import {
+  AVATAR_IMAGE_MIME_TYPES,
+  detectAvatarImageMime,
+  type AvatarImageMime,
+} from "./image-format";
 
 export const PROFILE_AVATAR_BUCKET = "profile-avatars";
 export const PROFILE_AVATAR_MAX_BYTES = 5 * 1024 * 1024;
-export const PROFILE_AVATAR_MIME_TYPES = ["image/jpeg", "image/png", "image/webp"] as const;
+export const PROFILE_AVATAR_MIME_TYPES = AVATAR_IMAGE_MIME_TYPES;
 
-type SupportedAvatarMime = (typeof PROFILE_AVATAR_MIME_TYPES)[number];
-
-const extensionByMime: Record<SupportedAvatarMime, string> = {
+const extensionByMime: Record<AvatarImageMime, string> = {
   "image/jpeg": "jpg",
   "image/png": "png",
   "image/webp": "webp",
@@ -77,7 +80,7 @@ export async function removeOtherUserAvatars(userId: string, keepPath: string | 
   }
 }
 
-export async function validateAvatarFile(file: File): Promise<{ bytes: Uint8Array; mime: SupportedAvatarMime }> {
+export async function validateAvatarFile(file: File): Promise<{ bytes: Uint8Array; mime: AvatarImageMime }> {
   if (file.size === 0) throw new AvatarValidationError("Choose a non-empty image.");
   if (file.size > PROFILE_AVATAR_MAX_BYTES) {
     throw new AvatarValidationError("Profile photos must be 5 MB or smaller.", 413);
@@ -88,34 +91,13 @@ export async function validateAvatarFile(file: File): Promise<{ bytes: Uint8Arra
   }
 
   const bytes = new Uint8Array(await file.arrayBuffer());
-  if (!matchesSignature(bytes, file.type)) {
+  if (detectAvatarImageMime(bytes) !== file.type) {
     throw new AvatarValidationError("The selected file does not match its image format.");
   }
 
   return { bytes, mime: file.type };
 }
 
-function isSupportedAvatarMime(value: string): value is SupportedAvatarMime {
-  return PROFILE_AVATAR_MIME_TYPES.includes(value as SupportedAvatarMime);
-}
-
-function matchesSignature(bytes: Uint8Array, mime: SupportedAvatarMime): boolean {
-  if (mime === "image/jpeg") {
-    return bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
-  }
-
-  if (mime === "image/png") {
-    const signature = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
-    return bytes.length >= signature.length && signature.every((value, index) => bytes[index] === value);
-  }
-
-  return (
-    bytes.length >= 12 &&
-    ascii(bytes, 0, 4) === "RIFF" &&
-    ascii(bytes, 8, 12) === "WEBP"
-  );
-}
-
-function ascii(bytes: Uint8Array, start: number, end: number): string {
-  return String.fromCharCode(...bytes.slice(start, end));
+function isSupportedAvatarMime(value: string): value is AvatarImageMime {
+  return PROFILE_AVATAR_MIME_TYPES.includes(value as AvatarImageMime);
 }

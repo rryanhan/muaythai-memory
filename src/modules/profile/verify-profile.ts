@@ -5,6 +5,7 @@ import { db, postgresClient } from "@/db/client";
 import { users } from "@/db/schema";
 import { PROFILE_AVATAR_BUCKET, PROFILE_AVATAR_MAX_BYTES, removeOtherUserAvatars, validateAvatarFile } from "./avatar";
 import { profileUsernameSchema } from "./contracts";
+import { detectAvatarImageMime } from "./image-format";
 import { updateProfile } from "./mutations";
 import type { CurrentAppUser } from "@/modules/auth";
 
@@ -20,6 +21,7 @@ async function main() {
   );
   const validatedPng = await validateAvatarFile(png);
   assert.equal(validatedPng.mime, "image/png");
+  assert.equal(detectAvatarImageMime(new Uint8Array(await png.arrayBuffer())), "image/png");
 
   await assert.rejects(
     validateAvatarFile(new File([new Uint8Array([0xff, 0xd8, 0xff])], "spoof.png", { type: "image/png" })),
