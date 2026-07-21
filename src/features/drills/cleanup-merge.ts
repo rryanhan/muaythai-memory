@@ -1,10 +1,18 @@
-export type DrillCleanupField = "title" | "summary" | "notes" | "steps";
+export type DrillCleanupField =
+  | "title"
+  | "summary"
+  | "notes"
+  | "steps"
+  | "trainingMethodSlugs"
+  | "tagSlugs";
 
 export type DrillCleanupValues = {
   title: string;
   summary: string;
   notes: string;
   steps: string[];
+  trainingMethodSlugs: string[];
+  tagSlugs: string[];
 };
 
 export type DrillDirtyFields = Record<DrillCleanupField, boolean>;
@@ -15,10 +23,22 @@ export function mergeDrillCleanup(
   dirty: DrillDirtyFields,
   suggestion: DrillCleanupValues,
 ): { applied: DrillCleanupValues; pending: PendingDrillCleanup } {
-  const applied: DrillCleanupValues = { ...current, steps: [...current.steps] };
+  const applied: DrillCleanupValues = {
+    ...current,
+    steps: [...current.steps],
+    trainingMethodSlugs: [...current.trainingMethodSlugs],
+    tagSlugs: [...current.tagSlugs],
+  };
   const pending: PendingDrillCleanup = {};
 
-  for (const field of ["title", "summary", "notes", "steps"] as const) {
+  for (const field of [
+    "title",
+    "summary",
+    "notes",
+    "steps",
+    "trainingMethodSlugs",
+    "tagSlugs",
+  ] as const) {
     if (valuesEqual(current[field], suggestion[field])) continue;
 
     if (dirty[field]) {

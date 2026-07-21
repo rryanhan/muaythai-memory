@@ -1,5 +1,4 @@
 import assert from "node:assert/strict";
-import { randomUUID } from "node:crypto";
 import {
   CAPTURE_CLIENT_TRANSCRIPTION_TIMEOUT_MS,
   CAPTURE_FINALIZATION_TIMEOUT_MS,
@@ -25,13 +24,12 @@ import {
   shouldRecorderStopSetIdle,
 } from "@/features/capture/voice-state";
 import { mergeDrillCleanup, type DrillDirtyFields } from "@/features/drills/cleanup-merge";
-import { modelCaptureDraftSchema } from "./contracts";
+import { createModelCaptureDraftSchema, modelCaptureDraftSchema } from "./contracts";
 import {
   CaptureDraftGenerationError,
   CaptureTranscriptionCancelledError,
   CaptureTranscriptionError,
 } from "./errors";
-import { parseCaptureTranscript } from "./parser";
 import { parseOpenAiCaptureResponse } from "./providers/openai";
 import {
   MAX_CAPTURE_AUDIO_BYTES,
@@ -40,17 +38,6 @@ import {
   transcribeCaptureAudio,
   validateCaptureAudioMetadata,
 } from "./transcription";
-import {
-  standardTagSeeds,
-  statusTagSeeds,
-  tagCategorySeeds,
-  trainingMethodSeeds,
-} from "@/modules/taxonomy/seed-data";
-import type { TaxonomyResponse } from "@/modules/taxonomy/contracts";
-
-const taxonomy = buildTaxonomy();
-
-verifyParser();
 verifyCaptureContract();
 verifyOpenAiCaptureResponse();
 verifyCleanupMerge();
@@ -70,50 +57,13 @@ void verifyTranscriptionProvider()
     process.exitCode = 1;
   });
 
-function verifyParser() {
-  expectCapture(
-    "Bag round. Jab cross, rear low kick, reset, then add a teep. Stay balanced.",
-    ["bag-work"],
-    ["jab", "cross", "low-kick", "teep"],
-  );
-  expectCapture(
-    "Partner feeds a jab. Parry with the rear hand, throw the rear knee, then angle off.",
-    ["partner-drill"],
-    ["jab", "parry", "knee", "angle"],
-  );
-  expectCapture("In the clinch, pummel to a rear knee and sweep.", ["clinch"], ["knee", "sweep"]);
-  expectCapture(
-    "Shadowbox the switch step into a lead teep and pivot out.",
-    ["technical-work"],
-    ["shadowboxing", "switch-step", "teep", "pivot"],
-  );
-  expectCapture(
-    "Partner holds pads for a one-two and low kick.",
-    ["partner-drill", "pad-work"],
-    ["jab", "cross", "low-kick"],
-  );
-  expectCapture("On pads, throw a check hook and pivot out.", ["pad-work"], ["hook", "pivot"], ["kick-check"]);
-  expectCapture(
-    "Partner drill: catch the body kick, step outside, and sweep.",
-    ["partner-drill"],
-    ["kick-catch", "round-kick", "sweep"],
-  );
-  expectCapture(
-    "Technical work: step through to southpaw, throw the cross, then step to orthodox.",
-    ["technical-work"],
-    ["step-through", "stance-switch", "cross"],
-  );
-
-  const missingMethod = parseCaptureTranscript("Jab, cross, low kick, then reset and keep the chin tucked.", taxonomy);
-  assert.equal(missingMethod.trainingMethodSlugs.length, 0);
-  assert.ok(missingMethod.warnings.some((warning) => warning.includes("Training Method")));
-}
-
 function verifyCaptureContract() {
   const baseDraft = {
     title: "Cross Slip Uppercut Exit",
     notes: "Keep the right hand high.",
     steps: ["Slip outside the cross.", "Throw the left uppercut."],
+    trainingMethodSlugs: ["pad-work"],
+    tagSlugs: ["cross", "slip", "uppercut"],
   };
 
   assert.equal(
@@ -131,6 +81,38 @@ function verifyCaptureContract() {
     true,
     "Model summary should accept a factual sentence.",
   );
+
+  const constrainedSchema = createModelCaptureDraftSchema(
+    ["pad-work", "partner-drill"],
+    ["cross", "hook", "shift-kick", "rear-kick", "feint", "stance-switch"],
+  );
+  assert.equal(
+    constrainedSchema.safeParse({
+      ...baseDraft,
+      summary: "Practice disguising a stance-shifting kick behind a cross.",
+      trainingMethodSlugs: ["pad-work", "partner-drill"],
+      tagSlugs: ["cross", "hook", "shift-kick", "rear-kick", "feint", "stance-switch"],
+    }).success,
+    true,
+  );
+  assert.equal(
+    constrainedSchema.safeParse({
+      ...baseDraft,
+      summary: "Invalid taxonomy fixture.",
+      trainingMethodSlugs: ["unknown-method"],
+    }).success,
+    false,
+    "AI capture must reject Training Methods outside the active taxonomy.",
+  );
+  assert.equal(
+    constrainedSchema.safeParse({
+      ...baseDraft,
+      summary: "Invalid taxonomy fixture.",
+      tagSlugs: ["unknown-tag"],
+    }).success,
+    false,
+    "AI capture must reject tags outside the active standard taxonomy.",
+  );
 }
 
 function verifyOpenAiCaptureResponse() {
@@ -139,6 +121,8 @@ function verifyOpenAiCaptureResponse() {
     summary: "Practice a jab-cross combination finishing with a rear low kick.",
     notes: "Keep the right hand high.",
     steps: ["Throw the jab.", "Throw the cross.", "Finish with the rear low kick."],
+    trainingMethodSlugs: ["pad-work"],
+    tagSlugs: ["jab", "cross", "low-kick"],
   };
 
   assert.deepEqual(
@@ -174,18 +158,24 @@ function verifyCleanupMerge() {
     summary: "",
     notes: "Original cue",
     steps: ["User-edited step"],
+    trainingMethodSlugs: ["partner-drill"],
+    tagSlugs: ["cross"],
   };
   const dirty: DrillDirtyFields = {
     title: true,
     summary: false,
     notes: false,
     steps: true,
+    trainingMethodSlugs: true,
+    tagSlugs: false,
   };
   const suggestion = {
     title: "AI title",
     summary: "AI summary",
     notes: "Cleaned cue",
     steps: ["AI step one", "AI step two"],
+    trainingMethodSlugs: ["pad-work", "partner-drill"],
+    tagSlugs: ["cross", "hook", "feint"],
   };
   const result = mergeDrillCleanup(current, dirty, suggestion);
 
@@ -193,10 +183,22 @@ function verifyCleanupMerge() {
   assert.deepEqual(result.applied.steps, current.steps, "Dirty steps should remain one owned collection.");
   assert.equal(result.applied.summary, suggestion.summary, "Untouched summary should update.");
   assert.equal(result.applied.notes, suggestion.notes, "Untouched notes should update.");
+  assert.deepEqual(
+    result.applied.trainingMethodSlugs,
+    current.trainingMethodSlugs,
+    "User-edited Training Methods should not be replaced.",
+  );
+  assert.deepEqual(result.applied.tagSlugs, suggestion.tagSlugs, "Untouched tags should update.");
   assert.equal(result.pending.title, suggestion.title, "Dirty title should be offered for review.");
   assert.deepEqual(result.pending.steps, suggestion.steps, "Dirty steps should be offered for review.");
+  assert.deepEqual(
+    result.pending.trainingMethodSlugs,
+    suggestion.trainingMethodSlugs,
+    "AI Training Methods should remain available as a suggestion.",
+  );
   assert.equal(result.pending.summary, undefined);
   assert.equal(result.pending.notes, undefined);
+  assert.equal(result.pending.tagSlugs, undefined);
 }
 
 function verifyRecorderRules() {
@@ -517,50 +519,4 @@ function expectTranscriptionError(action: () => unknown, status: number) {
     action,
     (error: unknown) => error instanceof CaptureTranscriptionError && error.status === status,
   );
-}
-
-function expectCapture(
-  transcript: string,
-  expectedMethods: string[],
-  expectedTags: string[],
-  absentTags: string[] = [],
-) {
-  const result = parseCaptureTranscript(transcript, taxonomy);
-  const methods = new Set(result.trainingMethodSlugs);
-  const tags = new Set(result.tagSlugs);
-
-  for (const method of expectedMethods) assert.ok(methods.has(method), `Expected ${method} for: ${transcript}`);
-  for (const tag of expectedTags) assert.ok(tags.has(tag), `Expected ${tag} for: ${transcript}`);
-  for (const tag of absentTags) assert.ok(!tags.has(tag), `Did not expect ${tag} for: ${transcript}`);
-}
-
-function buildTaxonomy(): TaxonomyResponse {
-  const categories = tagCategorySeeds.map((category) => ({
-    ...category,
-    id: randomUUID(),
-    tags: [] as TaxonomyResponse["standardTags"],
-  }));
-  const categoriesBySlug = new Map(categories.map((category) => [category.slug, category]));
-  const standardTags = standardTagSeeds.map((tag) => {
-    const category = categoriesBySlug.get(tag.categorySlug);
-    assert.ok(category, `Missing category ${tag.categorySlug}`);
-    const dto: TaxonomyResponse["standardTags"][number] = {
-      id: randomUUID(),
-      name: tag.name,
-      slug: tag.slug,
-      kind: "standard",
-      sortOrder: tag.sortOrder,
-      category: { id: category.id, name: category.name, slug: category.slug },
-    };
-    category.tags.push(dto);
-    return dto;
-  });
-
-  return {
-    trainingMethods: trainingMethodSeeds.map((method) => ({ ...method, id: randomUUID() })),
-    tagCategories: categories,
-    standardTags,
-    customTags: [],
-    statusTags: statusTagSeeds.map((status) => ({ ...status, id: randomUUID() })),
-  };
 }

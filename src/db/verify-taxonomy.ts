@@ -42,6 +42,10 @@ async function main() {
   expect(standardTagNames.has("Kick Check"), "Expected Kick Check to exist as a standard tag");
   expect(standardTagNames.has("Kick Catch"), "Expected Kick Catch to exist as a standard tag");
   expect(standardTagNames.has("Feint"), "Expected Feint to exist as a standard tag");
+  expect(standardTagNames.has("Shift Kick"), "Expected Shift Kick to exist as a standard tag");
+  expect(standardTagNames.has("Rear Kick"), "Expected Rear Kick to exist as a standard tag");
+  expect(standardTagNames.has("Stance Switch"), "Expected Stance Switch to exist as a standard tag");
+  expect(!standardTagNames.has("Switch Step"), "Switch Step should be retired in favor of Stance Switch");
   expect(!standardTagNames.has("Check"), "Check should be replaced by Kick Check");
   expect(!standardTagNames.has("Catch"), "Catch should be replaced by Kick Catch");
   expect(!standardTagNames.has("Shell"), "Shell should not be active in the MVP taxonomy");

@@ -65,29 +65,29 @@ Hosted transcription also requires the server-only `OPENAI_API_KEY` environment 
 - `summary`: required for AI capture; one short factual sentence describing what the drill practices.
 - `notes`: optional source-backed cues, reminders, or mistakes.
 - `steps`: one or more ordered physical actions.
-- `trainingMethodSlugs`: zero or more deterministic Training Method matches. The user must select at least one before saving.
-- `tagSlugs`: deterministic matches from the active standard-tag taxonomy.
+- `trainingMethodSlugs`: zero or more AI-selected values from the active Training Method taxonomy. The user must select at least one before saving.
+- `tagSlugs`: AI-selected values from the active standard-tag taxonomy.
 
 Core Idea, Status Tags, Custom Tag creation, confidence scores, training plans, and review dates are not capture outputs.
 
-## Hybrid Flow
+## Capture Flow
 
 1. The client records a voice memo or accepts a typed note while active taxonomy loads.
 2. Voice mode sends the recording to the configured transcription provider and receives an ephemeral transcript.
-3. A deterministic parser immediately selects explicit Training Methods and standard Tags only.
-4. Those taxonomy controls become editable while title, summary, notes, and steps show a `Cleaning up...` state.
-5. Ollama or OpenAI produces title, a required factual summary, optional notes, and ordered steps from the original note or transcript.
-6. The text fields become editable when cleanup finishes. If cleanup fails, they unlock empty for manual entry and cleanup can be retried.
-7. A retry never overwrites text the user edited after a failed cleanup; suggestions remain field-level and optional.
-8. Review keeps a compact transcript excerpt visible. Editing and regenerating the transcript replaces the current fields, Training Methods, and Tags only after confirmation.
+3. The review form opens with empty, editable taxonomy controls while all generated fields show a `Cleaning up...` state.
+4. Ollama or OpenAI produces title, a required factual summary, optional notes, ordered steps, Training Methods, and standard Tags in one structured response.
+5. The provider receives the active Training Method and standard-tag slugs as strict schema enums. Unknown slugs, custom tags, Saved Lists, Status Tags, and Core Idea cannot be returned.
+6. AI taxonomy selection is semantic rather than alias-only: directly described pad work, partner work, feints, and stance changes may be selected even when the transcript uses natural phrasing.
+7. Generated values automatically populate only untouched fields. Any Training Method, tag, text, or step collection edited while cleanup runs is preserved and the AI result is offered as an optional field-level suggestion.
+8. If cleanup fails, the form unlocks empty for manual entry and cleanup can be retried.
+9. Review keeps a compact transcript excerpt visible. Editing and regenerating the transcript replaces the current fields, Training Methods, and Tags only after confirmation.
 
-The deterministic parser is conservative:
+AI taxonomy selection remains conservative:
 
-- It uses curated aliases and active taxonomy rows only.
-- It supports multiple explicitly named Training Methods.
+- It can choose only active Training Methods and active standard tags supplied by the server.
+- It may select multiple methods when the note describes multiple practice contexts.
 - It does not assume Technical Work when no method is clear.
-- It does not generate or display deterministic title, summary, notes, or steps.
-- It does not infer mechanics that were not stated.
+- It does not create custom tags or infer mechanics that are not stated or directly described.
 
 ## Active Taxonomy
 
@@ -102,12 +102,12 @@ Training Methods:
 Standard Tag categories:
 
 - Boxing: Jab, Cross, Hook, Uppercut, Body Shot
-- Kicking: Teep, Round Kick, Low Kick
+- Kicking: Teep, Round Kick, Low Kick, Shift Kick, Rear Kick
 - Knees: Knee
 - Elbows: Elbow
 - Defense: Kick Check, Kick Catch, Parry, Long Guard
 - Head Movement: Slip, Roll
-- Footwork: Pivot, Switch Step, Step Through, Stance Switch
+- Footwork: Pivot, Step Through, Stance Switch
 - Sweeps: Sweep
 - Movement & Timing: Entry, Angle, Distance, Timing, Pressure, Feint
 - Practice Format: Shadowboxing
@@ -122,7 +122,9 @@ Clinch is a Training Method, not a Tag. Shadowboxing is a Tag and maps to Techni
 - Keep steps to ordered, observable actions that advance the sequence.
 - Put guard, posture, pacing, reminders, constraints, mistakes, and other how-to-perform cues in notes.
 - Never duplicate a note as a step. Return `null` for notes only when the source contains no actual cue.
-- AI does not choose or modify Training Methods, standard Tags, Custom Tags, or Status Tags.
+- Select every source-supported Training Method and standard Tag, including explicitly mentioned optional variations.
+- Use only active server-provided taxonomy slugs. Do not choose Custom Tags, Status Tags, or Core Idea.
+- Do not select broad Movement & Timing tags from plausible benefits alone; the transcript must describe that concept as part of the drill.
 
 Draft generation is provider-backed. Local development defaults to Ollama with `qwen3:4b-instruct`; production can switch to OpenAI with `CAPTURE_DRAFT_PROVIDER=openai`. Both providers share the same API contract.
 

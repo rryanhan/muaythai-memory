@@ -34,7 +34,7 @@ async function main() {
   const statusBySlug = new Map(taxonomy.statusTags.map((status) => [status.slug, status.name]));
 
   expect(taxonomy.trainingMethods.length === 5, `Expected 5 training methods, got ${taxonomy.trainingMethods.length}`);
-  expect(taxonomy.standardTags.length === 28, `Expected 28 standard tags, got ${taxonomy.standardTags.length}`);
+  expect(taxonomy.standardTags.length === 29, `Expected 29 standard tags, got ${taxonomy.standardTags.length}`);
   expect(taxonomy.statusTags.length === 2, `Expected 2 Saved Lists, got ${taxonomy.statusTags.length}`);
   expect(statusBySlug.get("starred") === "Favourite", "Favourite should retain the starred backend slug.");
   expect(statusBySlug.get("drill-back-in") === "Drill Back In", "Drill Back In should remain active.");
@@ -45,6 +45,8 @@ async function main() {
   expect(standardTagNames.has("Kick Check"), "Kick Check should be active.");
   expect(standardTagNames.has("Kick Catch"), "Kick Catch should be active.");
   expect(standardTagNames.has("Feint"), "Feint should be active.");
+  expect(standardTagNames.has("Shift Kick"), "Shift Kick should be active.");
+  expect(standardTagNames.has("Rear Kick"), "Rear Kick should be active.");
   expect(taxonomy.standardTags.filter((tag) => tag.name.includes("Sweep")).length === 1, "Sweep should be the only sweep tag.");
 
   // Query builders are part of the contract because the graph/library UI will

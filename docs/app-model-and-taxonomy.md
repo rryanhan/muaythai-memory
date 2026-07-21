@@ -81,6 +81,8 @@ Kicking:
 - Teep
 - Round Kick
 - Low Kick
+- Shift Kick
+- Rear Kick
 
 Knees:
 - Knee
@@ -100,7 +102,6 @@ Head Movement:
 
 Footwork:
 - Pivot
-- Switch Step
 - Step Through
 - Stance Switch
 

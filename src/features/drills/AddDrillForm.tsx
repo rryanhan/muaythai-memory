@@ -74,6 +74,8 @@ export function AddDrillForm({
     summary: false,
     notes: false,
     steps: false,
+    trainingMethodSlugs: false,
+    tagSlugs: false,
   });
   const taxonomyQuery = useQuery({
     queryKey: ["taxonomy"],
@@ -123,7 +125,7 @@ export function AddDrillForm({
 
     lastCleanupRevision.current = cleanupState.revision;
     const merged = mergeDrillCleanup(
-      { title, summary, notes, steps },
+      { title, summary, notes, steps, trainingMethodSlugs, tagSlugs },
       dirtyFields.current,
       cleanupState.values,
     );
@@ -132,6 +134,8 @@ export function AddDrillForm({
     setSummary(merged.applied.summary);
     setNotes(merged.applied.notes);
     setSteps(merged.applied.steps);
+    setTrainingMethodSlugs(merged.applied.trainingMethodSlugs);
+    setTagSlugs(merged.applied.tagSlugs);
     setPendingCleanup(merged.pending);
     // A cleanup revision is a one-time event. Including live form state here
     // would re-run the merge after each keystroke and risk overwriting edits.
@@ -165,6 +169,8 @@ export function AddDrillForm({
     if (field === "summary") setSummary(value as string);
     if (field === "notes") setNotes(value as string);
     if (field === "steps") setSteps(value as string[]);
+    if (field === "trainingMethodSlugs") setTrainingMethodSlugs(value as string[]);
+    if (field === "tagSlugs") setTagSlugs(value as string[]);
     markDirty(field);
     setPendingCleanup((current) => {
       const next = { ...current };
@@ -174,7 +180,14 @@ export function AddDrillForm({
   }
 
   function applyAllCleanup() {
-    for (const field of ["title", "summary", "notes", "steps"] as const) {
+    for (const field of [
+      "title",
+      "summary",
+      "notes",
+      "steps",
+      "trainingMethodSlugs",
+      "tagSlugs",
+    ] as const) {
       if (pendingCleanup[field] !== undefined) applyCleanupField(field);
     }
   }
@@ -311,7 +324,10 @@ export function AddDrillForm({
               key={method.id}
               method={method}
               selected={selectedMethods.has(method.slug)}
-              onToggle={() => setTrainingMethodSlugs((current) => toggleSlug(current, method.slug))}
+              onToggle={() => {
+                markDirty("trainingMethodSlugs");
+                setTrainingMethodSlugs((current) => toggleSlug(current, method.slug));
+              }}
             />
           ))}
         </div>
@@ -329,7 +345,10 @@ export function AddDrillForm({
                     key={tag.id}
                     label={tag.name}
                     selected={selectedTags.has(tag.slug)}
-                    onToggle={() => setTagSlugs((current) => toggleSlug(current, tag.slug))}
+                    onToggle={() => {
+                      markDirty("tagSlugs");
+                      setTagSlugs((current) => toggleSlug(current, tag.slug));
+                    }}
                   />
                 ))}
               </div>
@@ -344,7 +363,10 @@ export function AddDrillForm({
                     key={tag.id}
                     label={tag.name}
                     selected={selectedTags.has(tag.slug)}
-                    onToggle={() => setTagSlugs((current) => toggleSlug(current, tag.slug))}
+                    onToggle={() => {
+                      markDirty("tagSlugs");
+                      setTagSlugs((current) => toggleSlug(current, tag.slug));
+                    }}
                   />
                 ))}
               </div>
@@ -463,7 +485,14 @@ function CleanupState({
         </button>
       </div>
       <div className="capture-cleanup-suggestions">
-        {(["title", "summary", "notes", "steps"] as const).map((field) => {
+        {([
+          "title",
+          "summary",
+          "notes",
+          "steps",
+          "trainingMethodSlugs",
+          "tagSlugs",
+        ] as const).map((field) => {
           const value = pending[field];
           if (value === undefined) return null;
 
@@ -481,6 +510,8 @@ function CleanupState({
                     <li key={`${step}-${index}`}>{step}</li>
                   ))}
                 </ol>
+              ) : field === "trainingMethodSlugs" || field === "tagSlugs" ? (
+                <p>{(value as string[]).join(", ") || "Clear these selections."}</p>
               ) : (
                 <p>{(value as string) || "Clear this field."}</p>
               )}
@@ -499,7 +530,7 @@ function CaptureTextLoading() {
     <div className="capture-text-loading" aria-live="polite" aria-busy="true">
       <section className="capture-cleaning-banner">
         <p className="eyebrow">Cleaning up...</p>
-        <p>Training Methods and tags are ready to edit while AI organizes the drill.</p>
+        <p>AI is organizing the drill text, Training Methods, and tags.</p>
       </section>
       <section className="add-drill-section" aria-label="Cleaning drill information">
         <p className="eyebrow">Drill Info</p>
@@ -526,6 +557,8 @@ const cleanupFieldLabel: Record<DrillCleanupField, string> = {
   summary: "Summary",
   notes: "Notes",
   steps: "Steps",
+  trainingMethodSlugs: "Training Methods",
+  tagSlugs: "Tags",
 };
 
 function toInitialValues(drill: DrillDetail | undefined): DrillFormInitialValues {

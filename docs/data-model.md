@@ -67,12 +67,12 @@ Tags are organized under browse categories, but only the leaf tags should be sto
 First-pass tag groups:
 
 - Boxing: `Jab`, `Cross`, `Hook`, `Uppercut`, `Body Shot`
-- Kicking: `Teep`, `Round Kick`, `Low Kick`
+- Kicking: `Teep`, `Round Kick`, `Low Kick`, `Shift Kick`, `Rear Kick`
 - Knees: `Knee`
 - Elbows: `Elbow`
 - Defense: `Kick Check`, `Kick Catch`, `Parry`, `Long Guard`
 - Head Movement: `Slip`, `Roll`
-- Footwork: `Pivot`, `Switch Step`, `Step Through`, `Stance Switch`
+- Footwork: `Pivot`, `Step Through`, `Stance Switch`
 - Sweeps: `Sweep`
 - Movement & Timing: `Entry`, `Angle`, `Distance`, `Timing`, `Pressure`, `Feint`
 - Practice Format: `Shadowboxing`

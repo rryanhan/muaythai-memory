@@ -1,8 +1,9 @@
-import type { ModelCaptureDraft } from "../contracts";
+import type { CaptureModelSchema, ModelCaptureDraft } from "../contracts";
 
 export type CaptureDraftProviderInput = {
   instructions: string;
   prompt: string;
+  schema: CaptureModelSchema;
   signal?: AbortSignal;
 };
 

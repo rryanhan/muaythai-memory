@@ -1,5 +1,6 @@
 import OpenAI from "openai";
 import { zodTextFormat } from "openai/helpers/zod";
+import type { ZodType } from "zod";
 import { modelCaptureDraftSchema, type ModelCaptureDraft } from "../contracts";
 import {
   CaptureDraftCancelledError,
@@ -29,16 +30,16 @@ export function createOpenAiCaptureProvider(): CaptureDraftProvider {
             model,
             instructions: input.instructions,
             input: input.prompt,
-            reasoning: { effort: "minimal" },
+            reasoning: { effort: "low" },
             text: {
-              format: zodTextFormat(modelCaptureDraftSchema, "muay_thai_drill_capture_cleanup"),
+              format: zodTextFormat(input.schema, "muay_thai_drill_capture_cleanup"),
             },
-            max_output_tokens: 1_200,
+            max_output_tokens: 2_000,
           },
           { signal: input.signal },
         );
 
-        return parseOpenAiCaptureResponse(response);
+        return parseOpenAiCaptureResponse(response, input.schema);
       } catch (error) {
         if (input.signal?.aborted) {
           throw new CaptureDraftCancelledError();
@@ -73,7 +74,10 @@ type OpenAiCaptureResponse = {
   incomplete_details?: { reason?: string } | null;
 };
 
-export function parseOpenAiCaptureResponse(response: OpenAiCaptureResponse): ModelCaptureDraft {
+export function parseOpenAiCaptureResponse(
+  response: OpenAiCaptureResponse,
+  schema: ZodType<ModelCaptureDraft> = modelCaptureDraftSchema,
+): ModelCaptureDraft {
   if (response.status === "incomplete") {
     const reason = response.incomplete_details?.reason;
     throw new CaptureDraftGenerationError(
@@ -88,7 +92,7 @@ export function parseOpenAiCaptureResponse(response: OpenAiCaptureResponse): Mod
   }
 
   try {
-    return modelCaptureDraftSchema.parse(JSON.parse(response.output_text));
+    return schema.parse(JSON.parse(response.output_text));
   } catch {
     throw new CaptureDraftGenerationError("OpenAI returned an invalid drill draft.");
   }

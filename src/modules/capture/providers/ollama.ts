@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { modelCaptureDraftSchema, type ModelCaptureDraft } from "../contracts";
+import type { ModelCaptureDraft } from "../contracts";
 import { CaptureDraftCancelledError, CaptureDraftConfigError, CaptureDraftGenerationError } from "../errors";
 import type { CaptureDraftProvider, CaptureDraftProviderInput } from "./types";
 
@@ -12,10 +12,9 @@ const ollamaChatResponseSchema = z.object({
 export function createOllamaCaptureProvider(): CaptureDraftProvider {
   const baseUrl = normalizeBaseUrl(process.env.OLLAMA_BASE_URL ?? "http://127.0.0.1:11434");
   const model = process.env.OLLAMA_CAPTURE_MODEL?.trim() || "qwen3:4b-instruct";
-  const jsonSchema = z.toJSONSchema(modelCaptureDraftSchema);
-
   return {
     async generate(input: CaptureDraftProviderInput): Promise<ModelCaptureDraft> {
+      const jsonSchema = z.toJSONSchema(input.schema);
       let response: Response;
 
       try {
@@ -32,7 +31,7 @@ export function createOllamaCaptureProvider(): CaptureDraftProvider {
             keep_alive: "60m",
             options: {
               temperature: 0,
-              num_predict: 320,
+              num_predict: 480,
             },
             messages: [
               { role: "system", content: input.instructions },
@@ -73,7 +72,7 @@ export function createOllamaCaptureProvider(): CaptureDraftProvider {
 
       try {
         const payload = ollamaChatResponseSchema.parse(await response.json());
-        return modelCaptureDraftSchema.parse(JSON.parse(payload.message.content));
+        return input.schema.parse(JSON.parse(payload.message.content));
       } catch {
         throw new CaptureDraftGenerationError("Ollama returned a draft shape the app could not read.");
       }

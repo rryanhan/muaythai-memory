@@ -24,12 +24,12 @@ const workoutTypeBadgePaths = {
 
 const tagGroups = [
   { label: "Boxing", tags: ["Jab", "Cross", "Hook", "Uppercut", "Body Shot"] },
-  { label: "Kicking", tags: ["Teep", "Round Kick", "Low Kick"] },
+  { label: "Kicking", tags: ["Teep", "Round Kick", "Low Kick", "Shift Kick", "Rear Kick"] },
   { label: "Knees", tags: ["Knee"] },
   { label: "Elbows", tags: ["Elbow"] },
   { label: "Defense", tags: ["Check", "Catch", "Parry", "Shell", "Long Guard"] },
   { label: "Head Movement", tags: ["Slip", "Roll"] },
-  { label: "Footwork", tags: ["Pivot", "Switch Step", "Step Through", "Stance Switch"] },
+  { label: "Footwork", tags: ["Pivot", "Step Through", "Stance Switch"] },
   { label: "Sweeps", tags: ["Sweep"] },
   { label: "Training Qualities", tags: ["Entries", "Exits", "Angles", "Distance", "Timing", "Balance", "Pressure", "Rhythm"] },
   { label: "Practice Format", tags: ["Shadowboxing"] },

@@ -58,6 +58,7 @@
     ],
     "trainingTags": [
       "Low Kick",
+      "Rear Kick",
       "Jab",
       "Cross",
       "Pressure"
@@ -112,6 +113,7 @@
     "trainingTags": [
       "Kick Check",
       "Low Kick",
+      "Rear Kick",
       "Cross",
       "Timing"
     ],
@@ -211,6 +213,7 @@
     "trainingTags": [
       "Jab",
       "Round Kick",
+      "Rear Kick",
       "Pressure",
       "Distance",
       "Feint"
@@ -285,6 +288,7 @@
       "Jab",
       "Cross",
       "Round Kick",
+      "Rear Kick",
       "Timing"
     ],
     "coreIdea": "Rhythm Change",
@@ -495,6 +499,7 @@
       "Elbow",
       "Entry",
       "Round Kick",
+      "Rear Kick",
       "Timing",
       "Pressure",
       "Feint"
@@ -656,6 +661,7 @@
       "Stance Switch",
       "Jab",
       "Round Kick",
+      "Rear Kick",
       "Distance",
       "Angle"
     ],
@@ -680,7 +686,8 @@
       "Pad Work"
     ],
     "trainingTags": [
-      "Switch Step",
+      "Stance Switch",
+      "Shift Kick",
       "Round Kick",
       "Jab",
       "Shadowboxing"

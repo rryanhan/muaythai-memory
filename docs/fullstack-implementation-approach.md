@@ -549,8 +549,8 @@ Add Redis later for:
 User records voice memo
   -> request-only audio is sent to local Whisper
   -> ephemeral transcript returns
-  -> deterministic taxonomy is detected
-  -> AI cleanup runs without blocking taxonomy editing
+  -> AI generates text and selects active taxonomy values in one structured response
+  -> user taxonomy edits remain protected while AI runs
   -> user reviews and edits
   -> user saves a normal drill
 ```
@@ -633,8 +633,8 @@ If a save fails, revert and show a clear message.
 
 - Add browser recording.
 - Add request-only local transcription.
-- Add deterministic taxonomy detection.
-- Add editable AI cleanup.
+- Add schema-constrained AI taxonomy selection.
+- Add edit-safe AI cleanup.
 - Add draft review and normal drill save.
 - Defer durable audio uploads and capture jobs.
 

@@ -31,7 +31,7 @@ async function main() {
 
   expect(taxonomy.trainingMethods.length === 5, `Expected 5 training methods, got ${taxonomy.trainingMethods.length}`);
   expect(taxonomy.tagCategories.length === 10, `Expected 10 tag categories, got ${taxonomy.tagCategories.length}`);
-  expect(taxonomy.standardTags.length === 28, `Expected 28 standard tags, got ${taxonomy.standardTags.length}`);
+  expect(taxonomy.standardTags.length === 29, `Expected 29 standard tags, got ${taxonomy.standardTags.length}`);
   expect(taxonomy.statusTags.length === 2, `Expected 2 Saved Lists, got ${taxonomy.statusTags.length}`);
   expect(statusBySlug.get("starred") === "Favourite", "Favourite must retain the starred backend slug.");
   expect(statusBySlug.get("drill-back-in") === "Drill Back In", "Drill Back In must remain active.");
@@ -42,6 +42,10 @@ async function main() {
   expect(standardTagNames.has("Kick Check"), "Kick Check must be active.");
   expect(standardTagNames.has("Kick Catch"), "Kick Catch must be active.");
   expect(standardTagNames.has("Feint"), "Feint must be active.");
+  expect(standardTagNames.has("Shift Kick"), "Shift Kick must be active.");
+  expect(standardTagNames.has("Rear Kick"), "Rear Kick must be active.");
+  expect(standardTagNames.has("Stance Switch"), "Stance Switch must be active.");
+  expect(!standardTagNames.has("Switch Step"), "Switch Step should be retired in favor of Stance Switch.");
   expect(!standardTagNames.has("Check"), "Check should be replaced by Kick Check.");
   expect(!standardTagNames.has("Catch"), "Catch should be replaced by Kick Catch.");
   expect(!standardTagNames.has("Shell"), "Shell should not be active.");

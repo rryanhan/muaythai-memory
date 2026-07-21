@@ -13,7 +13,6 @@ import { AddDrillSkeleton } from "@/features/drills/AddDrillSkeleton";
 import type { DrillFormCleanupState, DrillFormInitialValues } from "@/features/drills/drill-form-types";
 import type { DrillCleanupValues } from "@/features/drills/cleanup-merge";
 import drillStyles from "@/features/drills/DrillForm.module.css";
-import type { CaptureTaxonomyResult } from "@/modules/capture/parser";
 import { isCurrentCaptureCleanup } from "./capture-session";
 import styles from "./Capture.module.css";
 import type { VoiceCaptureState } from "./VoiceCapturePanel";
@@ -92,8 +91,6 @@ export function CaptureDraftForm({
   const nextCleanupRequestId = useRef(1);
   const activeCleanupRequestId = useRef<number | null>(null);
   const nextCleanupRevision = useRef(1);
-  const nextParserRequestId = useRef(1);
-  const activeParserRequestId = useRef<number | null>(null);
   const taxonomyQuery = useQuery({
     queryKey: ["taxonomy"],
     queryFn: ({ signal }) => getTaxonomy({ requestInit: { signal } }),
@@ -139,7 +136,6 @@ export function CaptureDraftForm({
 
   useEffect(() => {
     return () => {
-      activeParserRequestId.current = null;
       activeCleanupRequestId.current = null;
       abortController.current?.abort();
     };
@@ -150,7 +146,7 @@ export function CaptureDraftForm({
     const readyTranscript = pendingVoiceTranscript;
     setPendingVoiceTranscript(null);
     void beginDraft(readyTranscript, "voice");
-    // The transcript is consumed once when app-wide taxonomy becomes ready.
+    // The transcript is consumed once the shared drill form taxonomy is ready.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingVoiceTranscript, taxonomyQuery.data]);
 
@@ -174,24 +170,22 @@ export function CaptureDraftForm({
     void beginDraft(transcript, "text");
   }
 
-  async function beginDraft(note: string, source: CaptureMode) {
+  function beginDraft(note: string, source: CaptureMode) {
     const normalizedNote = note.trim();
     if (!taxonomyQuery.data || normalizedNote.length < 12) return;
 
-    const parserRequestId = nextParserRequestId.current++;
-    activeParserRequestId.current = parserRequestId;
-    const { parseCaptureTranscript } = await import("@/modules/capture/parser");
-    if (activeParserRequestId.current !== parserRequestId) return;
-
     const sessionId = nextSessionId.current++;
-    const deterministicResult = parseCaptureTranscript(normalizedNote, taxonomyQuery.data);
     activeSessionId.current = sessionId;
     setSession({
       id: sessionId,
       transcript: normalizedNote,
       source,
-      initialValues: toTaxonomyInitialValues(deterministicResult),
-      warnings: deterministicResult.warnings,
+      initialValues: {
+        trainingMethodSlugs: [],
+        tagSlugs: [],
+        statusTagSlugs: [],
+      },
+      warnings: [],
     });
     setTranscript(normalizedNote);
     setTranscriptEditorOpen(false);
@@ -221,7 +215,6 @@ export function CaptureDraftForm({
   }
 
   function selectMode(nextMode: CaptureMode) {
-    activeParserRequestId.current = null;
     setMode(nextMode);
     setVoiceState(idleVoiceState);
 
@@ -278,7 +271,7 @@ export function CaptureDraftForm({
           <div className={styles.transcriptHeading}>
             <div>
               <p className="eyebrow">Original Memo</p>
-              <p>{session.source === "voice" ? "Transcribed locally" : "Typed note"}</p>
+              <p>{session.source === "voice" ? "Voice transcript" : "Typed note"}</p>
             </div>
             <button
               type="button"
@@ -357,7 +350,7 @@ export function CaptureDraftForm({
             </div>
           ) : (
             <div className={styles.voicePreparingCopy}>
-              <p className={styles.voicePreparingStatus}>Preparing drill taxonomy</p>
+              <p className={styles.voicePreparingStatus}>Preparing drill form</p>
               <p className={styles.voicePreparingLimit}>Your transcript stays in this capture session.</p>
             </div>
           )}
@@ -413,16 +406,6 @@ export function CaptureDraftForm({
   );
 }
 
-function toTaxonomyInitialValues(
-  result: CaptureTaxonomyResult,
-): DrillFormInitialValues {
-  return {
-    trainingMethodSlugs: result.trainingMethodSlugs,
-    tagSlugs: result.tagSlugs,
-    statusTagSlugs: [],
-  };
-}
-
 function VoiceCaptureLoading() {
   return (
     <section className={styles.voicePanel} aria-busy="true" aria-label="Loading voice recorder">
@@ -451,6 +434,8 @@ function toCleanupValues(draft: CaptureDraft): DrillCleanupValues {
     summary: draft.summary,
     notes: draft.notes ?? "",
     steps: draft.steps,
+    trainingMethodSlugs: draft.trainingMethodSlugs,
+    tagSlugs: draft.tagSlugs,
   };
 }
 
