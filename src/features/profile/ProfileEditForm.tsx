@@ -17,20 +17,29 @@ type ProfileEditFormProps = {
 };
 
 export function ProfileEditForm({ initialProfile, onDirtyChange, onCancel, onSaved }: ProfileEditFormProps) {
-  const [displayName, setDisplayName] = useState(initialProfile.displayName);
+  const [username, setUsername] = useState(initialProfile.username ?? initialProfile.displayName);
+  const [firstName, setFirstName] = useState(initialProfile.firstName ?? "");
+  const [lastName, setLastName] = useState(initialProfile.lastName ?? "");
+  const [location, setLocation] = useState(initialProfile.location ?? "");
   const [avatar, setAvatar] = useState<File | null>(null);
   const [removeAvatar, setRemoveAvatar] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const dirty = displayName.trim() !== initialProfile.displayName || Boolean(avatar) || removeAvatar;
+  const dirty =
+    username.trim() !== (initialProfile.username ?? initialProfile.displayName) ||
+    firstName.trim() !== (initialProfile.firstName ?? "") ||
+    lastName.trim() !== (initialProfile.lastName ?? "") ||
+    location.trim() !== (initialProfile.location ?? "") ||
+    Boolean(avatar) ||
+    removeAvatar;
   const previewProfile = useMemo(
     () => ({
-      displayName: displayName.trim() || initialProfile.displayName,
+      displayName: username.trim() || initialProfile.displayName,
       avatarUrl: previewUrl ?? (removeAvatar ? null : initialProfile.avatarUrl),
     }),
-    [displayName, initialProfile.avatarUrl, initialProfile.displayName, previewUrl, removeAvatar],
+    [username, initialProfile.avatarUrl, initialProfile.displayName, previewUrl, removeAvatar],
   );
 
   useEffect(() => onDirtyChange(dirty), [dirty, onDirtyChange]);
@@ -72,20 +81,16 @@ export function ProfileEditForm({ initialProfile, onDirtyChange, onCancel, onSav
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const normalizedName = displayName.trim();
-    if (!normalizedName) {
-      setErrorMessage("Enter a display name.");
-      return;
-    }
-    if (normalizedName.length > 120) {
-      setErrorMessage("Display name must be 120 characters or fewer.");
+    const normalizedUsername = username.trim().toLowerCase();
+    if (!/^[a-z0-9_]{3,30}$/.test(normalizedUsername)) {
+      setErrorMessage("Use 3–30 lowercase letters, numbers, or underscores for your username.");
       return;
     }
 
     setPending(true);
     setErrorMessage(null);
     try {
-      await updateProfile({ displayName: normalizedName, avatar, removeAvatar });
+      await updateProfile({ username: normalizedUsername, firstName, lastName, location, avatar, removeAvatar });
       onDirtyChange(false);
       onSaved();
     } catch (error) {
@@ -124,13 +129,27 @@ export function ProfileEditForm({ initialProfile, onDirtyChange, onCancel, onSav
 
       <section className={styles.fields}>
         <label>
-          <span>Display name</span>
+          <span>Username</span>
           <input
-            value={displayName}
-            maxLength={120}
-            autoComplete="name"
-            onChange={(event) => setDisplayName(event.target.value)}
+            value={username}
+            maxLength={30}
+            autoCapitalize="none"
+            autoCorrect="off"
+            autoComplete="username"
+            onChange={(event) => setUsername(event.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ""))}
           />
+        </label>
+        <label>
+          <span>First name optional</span>
+          <input value={firstName} maxLength={80} autoComplete="given-name" onChange={(event) => setFirstName(event.target.value)} />
+        </label>
+        <label>
+          <span>Last name optional</span>
+          <input value={lastName} maxLength={80} autoComplete="family-name" onChange={(event) => setLastName(event.target.value)} />
+        </label>
+        <label>
+          <span>Location optional</span>
+          <input value={location} maxLength={120} autoComplete="address-level2" onChange={(event) => setLocation(event.target.value)} />
         </label>
         <label>
           <span>Email</span>

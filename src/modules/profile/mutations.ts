@@ -8,10 +8,19 @@ import {
   uploadProfileAvatar,
   type UploadedAvatar,
 } from "./avatar";
-import { profileDisplayNameSchema, type ProfileDto } from "./contracts";
+import {
+  profileFirstNameSchema,
+  profileLastNameSchema,
+  profileLocationSchema,
+  profileUsernameSchema,
+  type ProfileDto,
+} from "./contracts";
 
 export type UpdateProfileInput = {
-  displayName: string;
+  username: string;
+  firstName: string;
+  lastName: string;
+  location: string;
   avatar: File | null;
   removeAvatar: boolean;
 };
@@ -27,10 +36,7 @@ export class ProfileUpdateError extends Error {
 }
 
 export async function updateProfile(currentUser: CurrentAppUser, input: UpdateProfileInput): Promise<ProfileDto> {
-  const displayNameResult = profileDisplayNameSchema.safeParse(input.displayName);
-  if (!displayNameResult.success) {
-    throw new ProfileUpdateError(displayNameResult.error.issues[0]?.message ?? "Enter a valid display name.");
-  }
+  const profile = parseProfileFields(input);
   if (input.avatar && input.removeAvatar) {
     throw new ProfileUpdateError("Choose either a new profile photo or remove the existing one.");
   }
@@ -43,12 +49,24 @@ export async function updateProfile(currentUser: CurrentAppUser, input: UpdatePr
     const [updatedUser] = await db
       .update(users)
       .set({
-        displayName: displayNameResult.data,
+        displayName: profile.username,
+        username: profile.username,
+        firstName: profile.firstName,
+        lastName: profile.lastName,
+        location: profile.location,
         avatarUrl,
         updatedAt: new Date(),
       })
       .where(eq(users.id, currentUser.id))
-      .returning({ id: users.id, displayName: users.displayName, avatarUrl: users.avatarUrl });
+      .returning({
+        id: users.id,
+        displayName: users.displayName,
+        username: users.username,
+        firstName: users.firstName,
+        lastName: users.lastName,
+        location: users.location,
+        avatarUrl: users.avatarUrl,
+      });
 
     if (!updatedUser) throw new ProfileUpdateError("Profile could not be found.", 404);
 
@@ -63,6 +81,39 @@ export async function updateProfile(currentUser: CurrentAppUser, input: UpdatePr
     if (uploadedAvatar) {
       await removeUploadedAvatar(uploadedAvatar.path).catch(() => undefined);
     }
+    if (isUniqueUsernameError(error)) {
+      throw new ProfileUpdateError("That username is already taken.", 409);
+    }
     throw error;
   }
+}
+
+function parseProfileFields(input: UpdateProfileInput) {
+  const results = {
+    username: profileUsernameSchema.safeParse(input.username),
+    firstName: profileFirstNameSchema.safeParse(input.firstName),
+    lastName: profileLastNameSchema.safeParse(input.lastName),
+    location: profileLocationSchema.safeParse(input.location),
+  };
+  for (const result of Object.values(results)) {
+    if (!result.success) {
+      throw new ProfileUpdateError(result.error.issues[0]?.message ?? "Enter valid profile details.");
+    }
+  }
+  return {
+    username: results.username.data as string,
+    firstName: results.firstName.data as string | null,
+    lastName: results.lastName.data as string | null,
+    location: results.location.data as string | null,
+  };
+}
+
+function isUniqueUsernameError(error: unknown): boolean {
+  return hasPostgresCode(error, "23505");
+}
+
+function hasPostgresCode(error: unknown, code: string): boolean {
+  if (typeof error !== "object" || error === null) return false;
+  if ("code" in error && error.code === code) return true;
+  return "cause" in error && hasPostgresCode(error.cause, code);
 }

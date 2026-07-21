@@ -25,11 +25,19 @@ export const users = pgTable(
   {
     id: uuid("id").primaryKey().defaultRandom(),
     displayName: text("display_name").notNull(),
+    username: varchar("username", { length: 30 }),
+    firstName: varchar("first_name", { length: 80 }),
+    lastName: varchar("last_name", { length: 80 }),
+    location: varchar("location", { length: 120 }),
     avatarUrl: text("avatar_url"),
+    profileOnboardedAt: timestamp("profile_onboarded_at", { withTimezone: true }),
+    firstDrillGuideCompletedAt: timestamp("first_drill_guide_completed_at", { withTimezone: true }),
+    firstDrillGuideSkippedAt: timestamp("first_drill_guide_skipped_at", { withTimezone: true }),
     ...timestamps,
   },
   (table) => ({
     displayNameIdx: index("users_display_name_idx").on(table.displayName),
+    usernameUnique: uniqueIndex("users_username_unique").on(table.username),
   }),
 );
 

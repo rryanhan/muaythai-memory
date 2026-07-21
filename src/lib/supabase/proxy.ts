@@ -2,7 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { safeInternalPath } from "@/lib/safe-internal-path";
 
-const PUBLIC_PAGE_PATHS = new Set(["/auth/sign-in", "/auth/confirm"]);
+const PUBLIC_PAGE_PATHS = new Set(["/auth/sign-in", "/auth/confirm", "/auth/forgot-password"]);
 
 export async function updateSupabaseSession(request: NextRequest) {
   let response = NextResponse.next({ request });

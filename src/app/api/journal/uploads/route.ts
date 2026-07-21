@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireCurrentAppUser } from "@/modules/auth";
+import { requireOnboardedAppUser } from "@/modules/auth";
 import {
   createJournalUploadInputSchema,
   journalUploadIntentResponseSchema,
@@ -12,7 +12,7 @@ export const runtime = "nodejs";
 
 export async function POST(request: NextRequest) {
   try {
-    const user = await requireCurrentAppUser();
+    const user = await requireOnboardedAppUser();
     const input = createJournalUploadInputSchema.parse(await request.json());
     return NextResponse.json(
       journalUploadIntentResponseSchema.parse(await createJournalUploadIntent(user.id, input)),

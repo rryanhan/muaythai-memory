@@ -1,34 +1,28 @@
 import type { AuthError } from "@supabase/supabase-js";
 
-export type MagicLinkFailureReason = "invalid-link";
+export type AuthFailureReason = "invalid-link";
+export type AuthOperation = "sign-in" | "create" | "recovery";
 
-/**
- * Supabase error messages are written for developers and can expose details
- * that do not help someone recover. Keep product copy stable by branching on
- * documented error codes and treating unknown failures conservatively.
- */
 export function getAuthErrorMessage(
   error: Pick<AuthError, "code" | "message" | "status">,
+  operation: AuthOperation,
 ): string {
   if (error.status === 429 || isRateLimitCode(error.code)) {
-    return "Too many sign-in links were requested. Wait a while before trying again.";
+    return "Too many attempts were made. Wait a while before trying again.";
   }
-
-  switch (error.code) {
-    case "email_address_invalid":
-      return "Enter a valid email address.";
-    case "email_address_not_authorized":
-      return "This email cannot receive sign-in messages yet. Use a project team email or configure custom SMTP.";
-    case "signup_disabled":
-      return "New account creation is currently unavailable.";
-    default:
-      return "We couldn't send a sign-in link. Try again shortly.";
+  if (operation === "sign-in") {
+    if (error.code === "email_not_confirmed") return "Confirm your email before signing in.";
+    return "The email or password is incorrect.";
   }
+  if (error.code === "email_address_invalid") return "Enter a valid email address.";
+  if (error.code === "signup_disabled") return "New account creation is currently unavailable.";
+  if (operation === "recovery") return "The recovery email could not be sent. Try again shortly.";
+  return "The account could not be created. Try again shortly.";
 }
 
-export function getMagicLinkFailureMessage(reason: string | null | undefined): string | null {
+export function getAuthLinkFailureMessage(reason: string | null | undefined): string | null {
   if (reason !== "invalid-link") return null;
-  return "That sign-in link is invalid or has expired. Request a new link and try again.";
+  return "That confirmation or recovery link is invalid or has expired. Start again below.";
 }
 
 function isRateLimitCode(code: AuthError["code"]): boolean {

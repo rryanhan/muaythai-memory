@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { requireCurrentAppUser, requireCurrentUserId } from "@/modules/auth";
+import { requireOnboardedAppUser, requireOnboardedUserId } from "@/modules/auth";
 import {
   deleteJournalEntryResponseSchema,
   journalDetailResponseSchema,
@@ -17,7 +17,7 @@ const paramsSchema = z.object({ id: z.string().uuid() });
 
 export async function GET(_request: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
-    const userId = await requireCurrentUserId();
+    const userId = await requireOnboardedUserId();
     const { id } = paramsSchema.parse(await context.params);
     const entry = await getJournalEntryById(userId, id);
     if (!entry) return NextResponse.json({ error: "Journal entry not found." }, { status: 404 });
@@ -29,7 +29,7 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ id
 
 export async function PATCH(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
-    const user = await requireCurrentAppUser();
+    const user = await requireOnboardedAppUser();
     const { id } = paramsSchema.parse(await context.params);
     const input = updateJournalEntryInputSchema.parse(await request.json());
     const entry = await updateJournalEntry(user.id, id, input);
@@ -41,7 +41,7 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
 
 export async function DELETE(_request: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
-    const user = await requireCurrentAppUser();
+    const user = await requireOnboardedAppUser();
     const { id } = paramsSchema.parse(await context.params);
     return NextResponse.json(
       deleteJournalEntryResponseSchema.parse({ deletedId: await deleteJournalEntry(user.id, id) }),

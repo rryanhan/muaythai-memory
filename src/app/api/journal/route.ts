@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { requireCurrentUserId } from "@/modules/auth";
+import { requireOnboardedUserId } from "@/modules/auth";
 import { journalListResponseSchema } from "@/modules/journal/contracts";
 import { journalErrorResponse } from "@/modules/journal/http";
 import { isOwnedDrill, listJournalEntries } from "@/modules/journal/queries";
@@ -16,7 +16,7 @@ const listParamsSchema = z.object({
 
 export async function GET(request: NextRequest) {
   try {
-    const userId = await requireCurrentUserId();
+    const userId = await requireOnboardedUserId();
     const params = listParamsSchema.parse({
       cursor: request.nextUrl.searchParams.get("cursor") ?? undefined,
       limit: request.nextUrl.searchParams.get("limit") ?? undefined,

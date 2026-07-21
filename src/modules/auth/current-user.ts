@@ -12,11 +12,27 @@ export class AuthenticationRequiredError extends Error {
   }
 }
 
+export class OnboardingRequiredError extends Error {
+  readonly status = 403;
+
+  constructor() {
+    super("Complete onboarding before using this part of the app.");
+    this.name = "OnboardingRequiredError";
+  }
+}
+
 export type CurrentAppUser = {
   id: string;
   displayName: string;
+  username: string | null;
+  firstName: string | null;
+  lastName: string | null;
+  location: string | null;
   avatarUrl: string | null;
   email: string | null;
+  profileOnboardedAt: Date | null;
+  firstDrillGuideCompletedAt: Date | null;
+  firstDrillGuideSkippedAt: Date | null;
 };
 
 type CurrentAuthIdentity = {
@@ -40,7 +56,7 @@ export const requireCurrentAppUser = cache(async (): Promise<CurrentAppUser> => 
     where: (table, operators) => operators.eq(table.id, id),
   });
 
-  if (existingUser) return toCurrentAppUser(existingUser, email);
+  if (existingUser) return toCurrentAppUser(existingUser, email, metadata);
 
   const [appUser] = await db
     .insert(users)
@@ -48,7 +64,7 @@ export const requireCurrentAppUser = cache(async (): Promise<CurrentAppUser> => 
     .onConflictDoNothing({ target: users.id })
     .returning();
 
-  if (appUser) return toCurrentAppUser(appUser, email);
+  if (appUser) return toCurrentAppUser(appUser, email, metadata);
 
   // Another concurrent first request may have inserted the row after our read.
   const racedUser = await db.query.users.findFirst({
@@ -56,7 +72,17 @@ export const requireCurrentAppUser = cache(async (): Promise<CurrentAppUser> => 
   });
 
   if (!racedUser) throw new Error("Authenticated app user could not be synchronized.");
-  return toCurrentAppUser(racedUser, email);
+  return toCurrentAppUser(racedUser, email, metadata);
+});
+
+export const requireOnboardedAppUser = cache(async (): Promise<CurrentAppUser> => {
+  const user = await requireCurrentAppUser();
+  if (!isOnboardingComplete(user)) throw new OnboardingRequiredError();
+  return user;
+});
+
+export const requireOnboardedUserId = cache(async (): Promise<string> => {
+  return (await requireOnboardedAppUser()).id;
 });
 
 // React cache deduplicates claim verification within one server request
@@ -76,15 +102,52 @@ const requireCurrentAuthIdentity = cache(async (): Promise<CurrentAuthIdentity> 
 });
 
 function toCurrentAppUser(
-  appUser: { id: string; displayName: string; avatarUrl: string | null },
+  appUser: {
+    id: string;
+    displayName: string;
+    username: string | null;
+    firstName: string | null;
+    lastName: string | null;
+    location: string | null;
+    avatarUrl: string | null;
+    profileOnboardedAt: Date | null;
+    firstDrillGuideCompletedAt: Date | null;
+    firstDrillGuideSkippedAt: Date | null;
+  },
   email: string | null,
+  metadata: Record<string, unknown>,
 ): CurrentAppUser {
+  const suggestedNames = appUser.profileOnboardedAt ? null : deriveNames(metadata);
   return {
     id: appUser.id,
     displayName: appUser.displayName,
+    username: appUser.username,
+    firstName: appUser.firstName ?? suggestedNames?.firstName ?? null,
+    lastName: appUser.lastName ?? suggestedNames?.lastName ?? null,
+    location: appUser.location,
     avatarUrl: appUser.avatarUrl,
     email,
+    profileOnboardedAt: appUser.profileOnboardedAt,
+    firstDrillGuideCompletedAt: appUser.firstDrillGuideCompletedAt,
+    firstDrillGuideSkippedAt: appUser.firstDrillGuideSkippedAt,
   };
+}
+
+export function isProfileOnboarded(user: CurrentAppUser): boolean {
+  return Boolean(user.profileOnboardedAt && user.username);
+}
+
+export function isOnboardingComplete(user: CurrentAppUser): boolean {
+  return isProfileOnboarded(user) && Boolean(
+    user.firstDrillGuideCompletedAt || user.firstDrillGuideSkippedAt,
+  );
+}
+
+export function getOnboardingPath(user: CurrentAppUser, nextPath = "/"): string | null {
+  const next = encodeURIComponent(nextPath);
+  if (!isProfileOnboarded(user)) return `/onboarding/profile?next=${next}`;
+  if (!isOnboardingComplete(user)) return `/onboarding/first-drill?next=${next}`;
+  return null;
 }
 
 function deriveDisplayName(metadata: Record<string, unknown>, email: string | null): string {
@@ -93,6 +156,24 @@ function deriveDisplayName(metadata: Record<string, unknown>, email: string | nu
 
   const emailPrefix = email?.split("@")[0]?.trim();
   return emailPrefix || "Fighter";
+}
+
+function deriveNames(metadata: Record<string, unknown>): { firstName: string | null; lastName: string | null } {
+  const givenName = stringValue(metadata.given_name);
+  const familyName = stringValue(metadata.family_name);
+  if (givenName || familyName) return { firstName: givenName, lastName: familyName };
+
+  const fullName = stringValue(metadata.full_name) ?? stringValue(metadata.name);
+  if (!fullName) return { firstName: null, lastName: null };
+  const parts = fullName.split(/\s+/).filter(Boolean);
+  return {
+    firstName: parts[0]?.slice(0, 80) ?? null,
+    lastName: parts.length > 1 ? parts.slice(1).join(" ").slice(0, 80) : null,
+  };
+}
+
+function stringValue(value: unknown): string | null {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

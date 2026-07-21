@@ -99,7 +99,7 @@ profile
 
 Owns:
 
-- Passwordless email magic-link sign in through Supabase Auth.
+- Google OAuth and confirmed email/password sign in through Supabase Auth.
 - Cookie-backed server sessions through `@supabase/ssr`.
 - Verified current-user lookup and public app-user synchronization.
 - Per-user authorization at every server query and mutation boundary.
@@ -112,11 +112,12 @@ verified user id into every read and write. Row Level Security is deferred while
 domain tables remain server-only, but must be added before any domain table is
 queried directly from a browser or third-party client.
 
-Supabase dashboard setup for magic links:
+Supabase dashboard setup for authentication:
 
-- Keep the Email provider enabled.
-- Keep `{{ .ConfirmationURL }}` in the passwordless email template. The app
-  intentionally does not ask users to enter an OTP code.
+- Keep the Email provider and email confirmation enabled.
+- Keep `{{ .ConfirmationURL }}` in signup-confirmation and password-recovery
+  templates.
+- Configure Google OAuth independently for staging and production.
 - Add the local, HTTPS tunnel, and production `/auth/confirm` URLs to the Auth
   redirect allow list.
 - Use custom SMTP before inviting users outside the Supabase project team.
@@ -139,6 +140,8 @@ Owns:
 - Profile.
 - Avatar.
 - Basic account info.
+- Username and private name/location fields.
+- Profile and first-drill onboarding state.
 
 ### taxonomy
 

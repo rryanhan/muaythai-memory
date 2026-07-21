@@ -138,7 +138,7 @@ export function ProfileEditScreen({ currentUser }: { currentUser: CurrentAppUser
       </header>
       <section className={routeStyles.heading}>
         <h1>Edit Profile</h1>
-        <p>Update the name and photo shown in your training log.</p>
+        <p>Update your username, private profile details, and photo.</p>
       </section>
       <ProfileEditForm
         initialProfile={currentUser}

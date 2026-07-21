@@ -43,6 +43,13 @@
       "when": 1784596823000,
       "tag": "0005_tighten_shift_kick_backfill",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1784600000000,
+      "tag": "0006_add_guided_onboarding",
+      "breakpoints": true
     }
   ]
 }

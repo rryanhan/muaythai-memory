@@ -7,14 +7,14 @@ import {
   CaptureDraftConfigError,
   CaptureDraftGenerationError,
 } from "@/modules/capture/errors";
-import { authenticationErrorResponse, requireCurrentUserId } from "@/modules/auth";
+import { authenticationErrorResponse, requireOnboardedUserId } from "@/modules/auth";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 export async function POST(request: NextRequest) {
   try {
-    const userId = await requireCurrentUserId();
+    const userId = await requireOnboardedUserId();
     const input = captureDraftRequestSchema.parse(await request.json());
     const response = captureDraftResponseSchema.parse(
       await generateCaptureDraft(userId, input.transcript, { signal: request.signal }),

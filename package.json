@@ -29,6 +29,7 @@
     "api:verify": "tsx src/data/verify-api.ts",
     "auth:verify": "tsx src/db/verify-auth-ownership.ts",
     "auth:verify-api": "tsx src/data/verify-auth-api.ts",
+    "onboarding:verify": "tsx src/modules/onboarding/verify-onboarding.ts",
     "capture:verify": "tsx src/modules/capture/verify-capture.ts",
     "profile:verify": "tsx src/modules/profile/verify-profile.ts",
     "journal:verify": "tsx src/modules/journal/verify-journal.ts",

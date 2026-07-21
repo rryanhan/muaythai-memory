@@ -1,6 +1,7 @@
 "use client";
 
 import { ListBullets } from "@phosphor-icons/react/ListBullets";
+import { ListChecks } from "@phosphor-icons/react/ListChecks";
 import { Microphone } from "@phosphor-icons/react/Microphone";
 import { Plus } from "@phosphor-icons/react/Plus";
 import Link from "next/link";
@@ -38,9 +39,14 @@ export function LibraryIndexPanel({
     router.prefetch("/capture/new?mode=voice&from=library");
   }
 
+  function prefetchFirstDrillGuide() {
+    router.prefetch("/onboarding/first-drill?replay=1&next=%2F%3Fview%3Dlibrary");
+  }
+
   useEffect(() => {
     prefetchAddDrill();
     prefetchCaptureDraft();
+    prefetchFirstDrillGuide();
   }, []);
 
   useEffect(() => {
@@ -103,6 +109,19 @@ export function LibraryIndexPanel({
                 <Plus size={22} weight="bold" />
               </span>
               <span>Add Drill</span>
+            </Link>
+            <Link
+              className="library-add-drill-link"
+              href="/onboarding/first-drill?replay=1&next=%2F%3Fview%3Dlibrary"
+              prefetch
+              onFocus={prefetchFirstDrillGuide}
+              onPointerEnter={prefetchFirstDrillGuide}
+              onTouchStart={prefetchFirstDrillGuide}
+            >
+              <span className="library-index-action-icon" aria-hidden="true">
+                <ListChecks size={22} weight="bold" />
+              </span>
+              <span>First Drill Guide</span>
             </Link>
           </div>
 

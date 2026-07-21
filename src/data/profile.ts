@@ -3,7 +3,10 @@ import { ApiError, fetchJson } from "./api-core";
 import type { ApiClientOptions } from "./types";
 
 export type UpdateProfileInput = {
-  displayName: string;
+  username: string;
+  firstName?: string;
+  lastName?: string;
+  location?: string;
   avatar?: File | null;
   removeAvatar?: boolean;
 };
@@ -13,7 +16,10 @@ export async function updateProfile(
   options: ApiClientOptions = {},
 ): Promise<ProfileDto> {
   const formData = new FormData();
-  formData.set("displayName", input.displayName);
+  formData.set("username", input.username);
+  formData.set("firstName", input.firstName ?? "");
+  formData.set("lastName", input.lastName ?? "");
+  formData.set("location", input.location ?? "");
   formData.set("removeAvatar", String(input.removeAvatar ?? false));
   if (input.avatar) formData.set("avatar", input.avatar);
 

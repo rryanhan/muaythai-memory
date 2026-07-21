@@ -10,8 +10,8 @@ import { CreateDrillValidationError, createDrill } from "@/modules/drills/mutati
 import { listDrills } from "@/modules/drills/queries";
 import {
   authenticationErrorResponse,
-  requireCurrentAppUser,
-  requireCurrentUserId,
+  requireOnboardedAppUser,
+  requireOnboardedUserId,
 } from "@/modules/auth";
 
 export const dynamic = "force-dynamic";
@@ -21,7 +21,7 @@ export const runtime = "nodejs";
 // and organized library need to share.
 export async function GET(request: NextRequest) {
   try {
-    const userId = await requireCurrentUserId();
+    const userId = await requireOnboardedUserId();
     const filters = parseDrillFiltersFromSearchParams(request.nextUrl.searchParams);
     const drillList = drillListResponseSchema.parse(await listDrills(userId, filters));
     return NextResponse.json(drillList);
@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const user = await requireCurrentAppUser();
+    const user = await requireOnboardedAppUser();
     const input = createDrillInputSchema.parse(await request.json());
     const response = drillDetailResponseSchema.parse({ drill: await createDrill(user.id, input) });
     return NextResponse.json(response, { status: 201 });

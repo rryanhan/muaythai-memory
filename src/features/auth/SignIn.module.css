@@ -47,6 +47,63 @@
   margin-top: 20px;
 }
 
+.googleButton {
+  display: flex;
+  width: 100%;
+  min-height: 48px;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  margin-top: 20px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--graphite);
+  cursor: pointer;
+  font-weight: 750;
+}
+
+.divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 16px 0;
+  color: var(--muted);
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.divider::before,
+.divider::after {
+  height: 1px;
+  flex: 1;
+  background: var(--border);
+  content: "";
+}
+
+.modeSwitch {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.modeSwitch button {
+  min-height: 42px;
+  border: 0;
+  border-right: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.modeSwitch button:last-child { border-right: 0; }
+.modeSwitch button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); }
+
 .field {
   display: grid;
   gap: 7px;
@@ -75,6 +132,27 @@
   box-shadow: 0 0 0 2px var(--accent-soft);
 }
 
+.passwordField {
+  position: relative;
+  display: block;
+}
+
+.passwordField .input { padding-right: 48px; }
+
+.passwordField button {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
 .primary,
 .secondary {
   min-height: 46px;
@@ -97,7 +175,8 @@
 }
 
 .primary:disabled,
-.secondary:disabled {
+.secondary:disabled,
+.googleButton:disabled {
   cursor: wait;
   opacity: 0.55;
 }
@@ -109,7 +188,8 @@
 }
 
 .message,
-.error {
+.error,
+.passwordHint {
   margin: 0;
   font-size: 14px;
   line-height: 1.4;
@@ -117,6 +197,27 @@
 
 .message {
   color: var(--muted);
+}
+
+.passwordHint { color: var(--muted); }
+
+.forgotLink {
+  width: fit-content;
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.secondaryLink {
+  display: grid;
+  min-height: 46px;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--muted);
+  font-weight: 750;
+  text-decoration: none;
 }
 
 .error {

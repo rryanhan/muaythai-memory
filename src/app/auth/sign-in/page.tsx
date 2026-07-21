@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { SignInForm } from "@/features/auth/SignInForm";
-import { getMagicLinkFailureMessage } from "@/features/auth/auth-error-messages";
+import { getAuthLinkFailureMessage } from "@/features/auth/auth-error-messages";
 import styles from "@/features/auth/SignIn.module.css";
 import { safeInternalPath } from "@/lib/safe-internal-path";
 
@@ -23,7 +23,7 @@ export default async function SignInPage({ searchParams }: SignInPageProps) {
       <div className="notebook-grid" aria-hidden="true" />
       <SignInForm
         nextPath={safeInternalPath(nextValue)}
-        initialError={getMagicLinkFailureMessage(reasonValue)}
+        initialError={getAuthLinkFailureMessage(reasonValue)}
       />
     </main>
   );

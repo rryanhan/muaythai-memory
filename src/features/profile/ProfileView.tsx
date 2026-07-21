@@ -61,7 +61,7 @@ export function ProfileView({ currentUser }: ProfileViewProps) {
         <ProfileAvatar profile={currentUser} className={styles.avatar} imageClassName={styles.avatarImage} />
         <div className={styles.identity}>
           <p className="eyebrow">Profile</p>
-          <h1>{currentUser.displayName}</h1>
+          <h1>{currentUser.username ? `@${currentUser.username}` : currentUser.displayName}</h1>
           <p>{drillsQuery.isPending ? "Loading entries" : `${drills.length} entries`}</p>
         </div>
         <Link className={styles.editLink} href="/profile/edit" prefetch aria-label="Edit profile">

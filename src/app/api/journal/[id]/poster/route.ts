@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { requireCurrentAppUser } from "@/modules/auth";
+import { requireOnboardedAppUser } from "@/modules/auth";
 import { journalPosterUploadResponseSchema } from "@/modules/journal/contracts";
 import { journalErrorResponse } from "@/modules/journal/http";
 import { saveJournalPoster } from "@/modules/journal/mutations";
@@ -13,7 +13,7 @@ const paramsSchema = z.object({ id: z.string().uuid() });
 
 export async function POST(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
-    const user = await requireCurrentAppUser();
+    const user = await requireOnboardedAppUser();
     const { id } = paramsSchema.parse(await context.params);
     const formData = await request.formData();
     const poster = formData.get("poster");

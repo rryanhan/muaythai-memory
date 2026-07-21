@@ -66,6 +66,9 @@ use the staging host and production callbacks must use the production host.
 SMTP credentials also belong to each Supabase project and are not copied by
 database migrations.
 
+Google OAuth client credentials are also environment-specific. Enable and test
+Google on staging before copying the approved provider setup to production.
+
 Production uses:
 
 - Site URL: `https://muaythai-memory.vercel.app`

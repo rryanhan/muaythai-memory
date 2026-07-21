@@ -27,7 +27,7 @@ import { getDrillById, listDrills } from "@/modules/drills/queries";
 import { getMuayThaiGraph } from "@/modules/graph/queries";
 import { getTaxonomy } from "@/modules/taxonomy/queries";
 import { safeInternalPath } from "@/lib/safe-internal-path";
-import { getAuthErrorMessage, getMagicLinkFailureMessage } from "@/features/auth/auth-error-messages";
+import { getAuthErrorMessage, getAuthLinkFailureMessage } from "@/features/auth/auth-error-messages";
 
 config({ path: getEnvironmentFilePath() });
 
@@ -45,13 +45,14 @@ async function main() {
   expect(
     getAuthErrorMessage(
       { code: "over_email_send_rate_limit", message: "raw provider error", status: 429 },
-    ) === "Too many sign-in links were requested. Wait a while before trying again.",
+      "recovery",
+    ) === "Too many attempts were made. Wait a while before trying again.",
     "Email rate limits should use recoverable product copy.",
   );
   expect(
-    getMagicLinkFailureMessage("invalid-link") ===
-      "That sign-in link is invalid or has expired. Request a new link and try again.",
-    "Expired magic links should use recoverable product copy.",
+    getAuthLinkFailureMessage("invalid-link") ===
+      "That confirmation or recovery link is invalid or has expired. Start again below.",
+    "Expired authentication links should use recoverable product copy.",
   );
 
   try {

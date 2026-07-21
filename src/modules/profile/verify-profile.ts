@@ -4,13 +4,14 @@ import { eq } from "drizzle-orm";
 import { db, postgresClient } from "@/db/client";
 import { users } from "@/db/schema";
 import { PROFILE_AVATAR_BUCKET, PROFILE_AVATAR_MAX_BYTES, removeOtherUserAvatars, validateAvatarFile } from "./avatar";
-import { profileDisplayNameSchema } from "./contracts";
+import { profileUsernameSchema } from "./contracts";
 import { updateProfile } from "./mutations";
+import type { CurrentAppUser } from "@/modules/auth";
 
 async function main() {
-  assert.equal(profileDisplayNameSchema.parse("  Ryan Han  "), "Ryan Han");
-  assert.equal(profileDisplayNameSchema.safeParse("   ").success, false);
-  assert.equal(profileDisplayNameSchema.safeParse("x".repeat(121)).success, false);
+  assert.equal(profileUsernameSchema.parse("  Ryan_Han  "), "ryan_han");
+  assert.equal(profileUsernameSchema.safeParse("x ").success, false);
+  assert.equal(profileUsernameSchema.safeParse("x".repeat(31)).success, false);
 
   const png = new File(
     [new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])],
@@ -38,8 +39,8 @@ async function main() {
 }
 
 async function verifyProfilePersistence(png: File) {
-  const userA = { id: randomUUID(), displayName: "Profile Verify A", avatarUrl: null, email: "a@example.com" };
-  const userB = { id: randomUUID(), displayName: "Profile Verify B", avatarUrl: null, email: "b@example.com" };
+  const userA = currentUser("profile_verify_a", "a@example.com");
+  const userB = currentUser("profile_verify_b", "b@example.com");
 
   try {
     await db.insert(users).values([
@@ -48,19 +49,25 @@ async function verifyProfilePersistence(png: File) {
     ]);
 
     const updated = await updateProfile(userA, {
-      displayName: "Updated Fighter",
+      username: "updated_fighter",
+      firstName: "Updated",
+      lastName: "Fighter",
+      location: "Vancouver",
       avatar: png,
       removeAvatar: false,
     });
-    assert.equal(updated.displayName, "Updated Fighter");
+    assert.equal(updated.username, "updated_fighter");
     assert.ok(updated.avatarUrl?.includes(`/storage/v1/object/public/${PROFILE_AVATAR_BUCKET}/${userA.id}/`));
 
     const untouchedUser = await db.query.users.findFirst({ where: (table, operators) => operators.eq(table.id, userB.id) });
     assert.equal(untouchedUser?.displayName, userB.displayName);
     assert.equal(untouchedUser?.avatarUrl, null);
 
-    const removed = await updateProfile({ ...userA, displayName: updated.displayName, avatarUrl: updated.avatarUrl }, {
-      displayName: updated.displayName,
+    const removed = await updateProfile({ ...userA, displayName: updated.displayName, username: updated.username, avatarUrl: updated.avatarUrl }, {
+      username: updated.username ?? "updated_fighter",
+      firstName: updated.firstName ?? "",
+      lastName: updated.lastName ?? "",
+      location: updated.location ?? "",
       avatar: null,
       removeAvatar: true,
     });
@@ -70,6 +77,22 @@ async function verifyProfilePersistence(png: File) {
     await db.delete(users).where(eq(users.id, userA.id));
     await db.delete(users).where(eq(users.id, userB.id));
   }
+}
+
+function currentUser(username: string, email: string): CurrentAppUser {
+  return {
+    id: randomUUID(),
+    displayName: username,
+    username,
+    firstName: null,
+    lastName: null,
+    location: null,
+    avatarUrl: null,
+    email,
+    profileOnboardedAt: new Date(),
+    firstDrillGuideCompletedAt: new Date(),
+    firstDrillGuideSkippedAt: null,
+  };
 }
 
 main().catch((error) => {

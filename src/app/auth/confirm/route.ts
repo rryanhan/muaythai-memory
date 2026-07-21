@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { safeInternalPath } from "@/lib/safe-internal-path";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getOnboardingPath, requireCurrentAppUser } from "@/modules/auth";
 
 /**
  * Exchanges Supabase's short-lived PKCE code for a cookie-backed session before
@@ -16,7 +17,12 @@ export async function GET(request: NextRequest) {
     const { error } = await supabase.auth.exchangeCodeForSession(code);
 
     if (!error) {
-      return NextResponse.redirect(new URL(nextPath, requestOrigin));
+      if (nextPath.startsWith("/auth/reset-password")) {
+        return NextResponse.redirect(new URL(nextPath, requestOrigin));
+      }
+      const user = await requireCurrentAppUser();
+      const destination = getOnboardingPath(user, nextPath) ?? nextPath;
+      return NextResponse.redirect(new URL(destination, requestOrigin));
     }
   }
 

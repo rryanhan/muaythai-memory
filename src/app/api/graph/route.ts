@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { ZodError } from "zod";
 import { graphResponseSchema, parseGraphRequestFromSearchParams } from "@/modules/graph/contracts";
 import { getMuayThaiGraph } from "@/modules/graph/queries";
-import { authenticationErrorResponse, requireCurrentUserId } from "@/modules/auth";
+import { authenticationErrorResponse, requireOnboardedUserId } from "@/modules/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 // so the client can keep chips and graph state in sync.
 export async function GET(request: NextRequest) {
   try {
-    const userId = await requireCurrentUserId();
+    const userId = await requireOnboardedUserId();
     const { filters, options } = parseGraphRequestFromSearchParams(request.nextUrl.searchParams);
     const graph = graphResponseSchema.parse(await getMuayThaiGraph(userId, filters, options));
     return NextResponse.json(graph);

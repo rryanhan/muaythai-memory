@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z, ZodError } from "zod";
-import { authenticationErrorResponse, requireCurrentUserId } from "@/modules/auth";
+import { authenticationErrorResponse, requireOnboardedUserId } from "@/modules/auth";
 import {
   updateSavedListInputSchema,
   updateSavedListResponseSchema,
@@ -14,7 +14,7 @@ const routeParamsSchema = z.object({ id: z.string().uuid() });
 
 export async function PATCH(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
-    const userId = await requireCurrentUserId();
+    const userId = await requireOnboardedUserId();
     const { id } = routeParamsSchema.parse(await context.params);
     const input = updateSavedListInputSchema.parse(await request.json());
     const response = updateSavedListResponseSchema.parse(await setDrillSavedList(userId, id, input));

@@ -9,6 +9,7 @@ import {
   statusTags,
   tags,
   trainingMethods,
+  users,
 } from "@/db/schema";
 import {
   createDrillInputSchema,
@@ -62,7 +63,11 @@ export class SavedListMutationError extends Error {
   }
 }
 
-export async function createDrill(userId: string, rawInput: CreateDrillInput): Promise<DrillDetail> {
+export async function createDrill(
+  userId: string,
+  rawInput: CreateDrillInput,
+  options: { completeFirstDrillGuide?: boolean } = {},
+): Promise<DrillDetail> {
   const input = createDrillInputSchema.parse(rawInput);
   const trainingMethodSlugs = unique(input.trainingMethodSlugs);
   const tagSlugs = unique(input.tagSlugs);
@@ -126,6 +131,17 @@ export async function createDrill(userId: string, rawInput: CreateDrillInput): P
           statusTagId: status.id,
         })),
       );
+    }
+
+    if (options.completeFirstDrillGuide) {
+      await tx
+        .update(users)
+        .set({
+          firstDrillGuideCompletedAt: new Date(),
+          firstDrillGuideSkippedAt: null,
+          updatedAt: new Date(),
+        })
+        .where(eq(users.id, userId));
     }
 
     return drill.id;

@@ -19,6 +19,19 @@ const checks: Array<{ path: string; method?: string; body?: BodyInit; headers?: 
   },
   { path: "/api/capture/transcribe", method: "POST", body: new FormData() },
   { path: "/api/profile", method: "PATCH", body: new FormData() },
+  {
+    path: "/api/onboarding/profile",
+    method: "POST",
+    body: JSON.stringify({ username: "verify_user", firstName: "", lastName: "", location: "" }),
+    headers: { "content-type": "application/json" },
+  },
+  { path: "/api/onboarding/skip", method: "POST" },
+  {
+    path: "/api/onboarding/first-drill",
+    method: "POST",
+    body: JSON.stringify({}),
+    headers: { "content-type": "application/json" },
+  },
   { path: "/api/journal" },
   {
     path: "/api/journal/uploads",
