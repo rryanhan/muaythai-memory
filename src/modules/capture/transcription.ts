@@ -9,6 +9,12 @@ export const CAPTURE_TRANSCRIPTION_TIMEOUT_MS = 180_000;
 
 const supportedAudioTypes = new Set(["audio/mp4", "audio/ogg", "audio/webm"]);
 const transcriptionResponseSchema = z.object({ text: z.string() });
+const openAIErrorResponseSchema = z.object({
+  error: z.object({
+    code: z.string().nullable().optional(),
+    type: z.string().nullable().optional(),
+  }),
+});
 
 export type CaptureTranscriptionProviderName = "whisper-local" | "openai";
 
@@ -139,6 +145,17 @@ export class OpenAITranscriptionProvider implements CaptureTranscriptionProvider
         );
       }
       if (response.status === 429) {
+        const providerError = await readOpenAIError(response);
+        if (
+          providerError?.code === "insufficient_quota" ||
+          providerError?.type === "insufficient_quota"
+        ) {
+          throw new CaptureTranscriptionError(
+            "Hosted transcription needs API credits.",
+            503,
+            "Add API credits or increase the project spending limit, then retry.",
+          );
+        }
         throw new CaptureTranscriptionError(
           "Hosted transcription is temporarily rate limited.",
           503,
@@ -310,6 +327,17 @@ async function readWhisperError(response: Response): Promise<string | null> {
     // The provider may return plain text for conversion failures.
   }
   return null;
+}
+
+async function readOpenAIError(
+  response: Response,
+): Promise<{ code?: string | null; type?: string | null } | null> {
+  try {
+    const result = openAIErrorResponseSchema.safeParse(await response.json());
+    return result.success ? result.data.error : null;
+  } catch {
+    return null;
+  }
 }
 
 const MUAY_THAI_TRANSCRIPTION_PROMPT = [

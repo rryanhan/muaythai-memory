@@ -443,12 +443,34 @@ async function verifyTranscriptionProvider() {
         provider: "openai",
         apiKey: "test-api-key",
         fetcher: async () =>
-          new Response(JSON.stringify({ error: { message: "rate limited" } }), { status: 429 }),
+          new Response(
+            JSON.stringify({ error: { code: "rate_limit_exceeded", type: "requests" } }),
+            { status: 429 },
+          ),
       }),
     (error: unknown) =>
       error instanceof CaptureTranscriptionError &&
       error.status === 503 &&
       error.message.includes("rate limited"),
+  );
+
+  await assert.rejects(
+    () =>
+      transcribeCaptureAudio(audio, {
+        provider: "openai",
+        apiKey: "test-api-key",
+        fetcher: async () =>
+          new Response(
+            JSON.stringify({
+              error: { code: "insufficient_quota", type: "insufficient_quota" },
+            }),
+            { status: 429 },
+          ),
+      }),
+    (error: unknown) =>
+      error instanceof CaptureTranscriptionError &&
+      error.status === 503 &&
+      error.message.includes("API credits"),
   );
 }
 
