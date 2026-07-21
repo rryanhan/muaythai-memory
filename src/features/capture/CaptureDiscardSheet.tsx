@@ -7,9 +7,21 @@ type CaptureDiscardSheetProps = {
   open: boolean;
   onStay: () => void;
   onDiscard: () => void;
+  title?: string;
+  description?: string;
+  stayLabel?: string;
+  discardLabel?: string;
 };
 
-export function CaptureDiscardSheet({ open, onStay, onDiscard }: CaptureDiscardSheetProps) {
+export function CaptureDiscardSheet({
+  open,
+  onStay,
+  onDiscard,
+  title = "Discard capture?",
+  description = "Your recording, transcript, and unsaved drill changes will be lost.",
+  stayLabel = "Keep editing",
+  discardLabel = "Discard capture",
+}: CaptureDiscardSheetProps) {
   return (
     <Drawer.Root
       open={open}
@@ -26,17 +38,17 @@ export function CaptureDiscardSheet({ open, onStay, onDiscard }: CaptureDiscardS
         <Drawer.Content className={styles.discardSheet} aria-label="Discard capture confirmation">
           <Drawer.Handle className="sheet-handle" />
           <Drawer.Title asChild>
-            <h2>Discard capture?</h2>
+            <h2>{title}</h2>
           </Drawer.Title>
           <Drawer.Description asChild>
-            <p>Your recording, transcript, and unsaved drill changes will be lost.</p>
+            <p>{description}</p>
           </Drawer.Description>
           <div className={styles.discardActions}>
             <button type="button" onClick={onStay}>
-              Keep editing
+              {stayLabel}
             </button>
             <button type="button" onClick={onDiscard}>
-              Discard capture
+              {discardLabel}
             </button>
           </div>
         </Drawer.Content>

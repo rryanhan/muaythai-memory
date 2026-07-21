@@ -173,6 +173,120 @@
   transform: translateY(1px);
 }
 
+.voiceCoachTarget {
+  position: relative;
+  z-index: 1;
+  outline: 2px solid var(--accent);
+  outline-offset: -3px;
+}
+
+.voiceManualCommand {
+  justify-self: start;
+  min-height: 40px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0 11px;
+  background: rgba(255, 255, 255, 0.54);
+  color: var(--accent);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.captureMethodCoach {
+  position: relative;
+  display: grid;
+  gap: 7px;
+  border: 1px solid rgba(209, 74, 50, 0.48);
+  border-radius: 6px;
+  padding: 12px;
+  background: rgba(252, 244, 239, 0.96);
+  box-shadow: 0 8px 20px rgba(46, 42, 38, 0.08);
+}
+
+.captureMethodCoach::before {
+  position: absolute;
+  top: -6px;
+  left: 18px;
+  width: 10px;
+  height: 10px;
+  border-top: 1px solid rgba(209, 74, 50, 0.48);
+  border-left: 1px solid rgba(209, 74, 50, 0.48);
+  background: rgba(252, 244, 239, 0.96);
+  content: "";
+  transform: rotate(45deg);
+}
+
+.captureMethodCoach[data-step="0"]::before {
+  right: 38px;
+  left: auto;
+}
+
+.captureMethodCoachHeading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--accent);
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.captureMethodCoach h2,
+.captureMethodCoach p {
+  margin: 0;
+}
+
+.captureMethodCoach h2 {
+  font-size: 16px;
+  line-height: 1.15;
+}
+
+.captureMethodCoach p {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.captureMethodCoachActions {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 6px;
+  margin-top: 3px;
+  border-top: 1px solid rgba(214, 209, 198, 0.78);
+  padding-top: 9px;
+}
+
+.captureMethodCoachActions button {
+  min-height: 34px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0 9px;
+  background: rgba(255, 255, 255, 0.58);
+  color: var(--muted);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.captureMethodCoachActions .captureMethodCoachPrimary {
+  grid-column: 4;
+  border-color: var(--accent);
+  background: var(--accent);
+  color: white;
+}
+
+.voiceManualCommand:focus-visible,
+.captureMethodCoachActions button:focus-visible {
+  outline: 2px solid var(--teal);
+  outline-offset: 2px;
+}
+
 .voicePreparingStage {
   display: grid;
   min-height: 260px;
@@ -497,6 +611,26 @@
   align-items: center;
   justify-content: center;
   gap: 7px;
+}
+
+.skipFirstDrill {
+  justify-self: start;
+  min-height: 40px;
+  margin-top: 2px;
+  border: 0;
+  border-bottom: 1px solid rgba(100, 100, 95, 0.44);
+  padding: 0 2px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.skipFirstDrill:focus-visible {
+  outline: 2px solid var(--teal);
+  outline-offset: 3px;
 }
 
 .discardBackdrop {

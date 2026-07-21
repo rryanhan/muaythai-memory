@@ -8,14 +8,14 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import type { ApiError } from "@/data/api-core";
 import { createCaptureDraft } from "@/data/capture";
 import { getTaxonomy } from "@/data/taxonomy";
-import type { CaptureDraft } from "@/data/types";
+import type { CaptureDraft, CreateDrillInput, DrillDetail } from "@/data/types";
 import { AddDrillSkeleton } from "@/features/drills/AddDrillSkeleton";
 import type { DrillFormCleanupState, DrillFormInitialValues } from "@/features/drills/drill-form-types";
 import type { DrillCleanupValues } from "@/features/drills/cleanup-merge";
 import drillStyles from "@/features/drills/DrillForm.module.css";
 import { isCurrentCaptureCleanup } from "./capture-session";
 import styles from "./Capture.module.css";
-import type { VoiceCaptureState } from "./VoiceCapturePanel";
+import type { CaptureMethodCoach, VoiceCaptureState } from "./VoiceCapturePanel";
 
 const AddDrillForm = dynamic(
   () => import("@/features/drills/AddDrillForm").then((module) => module.AddDrillForm),
@@ -41,6 +41,10 @@ type CaptureDraftFormProps = {
   onWorkflowChange?: (state: CaptureWorkflowState) => void;
   onRequestExit?: () => void;
   onSaveSuccess?: (drillId: string) => void;
+  createAction?: (input: CreateDrillInput) => Promise<DrillDetail>;
+  methodCoach?: CaptureMethodCoach;
+  onUseManual?: () => void;
+  returnToVoiceOnCancel?: boolean;
 };
 
 type CaptureSession = {
@@ -73,6 +77,10 @@ export function CaptureDraftForm({
   onWorkflowChange,
   onRequestExit,
   onSaveSuccess,
+  createAction,
+  methodCoach,
+  onUseManual,
+  returnToVoiceOnCancel = false,
 }: CaptureDraftFormProps) {
   const [mode, setMode] = useState<CaptureMode>(initialMode);
   const [voiceState, setVoiceState] = useState<VoiceCaptureState>(idleVoiceState);
@@ -223,6 +231,20 @@ export function CaptureDraftForm({
     window.history.replaceState(window.history.state, "", `${nextUrl.pathname}${nextUrl.search}`);
   }
 
+  function returnToVoiceInput() {
+    cancelCleanup();
+    activeSessionId.current = null;
+    setSession(null);
+    setTranscript("");
+    setPendingVoiceTranscript(null);
+    setTranscriptEditorOpen(false);
+    setTranscriptRevision("");
+    setCleanupSuggestion(null);
+    setCleanupError(null);
+    setTextFieldsRevealed(false);
+    selectMode("voice");
+  }
+
   function handleVoiceTranscript(nextTranscript: string) {
     setTranscript(nextTranscript);
     if (taxonomyQuery.data) {
@@ -323,8 +345,9 @@ export function CaptureDraftForm({
           cleanupState={cleanupState}
           textFieldsPending={!textFieldsRevealed}
           onBeforeSave={cancelCleanup}
-          onCancel={onRequestExit}
+          onCancel={returnToVoiceOnCancel ? returnToVoiceInput : onRequestExit}
           onSaveSuccess={onSaveSuccess}
+          createAction={createAction}
         />
       </div>
     );
@@ -363,7 +386,13 @@ export function CaptureDraftForm({
     return (
       <VoiceCapturePanel
         onTranscript={handleVoiceTranscript}
-        onUseText={() => selectMode("text")}
+        onUseText={() => {
+          methodCoach?.onDismiss();
+          selectMode("text");
+        }}
+        onUseManual={onUseManual}
+        onChooseVoice={methodCoach?.onDismiss}
+        methodCoach={methodCoach}
         onStateChange={setVoiceState}
       />
     );

@@ -1,18 +1,19 @@
 import { redirect } from "next/navigation";
 import { GuidedFirstDrillForm } from "@/features/onboarding/GuidedFirstDrillForm";
-import styles from "@/features/onboarding/Onboarding.module.css";
 import { safeInternalPath } from "@/lib/safe-internal-path";
 import { isOnboardingComplete, isProfileOnboarded, requireAuthenticatedPageUser } from "@/modules/auth";
 
-export default async function OnboardingFirstDrillPage({ searchParams }: { searchParams: Promise<{ next?: string; replay?: string }> }) {
+export default async function OnboardingFirstDrillPage({ searchParams }: { searchParams: Promise<{ mode?: string; next?: string; replay?: string }> }) {
   const params = await searchParams;
   const nextPath = safeInternalPath(params.next);
-  const user = await requireAuthenticatedPageUser(`/onboarding/first-drill?next=${encodeURIComponent(nextPath)}`);
+  const initialMode = params.mode === "text" ? "text" : "voice";
+  const replay = params.replay === "1";
+  const returnParams = new URLSearchParams({ next: nextPath });
+  if (initialMode === "text") returnParams.set("mode", "text");
+  if (replay) returnParams.set("replay", "1");
+  const user = await requireAuthenticatedPageUser(`/onboarding/first-drill?${returnParams.toString()}`);
   if (!isProfileOnboarded(user)) redirect(`/onboarding/profile?next=${encodeURIComponent(nextPath)}`);
-  if (isOnboardingComplete(user) && params.replay !== "1") redirect(nextPath);
+  if (isOnboardingComplete(user) && !replay) redirect(nextPath);
 
-  return <main className={styles.page}><div className="notebook-grid" aria-hidden="true" /><div className={styles.content}>
-    <div className={styles.topline}><p className="eyebrow">First Drill Guide</p><span className={styles.progress}>2 / 2</span></div>
-    <GuidedFirstDrillForm nextPath={nextPath} />
-  </div></main>;
+  return <GuidedFirstDrillForm initialMode={initialMode} nextPath={nextPath} replay={replay} />;
 }

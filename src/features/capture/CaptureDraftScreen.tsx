@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { RoutedBottomNav } from "@/components/navigation/RoutedBottomNav";
 import type { AppView } from "@/components/navigation/BottomNav";
+import type { CreateDrillInput, DrillDetail } from "@/data/types";
 import routeStyles from "@/features/drills/DrillRouteShell.module.css";
 import { CaptureDiscardSheet } from "./CaptureDiscardSheet";
 import {
@@ -11,17 +12,28 @@ import {
   type CaptureMode,
   type CaptureWorkflowState,
 } from "./CaptureDraftForm";
+import type { CaptureMethodCoach } from "./VoiceCapturePanel";
+import styles from "./Capture.module.css";
 
 export type CaptureOrigin = "network" | "library";
 
 type CaptureDraftScreenProps = {
   initialMode: CaptureMode;
   origin: CaptureOrigin;
+  onboarding?: CaptureOnboardingConfig;
+};
+
+export type CaptureOnboardingConfig = {
+  createAction: (input: CreateDrillInput) => Promise<DrillDetail>;
+  methodCoach?: CaptureMethodCoach;
+  onUseManual: () => void;
+  onSkipFirstDrill: () => Promise<string | null>;
 };
 
 type PendingNavigation =
   | { kind: "route"; destination: string }
   | { kind: "history" }
+  | { kind: "skip" }
   | null;
 
 const phaseCopy: Record<CaptureWorkflowState["phase"], string> = {
@@ -30,7 +42,7 @@ const phaseCopy: Record<CaptureWorkflowState["phase"], string> = {
   review: "Check the transcript and drill before saving.",
 };
 
-export function CaptureDraftScreen({ initialMode, origin }: CaptureDraftScreenProps) {
+export function CaptureDraftScreen({ initialMode, origin, onboarding }: CaptureDraftScreenProps) {
   const router = useRouter();
   const originRoute = origin === "network" ? "/" : "/?view=library";
   const activeView: AppView = origin;
@@ -106,8 +118,8 @@ export function CaptureDraftScreen({ initialMode, origin }: CaptureDraftScreenPr
     };
   }, []);
 
-  const navigateWithoutPrompt = useCallback(
-    (destination: string) => {
+  const runWithoutPrompt = useCallback(
+    (action: () => void) => {
       dirtyRef.current = false;
       const guardKey = guardKeyRef.current;
       guardKeyRef.current = null;
@@ -117,7 +129,7 @@ export function CaptureDraftScreen({ initialMode, origin }: CaptureDraftScreenPr
         window.addEventListener(
           "popstate",
           () => {
-            router.replace(destination);
+            action();
           },
           { once: true },
         );
@@ -125,9 +137,16 @@ export function CaptureDraftScreen({ initialMode, origin }: CaptureDraftScreenPr
         return;
       }
 
-      router.replace(destination);
+      action();
     },
-    [router],
+    [],
+  );
+
+  const navigateWithoutPrompt = useCallback(
+    (destination: string) => {
+      runWithoutPrompt(() => router.replace(destination));
+    },
+    [router, runWithoutPrompt],
   );
 
   const requestNavigation = useCallback(
@@ -166,7 +185,19 @@ export function CaptureDraftScreen({ initialMode, origin }: CaptureDraftScreenPr
       return;
     }
 
-    navigateWithoutPrompt(navigation?.destination ?? originRoute);
+    if (navigation?.kind === "skip" && onboarding) {
+      void onboarding.onSkipFirstDrill().then((destination) => {
+        if (destination) navigateWithoutPrompt(destination);
+      });
+      return;
+    }
+
+    navigateWithoutPrompt(navigation?.kind === "route" ? navigation.destination : originRoute);
+  }
+
+  function requestSkipFirstDrill() {
+    setPendingNavigation({ kind: "skip" });
+    setDiscardOpen(true);
   }
 
   return (
@@ -177,7 +208,7 @@ export function CaptureDraftScreen({ initialMode, origin }: CaptureDraftScreenPr
           type="button"
           className="drill-detail-page-back"
           aria-label="Exit Capture Drill"
-          onClick={() => requestNavigation(originRoute)}
+          onClick={() => (onboarding ? requestSkipFirstDrill() : requestNavigation(originRoute))}
         >
           <span aria-hidden="true">←</span>
         </button>
@@ -192,12 +223,31 @@ export function CaptureDraftScreen({ initialMode, origin }: CaptureDraftScreenPr
         onWorkflowChange={setWorkflow}
         onRequestExit={() => requestNavigation(originRoute)}
         onSaveSuccess={(drillId) => navigateWithoutPrompt(`/drills/${drillId}`)}
+        createAction={onboarding?.createAction}
+        methodCoach={onboarding?.methodCoach}
+        onUseManual={onboarding?.onUseManual}
+        returnToVoiceOnCancel={Boolean(onboarding)}
       />
-      <RoutedBottomNav
-        activeView={activeView}
-        onNavigate={(destination) => requestNavigation(destination)}
+      {onboarding ? (
+        <button className={styles.skipFirstDrill} type="button" onClick={requestSkipFirstDrill}>
+          Skip first drill
+        </button>
+      ) : (
+        <RoutedBottomNav
+          activeView={activeView}
+          onNavigate={(destination) => requestNavigation(destination)}
+        />
+      )}
+      <CaptureDiscardSheet
+        open={discardOpen}
+        onStay={keepCapture}
+        onDiscard={discardCapture}
+        title={pendingNavigation?.kind === "skip" ? "Skip your first drill?" : undefined}
+        description={pendingNavigation?.kind === "skip"
+          ? "You can reopen this guide later from Training Log. Any recording or unsaved drill will be discarded."
+          : undefined}
+        discardLabel={pendingNavigation?.kind === "skip" ? "Skip for now" : undefined}
       />
-      <CaptureDiscardSheet open={discardOpen} onStay={keepCapture} onDiscard={discardCapture} />
     </main>
   );
 }

@@ -6,7 +6,7 @@ import {
   CaptureTranscriptionError,
 } from "@/modules/capture/errors";
 import { transcribeCaptureAudio } from "@/modules/capture/transcription";
-import { authenticationErrorResponse, requireOnboardedUserId } from "@/modules/auth";
+import { authenticationErrorResponse, requireProfileOnboardedUserId } from "@/modules/auth";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
   const requestId = randomUUID().slice(0, 8);
   const requestStartedAt = performance.now();
   try {
-    await requireOnboardedUserId();
+    await requireProfileOnboardedUserId();
     const parsingStartedAt = performance.now();
     const formData = await request.formData();
     const audio = formData.get("audio");

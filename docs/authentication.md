@@ -32,9 +32,11 @@ skip `/onboarding/first-drill` before normal product pages and APIs are
 available. Username is required and future-public. First name, last name, and
 location are optional and private.
 
-The first-drill guide creates a normal owned drill through the same taxonomy
-and validation rules as Add Drill. Skipped users can replay it from Training
-Log.
+The first-drill guide opens the production Capture Drill recorder and teaches
+voice capture, typed AI capture, and manual Add Drill in that order. Every path
+ends in the normal editable drill form and creates a normal owned drill through
+the same taxonomy and validation rules. Skipped users can replay it from
+Training Log.
 
 ## Existing passwordless users
 

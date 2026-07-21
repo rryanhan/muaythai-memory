@@ -3,7 +3,8 @@ import { RoutedBottomNav } from "@/components/navigation/RoutedBottomNav";
 import { DrillDetailBackButton } from "@/features/drills/DrillDetailBackButton";
 import { AddDrillPageForm } from "@/features/drills/AddDrillPageForm";
 import routeStyles from "@/features/drills/DrillRouteShell.module.css";
-import { requireCurrentPageUserId } from "@/modules/auth";
+import { safeInternalPath } from "@/lib/safe-internal-path";
+import { requireCurrentPageUserId, requireProfileOnboardedPageUser } from "@/modules/auth";
 
 export const metadata: Metadata = {
   title: "Add Drill | Muay Thai Memory",
@@ -13,10 +14,20 @@ export const metadata: Metadata = {
 export default async function AddDrillPage({
   searchParams,
 }: {
-  searchParams: Promise<{ from?: string }>;
+  searchParams: Promise<{ from?: string; next?: string; onboarding?: string; replay?: string }>;
 }) {
-  await requireCurrentPageUserId("/drills/new");
-  const fromJournal = (await searchParams).from === "journal";
+  const params = await searchParams;
+  const fromJournal = params.from === "journal";
+  const onboarding = params.onboarding === "1";
+  const replay = params.replay === "1";
+  const nextPath = safeInternalPath(params.next);
+  if (onboarding) {
+    const returnParams = new URLSearchParams({ onboarding: "1", next: nextPath });
+    if (replay) returnParams.set("replay", "1");
+    await requireProfileOnboardedPageUser(`/drills/new?${returnParams.toString()}`);
+  } else {
+    await requireCurrentPageUserId("/drills/new");
+  }
 
   return (
     <main className={routeStyles.formPage}>
@@ -29,8 +40,13 @@ export default async function AddDrillPage({
         <h1>{fromJournal ? "New Related Drill" : "New Drill"}</h1>
         <p>{fromJournal ? "Create the drill, then return to your journal entry." : "Save the steps, notes, and tags while it is still fresh."}</p>
       </section>
-      <AddDrillPageForm fromJournal={fromJournal} />
-      <RoutedBottomNav activeView={fromJournal ? "profile" : "library"} />
+      <AddDrillPageForm
+        fromJournal={fromJournal}
+        onboarding={onboarding}
+        nextPath={nextPath}
+        replay={replay}
+      />
+      {!onboarding && <RoutedBottomNav activeView={fromJournal ? "profile" : "library"} />}
     </main>
   );
 }

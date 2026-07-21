@@ -11,7 +11,7 @@ import { getBuiltInStatusFilters } from "@/features/shared/tag-filter-helpers";
 import type { ApiError } from "@/data/api-core";
 import { createDrill, updateDrill } from "@/data/drills";
 import { getTaxonomy } from "@/data/taxonomy";
-import type { DrillDetail, TrainingMethodDto } from "@/data/types";
+import type { CreateDrillInput, DrillDetail, TrainingMethodDto } from "@/data/types";
 import { AddDrillSkeleton } from "./AddDrillSkeleton";
 import {
   hasPendingDrillCleanup,
@@ -33,6 +33,8 @@ type AddDrillFormProps = {
   onBeforeSave?: () => void;
   onCancel?: () => void;
   onSaveSuccess?: (drillId: string) => void;
+  createAction?: (input: CreateDrillInput) => Promise<DrillDetail>;
+  onDirtyChange?: (dirty: boolean) => void;
 };
 
 export type { DrillFormCleanupState, DrillFormInitialValues } from "./drill-form-types";
@@ -46,6 +48,8 @@ export function AddDrillForm({
   onBeforeSave,
   onCancel,
   onSaveSuccess,
+  createAction,
+  onDirtyChange,
 }: AddDrillFormProps) {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -89,7 +93,7 @@ export function AddDrillForm({
         return updateDrill(initialDrill.id, input);
       }
 
-      return createDrill(input);
+      return createAction ? createAction(input) : createDrill(input);
     },
     onSuccess: async (drill) => {
       await Promise.all([
@@ -97,6 +101,7 @@ export function AddDrillForm({
         queryClient.invalidateQueries({ queryKey: ["graph"] }),
         queryClient.invalidateQueries({ queryKey: ["drill", drill.id] }),
       ]);
+      onDirtyChange?.(false);
       if (onSaveSuccess) {
         onSaveSuccess(drill.id);
         return;
@@ -144,6 +149,11 @@ export function AddDrillForm({
 
   function markDirty(field: DrillCleanupField) {
     dirtyFields.current[field] = true;
+    onDirtyChange?.(true);
+  }
+
+  function markFormDirty() {
+    onDirtyChange?.(true);
   }
 
   function updateStep(index: number, value: string) {
@@ -243,7 +253,10 @@ export function AddDrillForm({
               key={option.id}
               option={option}
               selected={selectedStatuses.has(option.slug)}
-              onToggle={(slug) => setStatusTagSlugs((current) => toggleSlug(current, slug))}
+              onToggle={(slug) => {
+                markFormDirty();
+                setStatusTagSlugs((current) => toggleSlug(current, slug));
+              }}
             />
           ))}
         </div>

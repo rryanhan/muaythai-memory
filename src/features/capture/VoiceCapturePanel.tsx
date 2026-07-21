@@ -30,7 +30,16 @@ import { VoiceWaveform } from "./VoiceWaveform";
 type VoiceCapturePanelProps = {
   onTranscript: (transcript: string) => void;
   onUseText: () => void;
+  onUseManual?: () => void;
+  onChooseVoice?: () => void;
+  methodCoach?: CaptureMethodCoach;
   onStateChange?: (state: VoiceCaptureState) => void;
+};
+
+export type CaptureMethodCoach = {
+  activeStep: 0 | 1 | 2;
+  onStepChange: (step: 0 | 1 | 2) => void;
+  onDismiss: () => void;
 };
 
 export type VoiceCaptureState = {
@@ -43,6 +52,9 @@ export type VoiceCaptureState = {
 export function VoiceCapturePanel({
   onTranscript,
   onUseText,
+  onUseManual,
+  onChooseVoice,
+  methodCoach,
   onStateChange,
 }: VoiceCapturePanelProps) {
   const [status, setStatus] = useState<VoiceCaptureStatus>("idle");
@@ -201,6 +213,7 @@ export function VoiceCapturePanel({
   }
 
   async function startRecording() {
+    onChooseVoice?.();
     const recordingAttempt = recordingAttemptRef.current + 1;
     recordingAttemptRef.current = recordingAttempt;
     finalizedRecordingAttemptRef.current = null;
@@ -510,7 +523,12 @@ export function VoiceCapturePanel({
         </div>
         <div className={styles.voiceCommandRail} data-status={status}>
           {(status === "idle" || status === "error") && (
-            <button type="button" className={styles.voiceSecondaryCommand} onClick={onUseText}>
+            <button
+              type="button"
+              className={`${styles.voiceSecondaryCommand} ${methodCoach?.activeStep === 1 ? styles.voiceCoachTarget : ""}`}
+              aria-describedby={methodCoach?.activeStep === 1 ? "capture-method-coach" : undefined}
+              onClick={onUseText}
+            >
               <Keyboard size={19} weight="regular" />
               Type instead
             </button>
@@ -534,7 +552,8 @@ export function VoiceCapturePanel({
           {status === "idle" && (
             <button
               type="button"
-              className={styles.voicePrimaryCommand}
+              className={`${styles.voicePrimaryCommand} ${methodCoach?.activeStep === 0 ? styles.voiceCoachTarget : ""}`}
+              aria-describedby={methodCoach?.activeStep === 0 ? "capture-method-coach" : undefined}
               onClick={() => void startRecording()}
             >
               <Microphone size={21} weight="regular" />
@@ -589,7 +608,80 @@ export function VoiceCapturePanel({
           )}
         </div>
       </div>
+      {onUseManual &&
+        (status === "idle" || status === "error") &&
+        (!methodCoach || methodCoach.activeStep === 2) && (
+          <button
+            type="button"
+            className={`${styles.voiceManualCommand} ${methodCoach?.activeStep === 2 ? styles.voiceCoachTarget : ""}`}
+            aria-describedby={methodCoach?.activeStep === 2 ? "capture-method-coach" : undefined}
+            onClick={onUseManual}
+          >
+            Add Drill manually
+          </button>
+        )}
+      {methodCoach && <CaptureMethodCoachPanel coach={methodCoach} />}
     </section>
+  );
+}
+
+const captureCoachCopy = [
+  {
+    title: "Record the messy version",
+    body: "Fastest: talk naturally about the drill. Capture transcribes it and organizes an editable draft.",
+  },
+  {
+    title: "Type it instead",
+    body: "No recording needed. Write a rough training note and let the same AI cleanup build the form.",
+  },
+  {
+    title: "Add it manually",
+    body: "Choose Add Drill manually above for full control over the title, steps, methods, and tags.",
+  },
+] as const;
+
+function CaptureMethodCoachPanel({
+  coach,
+}: {
+  coach: CaptureMethodCoach;
+}) {
+  const copy = captureCoachCopy[coach.activeStep];
+
+  return (
+    <aside
+      id="capture-method-coach"
+      className={styles.captureMethodCoach}
+      data-step={coach.activeStep}
+      aria-live="polite"
+    >
+      <div className={styles.captureMethodCoachHeading}>
+        <span>First Drill Guide</span>
+        <span>{coach.activeStep + 1} / 3</span>
+      </div>
+      <h2>{copy.title}</h2>
+      <p>{copy.body}</p>
+      <div className={styles.captureMethodCoachActions}>
+        <button type="button" onClick={coach.onDismiss}>Dismiss tips</button>
+        <span />
+        {coach.activeStep > 0 && (
+          <button
+            type="button"
+            onClick={() => coach.onStepChange((coach.activeStep - 1) as 0 | 1 | 2)}
+          >
+            Back
+          </button>
+        )}
+        {coach.activeStep < 2 && (
+          <button
+            type="button"
+            className={styles.captureMethodCoachPrimary}
+            onClick={() => coach.onStepChange((coach.activeStep + 1) as 0 | 1 | 2)}
+          >
+            Next
+          </button>
+        )}
+      </div>
+    </aside>
   );
 }
 
