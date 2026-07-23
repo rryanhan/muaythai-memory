@@ -119,12 +119,19 @@ domain table is queried directly from a browser or third-party client.
 Supabase dashboard setup for authentication:
 
 - Keep the Email provider and email confirmation enabled.
+- Set the password minimum to at least eight characters.
 - Keep `{{ .ConfirmationURL }}` in signup-confirmation and password-recovery
   templates.
 - Configure Google OAuth independently for staging and production.
 - Add the local, HTTPS tunnel, and production `/auth/confirm` URLs to the Auth
   redirect allow list.
 - Use custom SMTP before inviting users outside the Supabase project team.
+- Configure a unique server-only `AUTH_FLOW_SECRET` in every deployment
+  environment for signed recovery intents, grants, and keyed password
+  fingerprints.
+- Apply the `auth_recovery_grants` migration before deploying recovery
+  hardening, then run `npm run auth:verify-recovery-grants` against the target
+  database.
 
 See `docs/authentication.md` for the callback and verification workflow.
 

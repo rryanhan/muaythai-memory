@@ -45,6 +45,10 @@ export function verifyDeploymentEnvironment(
 
   requireValue(environment, "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY");
   requireValue(environment, "SUPABASE_SERVICE_ROLE_KEY");
+  const authFlowSecret = requireValue(environment, "AUTH_FLOW_SECRET");
+  if (Buffer.byteLength(authFlowSecret, "utf8") < 32) {
+    throw new Error("AUTH_FLOW_SECRET must contain at least 32 bytes.");
+  }
 
   const runtime = getRuntimeDatabaseConfig(environment);
   const migrationUrl = getMigrationDatabaseUrl(environment);

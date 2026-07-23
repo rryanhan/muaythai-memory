@@ -1,6 +1,26 @@
 const baseUrl = process.env.AUTH_VERIFY_BASE_URL ?? "http://127.0.0.1:3005";
+const baseOrigin = new URL(baseUrl).origin;
 
-const checks: Array<{ path: string; method?: string; body?: BodyInit; headers?: HeadersInit }> = [
+const checks: Array<{
+  path: string;
+  method?: string;
+  body?: BodyInit;
+  headers?: HeadersInit;
+  expectedStatus?: number;
+  expectedError?: string;
+}> = [
+  {
+    path: "/api/auth/recovery/reset",
+    method: "POST",
+    body: JSON.stringify({ password: "verify-password" }),
+    headers: {
+      "content-type": "application/json",
+      origin: baseOrigin,
+    },
+    expectedStatus: 403,
+    expectedError:
+      "This recovery page is no longer active. Request a new recovery link.",
+  },
   { path: "/api/taxonomy" },
   { path: "/api/drills" },
   { path: "/api/drills/00000000-0000-4000-8000-000000000000" },
@@ -59,9 +79,14 @@ async function main() {
       redirect: "manual",
     });
     const payload = (await response.json().catch(() => null)) as { error?: unknown } | null;
+    const expectedStatus = check.expectedStatus ?? 401;
+    const expectedError = check.expectedError ?? "Authentication required.";
 
-    if (response.status !== 401 || payload?.error !== "Authentication required.") {
-      throw new Error(`${check.method ?? "GET"} ${check.path} returned ${response.status}, expected auth 401.`);
+    if (response.status !== expectedStatus || payload?.error !== expectedError) {
+      throw new Error(
+        `${check.method ?? "GET"} ${check.path} returned ${response.status},`
+        + ` expected ${expectedStatus}.`,
+      );
     }
   }
 

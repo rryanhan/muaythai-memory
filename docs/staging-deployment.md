@@ -27,12 +27,17 @@ Required production variables:
 - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 - `SUPABASE_SERVICE_ROLE_KEY`
+- `AUTH_FLOW_SECRET`
 - `DATABASE_POOLER_URL`
 - `DATABASE_POOL_MAX=1`
 - `NEXT_PUBLIC_APP_URL=https://muaythai-memory-staging.vercel.app`
 - `CAPTURE_DRAFT_PROVIDER=openai`
 - `OPENAI_API_KEY`
 - `OPENAI_CAPTURE_MODEL`
+
+Set `AUTH_FLOW_SECRET` independently in both the Preview and Production scopes
+of the staging Vercel project. Do not copy the staging value into the separate
+production Vercel project.
 
 Use Supabase's transaction pooler on port `6543` for
 `DATABASE_POOLER_URL`. The Postgres client disables prepared statements for
