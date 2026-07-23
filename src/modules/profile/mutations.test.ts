@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { CurrentAppUser } from "@/modules/auth";
-import type { UploadedAvatar } from "./avatar";
+import type { PreparedAvatarUpload } from "./avatar";
 
 type ProfileRow = {
   id: string;
@@ -13,19 +13,26 @@ type ProfileRow = {
 };
 
 const mocks = vi.hoisted(() => ({
+  activeTransactions: 0,
   commitOutcomeFailures: 0,
   forUpdate: vi.fn(),
-  removeFailures: new Set<string>(),
+  listProfileAvatarPaths: vi.fn(),
+  maxActiveTransactions: 0,
+  prepareProfileAvatarUpload: vi.fn(),
+  preparedUploads: [] as PreparedAvatarUpload[],
+  removeFailures: new Map<string, number>(),
   removeUploadedAvatar: vi.fn(),
   row: null as ProfileRow | null,
+  select: vi.fn(),
+  storageCallsDuringTransaction: [] as string[],
   storageObjects: new Set<string>(),
   transaction: vi.fn(),
-  updateFailures: 0,
-  uploadProfileAvatar: vi.fn(),
+  uploadPreparedProfileAvatar: vi.fn(),
 }));
 
 vi.mock("@/db/client", () => ({
   db: {
+    select: mocks.select,
     transaction: mocks.transaction,
   },
 }));
@@ -34,8 +41,10 @@ vi.mock("./avatar", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./avatar")>();
   return {
     ...actual,
+    listProfileAvatarPaths: mocks.listProfileAvatarPaths,
+    prepareProfileAvatarUpload: mocks.prepareProfileAvatarUpload,
     removeUploadedAvatar: mocks.removeUploadedAvatar,
-    uploadProfileAvatar: mocks.uploadProfileAvatar,
+    uploadPreparedProfileAvatar: mocks.uploadPreparedProfileAvatar,
   };
 });
 
@@ -46,161 +55,239 @@ const otherUserId = "22222222-2222-4222-8222-222222222222";
 const originalPath = `${userId}/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.jpg`;
 const firstPath = `${userId}/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb.jpg`;
 const secondPath = `${userId}/cccccccc-cccc-4ccc-8ccc-cccccccccccc.jpg`;
-const otherUserPath = `${otherUserId}/dddddddd-dddd-4ddd-8ddd-dddddddddddd.jpg`;
+const orphanPath = `${userId}/dddddddd-dddd-4ddd-8ddd-dddddddddddd.jpg`;
+const otherUserPath = `${otherUserId}/eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee.jpg`;
 
 beforeEach(() => {
+  mocks.activeTransactions = 0;
   mocks.commitOutcomeFailures = 0;
   mocks.forUpdate.mockReset();
+  mocks.maxActiveTransactions = 0;
+  mocks.preparedUploads = [preparedAvatar(firstPath), preparedAvatar(secondPath)];
   mocks.removeFailures.clear();
+  mocks.row = profileRow(avatarUrl(originalPath));
+  mocks.storageCallsDuringTransaction = [];
+  mocks.storageObjects = new Set([originalPath, otherUserPath]);
+
+  mocks.prepareProfileAvatarUpload.mockReset().mockImplementation(async () => (
+    mocks.preparedUploads.shift() ?? preparedAvatar(firstPath)
+  ));
+  mocks.uploadPreparedProfileAvatar.mockReset().mockImplementation(
+    async (upload: PreparedAvatarUpload) => {
+      recordStorageCall("upload");
+      mocks.storageObjects.add(upload.path);
+    },
+  );
   mocks.removeUploadedAvatar.mockReset().mockImplementation(async (path: string) => {
-    if (mocks.removeFailures.has(path)) throw new Error("storage unavailable");
+    recordStorageCall("remove");
+    const failures = mocks.removeFailures.get(path) ?? 0;
+    if (failures > 0) {
+      mocks.removeFailures.set(path, failures - 1);
+      throw new Error("storage unavailable");
+    }
     mocks.storageObjects.delete(path);
   });
-  mocks.row = profileRow(avatarUrl(originalPath));
-  mocks.storageObjects = new Set([originalPath, otherUserPath]);
-  mocks.updateFailures = 0;
-  mocks.uploadProfileAvatar.mockReset();
+  mocks.listProfileAvatarPaths.mockReset().mockImplementation(async (requestedUserId: string) => {
+    recordStorageCall("list");
+    return [...mocks.storageObjects].filter((path) => (
+      path.startsWith(`${requestedUserId}/`)
+      && !path.slice(requestedUserId.length + 1).includes("/")
+    ));
+  });
+
+  installDirectSelect();
   installSerializedTransactions();
 });
 
-describe("updateProfile avatar serialization", () => {
-  it("serializes overlapping uploads and never removes the committed avatar", async () => {
-    const firstUpload = deferred<UploadedAvatar>();
-    mocks.uploadProfileAvatar
-      .mockImplementationOnce(async () => {
-        const uploaded = await firstUpload.promise;
-        mocks.storageObjects.add(uploaded.path);
-        return uploaded;
+describe("updateProfile avatar claims and reconciliation", () => {
+  it("lets a newer upload claim and finalize while an earlier upload is delayed", async () => {
+    const firstUpload = deferred<void>();
+    mocks.uploadPreparedProfileAvatar
+      .mockImplementationOnce(async (upload: PreparedAvatarUpload) => {
+        recordStorageCall("upload");
+        await firstUpload.promise;
+        mocks.storageObjects.add(upload.path);
       })
-      .mockImplementationOnce(async () => {
-        const uploaded = uploadedAvatar(secondPath);
-        mocks.storageObjects.add(uploaded.path);
-        return uploaded;
+      .mockImplementationOnce(async (upload: PreparedAvatarUpload) => {
+        recordStorageCall("upload");
+        mocks.storageObjects.add(upload.path);
       });
 
     const firstUpdate = updateProfile(currentUser(), input({
       username: "first_save",
       avatar: imageFile("first.jpg"),
     }));
-    await vi.waitFor(() => expect(mocks.uploadProfileAvatar).toHaveBeenCalledOnce());
+    await vi.waitFor(() => expect(mocks.uploadPreparedProfileAvatar).toHaveBeenCalledOnce());
+    expect(mocks.row?.avatarUrl).toContain("#profile-avatar-claim=");
 
     const secondUpdate = updateProfile(currentUser(), input({
       username: "second_save",
       avatar: imageFile("second.jpg"),
     }));
-    await vi.waitFor(() => expect(mocks.transaction).toHaveBeenCalledTimes(2));
-    expect(mocks.uploadProfileAvatar).toHaveBeenCalledOnce();
-
-    firstUpload.resolve(uploadedAvatar(firstPath));
-
-    await expect(firstUpdate).resolves.toMatchObject({ avatarUrl: avatarUrl(firstPath) });
-    await expect(secondUpdate).resolves.toMatchObject({ avatarUrl: avatarUrl(secondPath) });
+    await expect(secondUpdate).resolves.toMatchObject({
+      username: "second_save",
+      avatarUrl: avatarUrl(secondPath),
+    });
     expect(mocks.row?.avatarUrl).toBe(avatarUrl(secondPath));
+
+    firstUpload.resolve();
+    await expect(firstUpdate).rejects.toMatchObject({ status: 409 });
+
     expect(mocks.storageObjects).toEqual(new Set([secondPath, otherUserPath]));
-    expect(removedPaths()).toEqual([originalPath, firstPath]);
+    expect(removedPaths()).toContain(originalPath);
+    expect(removedPaths()).toContain(firstPath);
     expect(removedPaths()).not.toContain(secondPath);
-    expect(mocks.forUpdate).toHaveBeenCalledTimes(2);
+    expect(mocks.storageCallsDuringTransaction).toEqual([]);
   });
 
-  it("serializes an upload before removal and deletes only superseded objects", async () => {
-    const upload = deferred<UploadedAvatar>();
-    mocks.uploadProfileAvatar.mockImplementationOnce(async () => {
-      const uploaded = await upload.promise;
-      mocks.storageObjects.add(uploaded.path);
-      return uploaded;
-    });
+  it("lets removal supersede a delayed upload without waiting for Storage", async () => {
+    const upload = deferred<void>();
+    mocks.uploadPreparedProfileAvatar.mockImplementationOnce(
+      async (prepared: PreparedAvatarUpload) => {
+        recordStorageCall("upload");
+        await upload.promise;
+        mocks.storageObjects.add(prepared.path);
+      },
+    );
 
     const uploadUpdate = updateProfile(currentUser(), input({
       username: "upload_save",
       avatar: imageFile("upload.jpg"),
     }));
-    await vi.waitFor(() => expect(mocks.uploadProfileAvatar).toHaveBeenCalledOnce());
+    await vi.waitFor(() => expect(mocks.uploadPreparedProfileAvatar).toHaveBeenCalledOnce());
 
-    const removeUpdate = updateProfile(currentUser(), input({
+    await expect(updateProfile(currentUser(), input({
       username: "remove_save",
       removeAvatar: true,
-    }));
-    await vi.waitFor(() => expect(mocks.transaction).toHaveBeenCalledTimes(2));
-    expect(mocks.row?.avatarUrl).toBe(avatarUrl(originalPath));
-
-    upload.resolve(uploadedAvatar(firstPath));
-
-    await expect(uploadUpdate).resolves.toMatchObject({ avatarUrl: avatarUrl(firstPath) });
-    await expect(removeUpdate).resolves.toMatchObject({ avatarUrl: null });
+    }))).resolves.toMatchObject({ username: "remove_save", avatarUrl: null });
     expect(mocks.row?.avatarUrl).toBeNull();
+
+    upload.resolve();
+    await expect(uploadUpdate).rejects.toMatchObject({ status: 409 });
     expect(mocks.storageObjects).toEqual(new Set([otherUserPath]));
-    expect(removedPaths()).toEqual([originalPath, firstPath]);
+    expect(mocks.storageCallsDuringTransaction).toEqual([]);
   });
 
-  it("keeps the committed avatar when previous-object cleanup fails", async () => {
-    mocks.removeFailures.add(originalPath);
-    mocks.uploadProfileAvatar.mockImplementationOnce(async () => {
-      const uploaded = uploadedAvatar(firstPath);
-      mocks.storageObjects.add(uploaded.path);
-      return uploaded;
+  it("allows another profile transaction to finish while superseded removal is delayed", async () => {
+    const removal = deferred<void>();
+    mocks.removeUploadedAvatar.mockImplementationOnce(async (path: string) => {
+      recordStorageCall("remove");
+      await removal.promise;
+      mocks.storageObjects.delete(path);
     });
+
+    const avatarUpdate = updateProfile(currentUser(), input({
+      username: "avatar_save",
+      avatar: imageFile("replacement.jpg"),
+    }));
+    await vi.waitFor(() => expect(mocks.removeUploadedAvatar).toHaveBeenCalledWith(originalPath));
+
+    await expect(updateProfile(currentUser(), input({
+      username: "details_save",
+    }))).resolves.toMatchObject({
+      username: "details_save",
+      avatarUrl: avatarUrl(firstPath),
+    });
+    expect(mocks.row?.username).toBe("details_save");
+
+    removal.resolve();
+    await expect(avatarUpdate).resolves.toMatchObject({ avatarUrl: avatarUrl(firstPath) });
+    expect(mocks.storageCallsDuringTransaction).toEqual([]);
+  });
+
+  it("protects both sides of an in-flight claim during a concurrent reconciliation", async () => {
+    const upload = deferred<void>();
+    mocks.storageObjects.add(firstPath).add(orphanPath);
+    mocks.uploadPreparedProfileAvatar.mockImplementationOnce(async () => {
+      recordStorageCall("upload");
+      await upload.promise;
+    });
+
+    const avatarUpdate = updateProfile(currentUser(), input({
+      avatar: imageFile("replacement.jpg"),
+    }));
+    await vi.waitFor(() => expect(mocks.uploadPreparedProfileAvatar).toHaveBeenCalledOnce());
+
+    await expect(updateProfile(currentUser(), input({
+      username: "details_save",
+    }))).resolves.toMatchObject({ username: "details_save" });
+    expect(mocks.storageObjects).toContain(originalPath);
+    expect(mocks.storageObjects).toContain(firstPath);
+    expect(mocks.storageObjects).not.toContain(orphanPath);
+    expect(removedPaths()).toEqual([orphanPath]);
+
+    upload.resolve();
+    await expect(avatarUpdate).resolves.toMatchObject({ avatarUrl: avatarUrl(firstPath) });
+    expect(mocks.storageObjects).toEqual(new Set([firstPath, otherUserPath]));
+    expect(mocks.storageCallsDuringTransaction).toEqual([]);
+  });
+
+  it("rediscovers a superseded avatar after repeated cleanup failure and retries later", async () => {
+    mocks.removeFailures.set(originalPath, 2);
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    await expect(updateProfile(currentUser(), input({
+      avatar: imageFile("replacement.jpg"),
+    }))).resolves.toMatchObject({ avatarUrl: avatarUrl(firstPath) });
+    expect(mocks.storageObjects).toEqual(new Set([originalPath, firstPath, otherUserPath]));
+    expect(removedPaths().filter((path) => path === originalPath)).toHaveLength(2);
+
+    await expect(updateProfile(currentUser(), input({
+      username: "later_save",
+    }))).resolves.toMatchObject({ username: "later_save" });
+    expect(mocks.storageObjects).toEqual(new Set([firstPath, otherUserPath]));
+    expect(removedPaths().filter((path) => path === originalPath)).toHaveLength(3);
+    expect(consoleError).toHaveBeenCalledWith("Profile avatar cleanup failed.", "storage unavailable");
+    expect(consoleError).toHaveBeenCalledWith(
+      "Profile avatar reconciliation failed.",
+      "storage unavailable",
+    );
+    consoleError.mockRestore();
+  });
+
+  it("removes public orphans while protecting the committed avatar and another user", async () => {
+    mocks.storageObjects.add(orphanPath);
+
+    await updateProfile(currentUser(), input({ username: "reconcile_save" }));
+
+    expect(mocks.storageObjects).toEqual(new Set([originalPath, otherUserPath]));
+    expect(removedPaths()).toEqual([orphanPath]);
+    expect(removedPaths()).not.toContain(originalPath);
+    expect(removedPaths()).not.toContain(otherUserPath);
+    expect(mocks.listProfileAvatarPaths).toHaveBeenCalledWith(userId);
+    expect(mocks.listProfileAvatarPaths).not.toHaveBeenCalledWith(otherUserId);
+  });
+
+  it("rolls back a failed upload and deletes its object outside the transaction", async () => {
+    mocks.uploadPreparedProfileAvatar.mockImplementationOnce(
+      async (upload: PreparedAvatarUpload) => {
+        recordStorageCall("upload");
+        mocks.storageObjects.add(upload.path);
+        throw new Error("upload response unavailable");
+      },
+    );
+
+    await expect(updateProfile(currentUser(), input({
+      avatar: imageFile("replacement.jpg"),
+    }))).rejects.toThrow("upload response unavailable");
+
+    expect(mocks.row?.avatarUrl).toBe(avatarUrl(originalPath));
+    expect(mocks.storageObjects).toEqual(new Set([originalPath, otherUserPath]));
+    expect(removedPaths()).toEqual([firstPath]);
+    expect(mocks.storageCallsDuringTransaction).toEqual([]);
+  });
+
+  it("continues an upload when an uncertain claim commit is confirmed by reread", async () => {
+    mocks.commitOutcomeFailures = 1;
 
     await expect(updateProfile(currentUser(), input({
       avatar: imageFile("replacement.jpg"),
     }))).resolves.toMatchObject({ avatarUrl: avatarUrl(firstPath) });
 
     expect(mocks.row?.avatarUrl).toBe(avatarUrl(firstPath));
-    expect(mocks.storageObjects).toEqual(new Set([originalPath, firstPath, otherUserPath]));
-    expect(removedPaths()).toEqual([originalPath]);
-    expect(removedPaths()).not.toContain(firstPath);
-    expect(consoleError).toHaveBeenCalledWith("Profile avatar cleanup failed.", "storage unavailable");
-    consoleError.mockRestore();
-  });
-
-  it("removes a fresh upload after a database write failure without touching the current avatar", async () => {
-    mocks.updateFailures = 1;
-    mocks.uploadProfileAvatar.mockImplementationOnce(async () => {
-      const uploaded = uploadedAvatar(firstPath);
-      mocks.storageObjects.add(uploaded.path);
-      return uploaded;
-    });
-
-    await expect(updateProfile(currentUser(), input({
-      avatar: imageFile("replacement.jpg"),
-    }))).rejects.toThrow("database unavailable");
-
-    expect(mocks.row?.avatarUrl).toBe(avatarUrl(originalPath));
-    expect(mocks.storageObjects).toEqual(new Set([originalPath, otherUserPath]));
-    expect(removedPaths()).toEqual([firstPath]);
-    expect(removedPaths()).not.toContain(originalPath);
-  });
-
-  it("preserves a fresh upload when a failed commit outcome shows it is current", async () => {
-    mocks.commitOutcomeFailures = 1;
-    mocks.uploadProfileAvatar.mockImplementationOnce(async () => {
-      const uploaded = uploadedAvatar(firstPath);
-      mocks.storageObjects.add(uploaded.path);
-      return uploaded;
-    });
-
-    await expect(updateProfile(currentUser(), input({
-      avatar: imageFile("replacement.jpg"),
-    }))).rejects.toThrow("database commit outcome unavailable");
-
-    expect(mocks.row?.avatarUrl).toBe(avatarUrl(firstPath));
-    expect(mocks.storageObjects).toEqual(new Set([originalPath, firstPath, otherUserPath]));
-    expect(removedPaths()).toEqual([]);
-    expect(mocks.forUpdate).toHaveBeenCalledTimes(2);
-  });
-
-  it("never removes an avatar object owned by another user", async () => {
-    mocks.uploadProfileAvatar.mockImplementationOnce(async () => {
-      const uploaded = uploadedAvatar(firstPath);
-      mocks.storageObjects.add(uploaded.path);
-      return uploaded;
-    });
-
-    await updateProfile(currentUser(), input({ avatar: imageFile("replacement.jpg") }));
-
-    expect(mocks.storageObjects).toContain(otherUserPath);
-    expect(removedPaths()).toEqual([originalPath]);
-    expect(removedPaths()).not.toContain(otherUserPath);
+    expect(mocks.storageObjects).toEqual(new Set([firstPath, otherUserPath]));
+    expect(mocks.uploadPreparedProfileAvatar).toHaveBeenCalledOnce();
+    expect(mocks.storageCallsDuringTransaction).toEqual([]);
   });
 });
 
@@ -217,6 +304,11 @@ function installSerializedTransactions(): void {
     await previous;
 
     const local = { row: mocks.row ? { ...mocks.row } : null };
+    mocks.activeTransactions += 1;
+    mocks.maxActiveTransactions = Math.max(
+      mocks.maxActiveTransactions,
+      mocks.activeTransactions,
+    );
     try {
       const result = await callback(fakeTransaction(local));
       mocks.row = local.row;
@@ -226,8 +318,19 @@ function installSerializedTransactions(): void {
       }
       return result;
     } finally {
+      mocks.activeTransactions -= 1;
       release();
     }
+  });
+}
+
+function installDirectSelect(): void {
+  mocks.select.mockReset().mockImplementation(() => {
+    const builder = chainBuilder();
+    builder.limit = vi.fn(async () => mocks.row
+      ? [{ avatarUrl: mocks.row.avatarUrl }]
+      : []);
+    return builder;
   });
 }
 
@@ -252,10 +355,6 @@ function fakeTransaction(local: { row: ProfileRow | null }) {
         return builder;
       });
       builder.returning = vi.fn(async () => {
-        if (mocks.updateFailures > 0) {
-          mocks.updateFailures -= 1;
-          throw new Error("database unavailable");
-        }
         if (!local.row) return [];
         local.row = { ...local.row, ...values };
         return [{ ...local.row }];
@@ -271,6 +370,12 @@ function chainBuilder(): Record<string, ReturnType<typeof vi.fn>> {
     builder[method] = vi.fn(() => builder);
   }
   return builder;
+}
+
+function recordStorageCall(operation: string): void {
+  if (mocks.activeTransactions > 0) {
+    mocks.storageCallsDuringTransaction.push(operation);
+  }
 }
 
 function currentUser(): CurrentAppUser {
@@ -311,8 +416,13 @@ function imageFile(name: string): File {
   return new File(["image"], name, { type: "image/jpeg" });
 }
 
-function uploadedAvatar(path: string): UploadedAvatar {
-  return { path, publicUrl: avatarUrl(path) };
+function preparedAvatar(path: string): PreparedAvatarUpload {
+  return {
+    path,
+    publicUrl: avatarUrl(path),
+    bytes: new Uint8Array([1, 2, 3]),
+    mime: "image/jpeg",
+  };
 }
 
 function avatarUrl(path: string): string {
