@@ -14,9 +14,28 @@ concurrency:
 
 jobs:
   test:
-    name: Tests and typecheck
+    name: Tests, Postgres, and typecheck
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      DATABASE_DIRECT_URL: postgresql://postgres:postgres@127.0.0.1:5432/muaythai_ci
+      DATABASE_POOLER_URL: postgresql://postgres:postgres@127.0.0.1:5432/muaythai_ci
+      DATABASE_POOL_MAX: "3"
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: muaythai_ci
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d muaythai_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
 
     steps:
       - name: Check out repository
@@ -31,8 +50,20 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Generate isolated auth-flow key
+        run: echo "AUTH_FLOW_SECRET=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+
       - name: Verify access-control configuration
         run: npm run db:verify-access-control:test
+
+      - name: Run unit tests
+        run: npm test
+
+      - name: Migrate ephemeral database
+        run: npm run db:migrate
+
+      - name: Verify recovery grant concurrency and retention
+        run: npm run auth:verify-recovery-grants
 
       - name: Run typecheck
         run: npm run typecheck
