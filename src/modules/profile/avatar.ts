@@ -60,6 +60,24 @@ export async function removeUploadedAvatar(path: string): Promise<void> {
   if (error) throw new Error(`Avatar cleanup failed: ${error.message}`);
 }
 
+export function getOwnedProfileAvatarPath(userId: string, publicUrl: string | null): string | null {
+  if (!publicUrl) return null;
+
+  try {
+    const marker = `/storage/v1/object/public/${PROFILE_AVATAR_BUCKET}/`;
+    const pathname = new URL(publicUrl).pathname;
+    const markerIndex = pathname.indexOf(marker);
+    if (markerIndex === -1) return null;
+
+    const path = decodeURIComponent(pathname.slice(markerIndex + marker.length));
+    const objectName = path.slice(userId.length + 1);
+    if (!path.startsWith(`${userId}/`) || !objectName || objectName.includes("/")) return null;
+    return path;
+  } catch {
+    return null;
+  }
+}
+
 export async function removeOtherUserAvatars(userId: string, keepPath: string | null): Promise<void> {
   const supabase = createSupabaseAdminClient();
   const bucket = supabase.storage.from(PROFILE_AVATAR_BUCKET);

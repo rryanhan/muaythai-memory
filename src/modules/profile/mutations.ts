@@ -3,7 +3,7 @@ import { db } from "@/db/client";
 import { users } from "@/db/schema";
 import type { CurrentAppUser } from "@/modules/auth";
 import {
-  removeOtherUserAvatars,
+  getOwnedProfileAvatarPath,
   removeUploadedAvatar,
   uploadProfileAvatar,
   type UploadedAvatar,
@@ -42,50 +42,104 @@ export async function updateProfile(currentUser: CurrentAppUser, input: UpdatePr
   }
 
   let uploadedAvatar: UploadedAvatar | null = null;
+  let outcome: {
+    updatedUser: Omit<ProfileDto, "email">;
+    previousAvatarPath: string | null;
+  };
   try {
-    if (input.avatar) uploadedAvatar = await uploadProfileAvatar(currentUser.id, input.avatar);
+    outcome = await db.transaction(async (tx) => {
+      const current = await getLockedProfileAvatar(tx, currentUser.id);
+      if (!current) throw new ProfileUpdateError("Profile could not be found.", 404);
 
-    const avatarUrl = uploadedAvatar?.publicUrl ?? (input.removeAvatar ? null : currentUser.avatarUrl);
-    const [updatedUser] = await db
-      .update(users)
-      .set({
+      if (input.avatar) uploadedAvatar = await uploadProfileAvatar(currentUser.id, input.avatar);
+      const avatarChanged = Boolean(uploadedAvatar || input.removeAvatar);
+      const values: {
+        displayName: string;
+        username: string;
+        firstName: string | null;
+        lastName: string | null;
+        location: string | null;
+        avatarUrl?: string | null;
+        updatedAt: Date;
+      } = {
         displayName: profile.username,
         username: profile.username,
         firstName: profile.firstName,
         lastName: profile.lastName,
         location: profile.location,
-        avatarUrl,
         updatedAt: new Date(),
-      })
-      .where(eq(users.id, currentUser.id))
-      .returning({
-        id: users.id,
-        displayName: users.displayName,
-        username: users.username,
-        firstName: users.firstName,
-        lastName: users.lastName,
-        location: users.location,
-        avatarUrl: users.avatarUrl,
-      });
+      };
+      if (avatarChanged) values.avatarUrl = uploadedAvatar?.publicUrl ?? null;
 
-    if (!updatedUser) throw new ProfileUpdateError("Profile could not be found.", 404);
+      const [updatedUser] = await tx
+        .update(users)
+        .set(values)
+        .where(eq(users.id, currentUser.id))
+        .returning({
+          id: users.id,
+          displayName: users.displayName,
+          username: users.username,
+          firstName: users.firstName,
+          lastName: users.lastName,
+          location: users.location,
+          avatarUrl: users.avatarUrl,
+        });
 
-    if (uploadedAvatar || input.removeAvatar) {
-      await removeOtherUserAvatars(currentUser.id, uploadedAvatar?.path ?? null).catch((error) => {
-        console.error("Profile avatar cleanup failed.", error instanceof Error ? error.message : error);
-      });
-    }
+      if (!updatedUser) throw new ProfileUpdateError("Profile could not be found.", 404);
 
-    return { ...updatedUser, email: currentUser.email };
+      return {
+        updatedUser,
+        previousAvatarPath: avatarChanged
+          ? getOwnedProfileAvatarPath(currentUser.id, current.avatarUrl)
+          : null,
+      };
+    });
+
   } catch (error) {
     if (uploadedAvatar) {
-      await removeUploadedAvatar(uploadedAvatar.path).catch(() => undefined);
+      await cleanupFailedAvatarUpload(currentUser.id, uploadedAvatar).catch((cleanupError) => {
+        console.error(
+          "Failed profile avatar upload cleanup failed.",
+          cleanupError instanceof Error ? cleanupError.message : cleanupError,
+        );
+      });
     }
     if (isUniqueUsernameError(error)) {
       throw new ProfileUpdateError("That username is already taken.", 409);
     }
     throw error;
   }
+
+  if (outcome.previousAvatarPath) {
+    await removeUploadedAvatar(outcome.previousAvatarPath).catch((error) => {
+      console.error("Profile avatar cleanup failed.", error instanceof Error ? error.message : error);
+    });
+  }
+
+  return { ...outcome.updatedUser, email: currentUser.email };
+}
+
+type ProfileTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+async function getLockedProfileAvatar(tx: ProfileTransaction, userId: string) {
+  const [current] = await tx
+    .select({ avatarUrl: users.avatarUrl })
+    .from(users)
+    .where(eq(users.id, userId))
+    .for("update", { of: users })
+    .limit(1);
+  return current ?? null;
+}
+
+async function cleanupFailedAvatarUpload(
+  userId: string,
+  uploadedAvatar: UploadedAvatar,
+): Promise<void> {
+  await db.transaction(async (tx) => {
+    const current = await getLockedProfileAvatar(tx, userId);
+    if (current?.avatarUrl === uploadedAvatar.publicUrl) return;
+    await removeUploadedAvatar(uploadedAvatar.path);
+  });
 }
 
 function parseProfileFields(input: UpdateProfileInput) {
