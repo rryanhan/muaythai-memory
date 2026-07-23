@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { createDrillPayloadHash } from "./idempotency";
+import {
+  createDrillPayloadHash,
+  resolveDrillCreationLedgerEntry,
+} from "./idempotency";
 
 const input = {
   title: "Rear kick return",
@@ -36,5 +39,23 @@ describe("createDrillPayloadHash", () => {
       ...input,
       title: "A different original title",
     })).not.toBe(createDrillPayloadHash(input));
+  });
+
+  it("distinguishes an existing drill, a deleted drill, and payload misuse", () => {
+    const payloadHash = createDrillPayloadHash(input);
+    const drillId = "00000000-0000-4000-8000-000000000001";
+
+    expect(resolveDrillCreationLedgerEntry(
+      { drillId, payloadHash },
+      payloadHash,
+    )).toEqual({ status: "existing", drillId });
+    expect(resolveDrillCreationLedgerEntry(
+      { drillId: null, payloadHash },
+      payloadHash,
+    )).toEqual({ status: "deleted" });
+    expect(resolveDrillCreationLedgerEntry(
+      { drillId: null, payloadHash },
+      createDrillPayloadHash({ ...input, title: "Different request" }),
+    )).toEqual({ status: "payload-mismatch" });
   });
 });

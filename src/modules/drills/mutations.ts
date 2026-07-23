@@ -1,6 +1,7 @@
 import { and, eq, inArray, isNull, or } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
+  drillCreationKeys,
   drillStatusTags,
   drillSteps,
   drillTags,
@@ -20,7 +21,11 @@ import {
   type UpdateSavedListResponse,
   type UpdateDrillInput,
 } from "./contracts";
-import { createDrillPayloadHash } from "./idempotency";
+import {
+  createDrillPayloadHash,
+  resolveDrillCreationLedgerEntry,
+  type DrillCreationLedgerEntry,
+} from "./idempotency";
 import { getDrillById } from "./queries";
 
 export class CreateDrillValidationError extends Error {
@@ -36,9 +41,16 @@ export class CreateDrillValidationError extends Error {
 export class CreateDrillIdempotencyError extends Error {
   readonly status = 409;
 
-  constructor() {
-    super("This Idempotency-Key was already used for a different drill.");
+  constructor(message = "This Idempotency-Key was already used for a different drill.") {
+    super(message);
     this.name = "CreateDrillIdempotencyError";
+  }
+}
+
+export class CreateDrillIdempotencyGoneError extends CreateDrillIdempotencyError {
+  constructor() {
+    super("The drill created with this Idempotency-Key no longer exists.");
+    this.name = "CreateDrillIdempotencyGoneError";
   }
 }
 
@@ -86,11 +98,11 @@ export async function createDrill(
       }
     : null;
   if (idempotency) {
-    const existing = await getDrillRecordByCreationKey(userId, idempotency.creationKey);
+    const existing = await getDrillCreationLedgerEntry(userId, idempotency.creationKey);
     if (existing) {
-      assertIdempotentPayloadHash(existing.creationPayloadHash, idempotency.payloadHash);
-      const existingDrill = await getDrillById(userId, existing.id);
-      if (!existingDrill) throw new Error("Created drill could not be loaded.");
+      const existingDrillId = resolveExistingDrillId(existing, idempotency.payloadHash);
+      const existingDrill = await getDrillById(userId, existingDrillId);
+      if (!existingDrill) throw new CreateDrillIdempotencyGoneError();
       return existingDrill;
     }
   }
@@ -114,38 +126,59 @@ export async function createDrill(
   }
 
   const createdDrillId = await db.transaction(async (tx) => {
-    const insert = tx
+    if (idempotency) {
+      const [reservation] = await tx
+        .insert(drillCreationKeys)
+        .values({
+          userId,
+          creationKey: idempotency.creationKey,
+          payloadHash: idempotency.payloadHash,
+        })
+        .onConflictDoNothing({
+          target: [drillCreationKeys.userId, drillCreationKeys.creationKey],
+        })
+        .returning({ creationKey: drillCreationKeys.creationKey });
+
+      if (!reservation) {
+        const [existing] = await tx
+          .select({
+            drillId: drillCreationKeys.drillId,
+            payloadHash: drillCreationKeys.payloadHash,
+          })
+          .from(drillCreationKeys)
+          .where(and(
+            eq(drillCreationKeys.userId, userId),
+            eq(drillCreationKeys.creationKey, idempotency.creationKey),
+          ))
+          .limit(1);
+        if (!existing) throw new Error("Creation key reservation could not be loaded.");
+        return resolveExistingDrillId(existing, idempotency.payloadHash);
+      }
+    }
+
+    const [drill] = await tx
       .insert(drills)
       .values({
         userId,
         title: input.title,
         summary: input.summary ?? "",
         notes: input.notes,
-        creationKey: idempotency?.creationKey,
-        creationPayloadHash: idempotency?.payloadHash,
-      });
-    const [drill] = idempotency
-      ? await insert
-          .onConflictDoNothing({ target: [drills.userId, drills.creationKey] })
-          .returning({ id: drills.id })
-      : await insert.returning({ id: drills.id });
-
-    if (!drill && idempotency) {
-      const [existing] = await tx
-        .select({
-          id: drills.id,
-          creationPayloadHash: drills.creationPayloadHash,
-        })
-        .from(drills)
-        .where(and(eq(drills.userId, userId), eq(drills.creationKey, idempotency.creationKey)))
-        .limit(1);
-      if (existing) {
-        assertIdempotentPayloadHash(existing.creationPayloadHash, idempotency.payloadHash);
-        return existing.id;
-      }
-    }
+      })
+      .returning({ id: drills.id });
 
     if (!drill) throw new Error("Failed to create drill.");
+
+    if (idempotency) {
+      const [boundReservation] = await tx
+        .update(drillCreationKeys)
+        .set({ drillId: drill.id })
+        .where(and(
+          eq(drillCreationKeys.userId, userId),
+          eq(drillCreationKeys.creationKey, idempotency.creationKey),
+        ))
+        .returning({ creationKey: drillCreationKeys.creationKey });
+      if (!boundReservation) throw new Error("Creation key reservation could not be bound.");
+    }
 
     await tx.insert(drillSteps).values(
       input.steps.map((body, index) => ({
@@ -379,23 +412,34 @@ function unique(values: string[]): string[] {
   return [...new Set(values)];
 }
 
-async function getDrillRecordByCreationKey(userId: string, creationKey: string) {
+async function getDrillCreationLedgerEntry(
+  userId: string,
+  creationKey: string,
+): Promise<DrillCreationLedgerEntry | null> {
   const [existing] = await db
     .select({
-      id: drills.id,
-      creationPayloadHash: drills.creationPayloadHash,
+      drillId: drillCreationKeys.drillId,
+      payloadHash: drillCreationKeys.payloadHash,
     })
-    .from(drills)
-    .where(and(eq(drills.userId, userId), eq(drills.creationKey, creationKey)))
+    .from(drillCreationKeys)
+    .where(and(
+      eq(drillCreationKeys.userId, userId),
+      eq(drillCreationKeys.creationKey, creationKey),
+    ))
     .limit(1);
   return existing ?? null;
 }
 
-function assertIdempotentPayloadHash(
-  existingHash: string | null,
-  requestedHash: string,
-): void {
-  if (existingHash !== requestedHash) {
+function resolveExistingDrillId(
+  entry: DrillCreationLedgerEntry,
+  requestedPayloadHash: string,
+): string {
+  const resolution = resolveDrillCreationLedgerEntry(entry, requestedPayloadHash);
+  if (resolution.status === "payload-mismatch") {
     throw new CreateDrillIdempotencyError();
   }
+  if (resolution.status === "deleted") {
+    throw new CreateDrillIdempotencyGoneError();
+  }
+  return resolution.drillId;
 }

@@ -2,11 +2,19 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { and, asc, eq } from "drizzle-orm";
 import { db, postgresClient } from "@/db/client";
-import { drills, tags, trainingMethods, users } from "@/db/schema";
+import {
+  drillCreationKeys,
+  drills,
+  tags,
+  trainingMethods,
+  users,
+} from "@/db/schema";
 import type { CurrentAppUser } from "@/modules/auth";
 import { createDrillPayloadHash } from "@/modules/drills/idempotency";
 import {
   CreateDrillIdempotencyError,
+  CreateDrillIdempotencyGoneError,
+  deleteDrill,
   updateDrill,
 } from "@/modules/drills/mutations";
 import {
@@ -84,11 +92,18 @@ async function main() {
     const drill = await createGuidedFirstDrill(userA.id, immutableInput, creationKey);
     assert.equal(drill.title, "Onboarding Verification Drill");
     const [storedContract] = await db
-      .select({ payloadHash: drills.creationPayloadHash })
-      .from(drills)
-      .where(eq(drills.id, drill.id))
+      .select({
+        drillId: drillCreationKeys.drillId,
+        payloadHash: drillCreationKeys.payloadHash,
+      })
+      .from(drillCreationKeys)
+      .where(and(
+        eq(drillCreationKeys.userId, userA.id),
+        eq(drillCreationKeys.creationKey, creationKey),
+      ))
       .limit(1);
     assert.equal(storedContract?.payloadHash, createDrillPayloadHash(immutableInput));
+    assert.equal(storedContract?.drillId, drill.id);
 
     const editedTitle = "Edited After Original Save";
     await updateDrill(userA.id, drill.id, {
@@ -109,6 +124,28 @@ async function main() {
       createGuidedFirstDrill(userA.id, { ...immutableInput, title: editedTitle }, creationKey),
       (error: unknown) => error instanceof CreateDrillIdempotencyError,
     );
+
+    await deleteDrill(userA.id, drill.id);
+    await assert.rejects(
+      createGuidedFirstDrill(userA.id, immutableInput, creationKey),
+      (error: unknown) => error instanceof CreateDrillIdempotencyGoneError,
+    );
+    await assert.rejects(
+      createGuidedFirstDrill(userA.id, { ...immutableInput, title: editedTitle }, creationKey),
+      (error: unknown) => (
+        error instanceof CreateDrillIdempotencyError
+        && !(error instanceof CreateDrillIdempotencyGoneError)
+      ),
+    );
+    const [deletedLedger] = await db
+      .select({ drillId: drillCreationKeys.drillId })
+      .from(drillCreationKeys)
+      .where(and(
+        eq(drillCreationKeys.userId, userA.id),
+        eq(drillCreationKeys.creationKey, creationKey),
+      ))
+      .limit(1);
+    assert.equal(deletedLedger?.drillId, null, "Deleting a drill must tombstone, not free, its creation key.");
 
     const responseLossKey = randomUUID();
     let responseLostDrillId: string | null = null;
@@ -143,10 +180,44 @@ async function main() {
     ]);
     assert.equal(concurrentDrills[0].id, concurrentDrills[1].id);
     const concurrentRows = await db
-      .select({ id: drills.id })
-      .from(drills)
-      .where(and(eq(drills.userId, userA.id), eq(drills.creationKey, concurrentKey)));
+      .select({ drillId: drillCreationKeys.drillId })
+      .from(drillCreationKeys)
+      .where(and(
+        eq(drillCreationKeys.userId, userA.id),
+        eq(drillCreationKeys.creationKey, concurrentKey),
+      ));
     assert.equal(concurrentRows.length, 1);
+    assert.equal(concurrentRows[0]?.drillId, concurrentDrills[0].id);
+
+    const competingKey = randomUUID();
+    const competingResults = await Promise.allSettled([
+      createGuidedFirstDrill(
+        userA.id,
+        { ...input, title: "Competing Payload A" },
+        competingKey,
+      ),
+      createGuidedFirstDrill(
+        userA.id,
+        { ...input, title: "Competing Payload B" },
+        competingKey,
+      ),
+    ]);
+    assert.equal(competingResults.filter((result) => result.status === "fulfilled").length, 1);
+    const competingFailure = competingResults.find((result) => result.status === "rejected");
+    assert.ok(
+      competingFailure?.status === "rejected"
+      && competingFailure.reason instanceof CreateDrillIdempotencyError,
+      "Concurrent payload misuse must reject the losing request.",
+    );
+    const competingLedgerRows = await db
+      .select({ drillId: drillCreationKeys.drillId })
+      .from(drillCreationKeys)
+      .where(and(
+        eq(drillCreationKeys.userId, userA.id),
+        eq(drillCreationKeys.creationKey, competingKey),
+      ));
+    assert.equal(competingLedgerRows.length, 1);
+    assert.ok(competingLedgerRows[0]?.drillId);
 
     const completed = await db.query.users.findFirst({ where: (table, operators) => operators.eq(table.id, userA.id) });
     assert.ok(completed?.profileOnboardedAt);
@@ -193,7 +264,7 @@ async function main() {
     assert.notEqual(scopedKeyDrill.id, drill.id, "Creation keys must be scoped to the owning user.");
 
     console.log(
-      "Onboarding verification passed: profile validation, immutable scoped idempotency, response-loss retries, concurrency, and terminal guide state are stable.",
+      "Onboarding verification passed: durable scoped idempotency, deletion tombstones, response-loss retries, concurrency, and terminal guide state are stable.",
     );
   } finally {
     await db.delete(users).where(eq(users.id, userA.id));

@@ -21,7 +21,7 @@ const userId = "00000000-0000-4000-8000-000000000001";
 
 describe("POST /api/onboarding/skip", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     mocks.requireProfileOnboardedUserId.mockResolvedValue(userId);
     mocks.skipFirstDrillGuide.mockResolvedValue(true);
   });
@@ -31,6 +31,23 @@ describe("POST /api/onboarding/skip", () => {
 
     expect(response.status).toBe(200);
     expect(mocks.invalidateOnboardingState).toHaveBeenCalledWith(userId);
+  });
+
+  it("returns a retryable error when Skip succeeds but invalidation fails", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    mocks.invalidateOnboardingState.mockImplementation(() => {
+      throw new Error("cache invalidation failed");
+    });
+
+    const response = await POST();
+
+    expect(response.status).toBe(503);
+    expect(response.headers.get("retry-after")).toBe("1");
+    await expect(response.json()).resolves.toEqual({
+      error: "The guide was skipped, but onboarding could not be refreshed. Try again.",
+    });
+    expect(mocks.skipFirstDrillGuide).toHaveBeenCalledTimes(1);
+    consoleError.mockRestore();
   });
 
   it("invalidates after a post-commit failure without hiding the mutation error", async () => {

@@ -207,8 +207,6 @@ export const drills = pgTable(
     summary: text("summary").notNull(),
     notes: text("notes"),
     sourceTranscript: text("source_transcript"),
-    creationKey: varchar("creation_key", { length: 36 }),
-    creationPayloadHash: varchar("creation_payload_hash", { length: 64 }),
     archivedAt: timestamp("archived_at", { withTimezone: true }),
     ...timestamps,
   },
@@ -216,14 +214,23 @@ export const drills = pgTable(
     userIdx: index("drills_user_id_idx").on(table.userId),
     titleIdx: index("drills_title_idx").on(table.title),
     archivedIdx: index("drills_archived_at_idx").on(table.archivedAt),
-    userCreationKeyUnique: uniqueIndex("drills_user_creation_key_unique").on(
-      table.userId,
-      table.creationKey,
-    ),
-    creationIdempotencyCheck: check(
-      "drills_creation_idempotency_check",
-      sql`(${table.creationKey} is null and ${table.creationPayloadHash} is null) or (${table.creationKey} is not null and ${table.creationPayloadHash} is not null)`,
-    ),
+  }),
+);
+
+// Creation keys outlive drills so deleting a drill cannot make a committed
+// onboarding request reusable. The drill reference is tombstoned on deletion.
+export const drillCreationKeys = pgTable(
+  "drill_creation_keys",
+  {
+    userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    creationKey: varchar("creation_key", { length: 36 }).notNull(),
+    payloadHash: varchar("payload_hash", { length: 64 }).notNull(),
+    drillId: uuid("drill_id").references(() => drills.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.userId, table.creationKey] }),
+    drillIdx: index("drill_creation_keys_drill_id_idx").on(table.drillId),
   }),
 );
 

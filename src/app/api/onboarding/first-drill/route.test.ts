@@ -21,14 +21,21 @@ const mocks = vi.hoisted(() => {
   class CreateDrillIdempotencyError extends Error {
     readonly status = 409;
 
+    constructor(message = "This Idempotency-Key was already used for a different drill.") {
+      super(message);
+    }
+  }
+
+  class CreateDrillIdempotencyGoneError extends CreateDrillIdempotencyError {
     constructor() {
-      super("This Idempotency-Key was already used for a different drill.");
+      super("The drill created with this Idempotency-Key no longer exists.");
     }
   }
 
   return {
     AuthenticationRequiredError,
     CreateDrillIdempotencyError,
+    CreateDrillIdempotencyGoneError,
     OnboardingRequiredError,
     createGuidedFirstDrill: vi.fn(),
     invalidateOnboardingState: vi.fn(),
@@ -102,7 +109,7 @@ const drill = {
 
 describe("POST /api/onboarding/first-drill", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     mocks.requireProfileOnboardedUserId.mockResolvedValue(userId);
     mocks.createGuidedFirstDrill.mockResolvedValue(drill);
   });
@@ -168,6 +175,36 @@ describe("POST /api/onboarding/first-drill", () => {
       error: "This Idempotency-Key was already used for a different drill.",
     });
     expect(mocks.invalidateOnboardingState).toHaveBeenCalledWith(userId);
+  });
+
+  it("returns a deterministic conflict after the originally created drill was deleted", async () => {
+    mocks.createGuidedFirstDrill.mockRejectedValue(
+      new mocks.CreateDrillIdempotencyGoneError(),
+    );
+
+    const response = await POST(request(input, creationKey));
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual({
+      error: "The drill created with this Idempotency-Key no longer exists.",
+    });
+  });
+
+  it("returns a retryable error when creation succeeds but invalidation fails", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    mocks.invalidateOnboardingState.mockImplementation(() => {
+      throw new Error("cache invalidation failed");
+    });
+
+    const response = await POST(request(input, creationKey));
+
+    expect(response.status).toBe(503);
+    expect(response.headers.get("retry-after")).toBe("1");
+    await expect(response.json()).resolves.toEqual({
+      error: "Your first drill was saved, but onboarding could not be refreshed. Try again.",
+    });
+    expect(mocks.createGuidedFirstDrill).toHaveBeenCalledTimes(1);
+    consoleError.mockRestore();
   });
 
   it("invalidates after a post-commit response failure without replacing the original error", async () => {

@@ -12,31 +12,53 @@ export const runtime = "nodejs";
 export async function POST() {
   let mutationUserId: string | null = null;
   let mutationAttempted = false;
+  let mutationSucceeded = false;
+  let response: NextResponse;
 
   try {
     const userId = await requireProfileOnboardedUserId();
     mutationUserId = userId;
     mutationAttempted = true;
     const skipped = await skipFirstDrillGuide(userId);
-    return NextResponse.json(onboardingSkipResponseSchema.parse({ skipped }));
+    mutationSucceeded = true;
+    response = NextResponse.json(onboardingSkipResponseSchema.parse({ skipped }));
   } catch (error) {
-    const authResponse = authenticationErrorResponse(error);
-    if (authResponse) return authResponse;
-    console.error("Onboarding skip failed.", error instanceof Error ? error.message : error);
-    return NextResponse.json({ error: "The guide could not be skipped. Try again." }, { status: 500 });
-  } finally {
-    invalidateAfterMutation(mutationUserId, mutationAttempted);
+    response = skipErrorResponse(error);
   }
+
+  const invalidated = invalidateAfterMutation(mutationUserId, mutationAttempted);
+  if (mutationSucceeded && response.ok && !invalidated) {
+    return retryableInvalidationResponse(
+      "The guide was skipped, but onboarding could not be refreshed. Try again.",
+    );
+  }
+  return response;
 }
 
-function invalidateAfterMutation(userId: string | null, attempted: boolean): void {
-  if (!userId || !attempted) return;
+function skipErrorResponse(error: unknown): NextResponse {
+  const authResponse = authenticationErrorResponse(error);
+  if (authResponse) return authResponse;
+  console.error("Onboarding skip failed.", error instanceof Error ? error.message : error);
+  return NextResponse.json({ error: "The guide could not be skipped. Try again." }, { status: 500 });
+}
+
+function invalidateAfterMutation(userId: string | null, attempted: boolean): boolean {
+  if (!userId || !attempted) return true;
   try {
     invalidateOnboardingState(userId);
+    return true;
   } catch (error) {
     console.error(
       "Onboarding state invalidation failed after first-drill skip.",
       error instanceof Error ? error.message : error,
     );
+    return false;
   }
+}
+
+function retryableInvalidationResponse(message: string): NextResponse {
+  return NextResponse.json(
+    { error: message },
+    { status: 503, headers: { "retry-after": "1" } },
+  );
 }
