@@ -77,6 +77,12 @@ ends in the normal editable drill form and creates a normal owned drill through
 the same taxonomy and validation rules. Skipped users can replay it from
 Training Log.
 
+Each mounted first-drill attempt keeps one browser-session creation key. The
+server scopes that key to the authenticated user, returns the original owned
+drill after an identical retry or lost response, and rejects reuse with a
+different payload. Save is allowed to replace a prior Skip during a replay;
+Skip never replaces a completed guide.
+
 ## Existing passwordless users
 
 Accounts created under the previous magic-link flow can select **Forgot
@@ -89,6 +95,7 @@ not change.
 npm test
 npm run auth:verify
 npm run auth:verify-api
+npm run auth:verify-api-state
 npm run auth:verify-recovery-grants
 npm run onboarding:verify
 npm run typecheck
@@ -98,5 +105,15 @@ npm run build
 Run `auth:verify-recovery-grants` only after migration `0008` is applied to the
 target environment. It exercises concurrent grant claims against real
 Postgres and removes its temporary app user afterward.
+
+Run `onboarding:verify` only after migration `0009` is applied. It creates and
+removes temporary app users while checking response-loss retries, concurrent
+Save/Skip, and scoped creation keys.
+
+`auth:verify-api-state` is non-mutating. Point `AUTH_VERIFY_BASE_URL` at a
+running app and provide session-cookie header values for three existing fixture
+accounts in `AUTH_VERIFY_PROFILE_INCOMPLETE_COOKIE`,
+`AUTH_VERIFY_GUIDE_INCOMPLETE_COOKIE`, and
+`AUTH_VERIFY_ONBOARDED_COOKIE`.
 
 Use two accounts to confirm drill, graph, journal, and custom-tag isolation.

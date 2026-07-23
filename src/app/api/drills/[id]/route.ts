@@ -14,7 +14,6 @@ import {
 import { getDrillById } from "@/modules/drills/queries";
 import {
   authenticationErrorResponse,
-  requireOnboardedAppUser,
   requireOnboardedUserId,
 } from "@/modules/auth";
 
@@ -46,10 +45,10 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ id
 
 export async function PATCH(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
-    const user = await requireOnboardedAppUser();
+    const userId = await requireOnboardedUserId();
     const { id } = routeParamsSchema.parse(await context.params);
     const input = updateDrillInputSchema.parse(await request.json());
-    const response = drillDetailResponseSchema.parse({ drill: await updateDrill(user.id, id, input) });
+    const response = drillDetailResponseSchema.parse({ drill: await updateDrill(userId, id, input) });
     return NextResponse.json(response);
   } catch (error) {
     return handleRouteError(error, "Failed to update drill.");
@@ -58,10 +57,10 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
 
 export async function DELETE(_request: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
-    const user = await requireOnboardedAppUser();
+    const userId = await requireOnboardedUserId();
     const { id } = routeParamsSchema.parse(await context.params);
     return NextResponse.json(
-      deleteDrillResponseSchema.parse({ deletedId: await deleteDrill(user.id, id) }),
+      deleteDrillResponseSchema.parse({ deletedId: await deleteDrill(userId, id) }),
     );
   } catch (error) {
     return handleRouteError(error, "Failed to delete drill.");

@@ -32,6 +32,7 @@
     "api:verify": "tsx src/data/verify-api.ts",
     "auth:verify": "tsx src/db/verify-auth-ownership.ts",
     "auth:verify-api": "tsx src/data/verify-auth-api.ts",
+    "auth:verify-api-state": "tsx src/data/verify-onboarding-api-state.ts",
     "auth:verify-recovery-grants": "tsx src/db/verify-auth-recovery-grants.ts",
     "onboarding:verify": "tsx src/modules/onboarding/verify-onboarding.ts",
     "capture:verify": "tsx src/modules/capture/verify-capture.ts",

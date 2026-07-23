@@ -10,7 +10,6 @@ import { CreateDrillValidationError, createDrill } from "@/modules/drills/mutati
 import { listDrills } from "@/modules/drills/queries";
 import {
   authenticationErrorResponse,
-  requireOnboardedAppUser,
   requireOnboardedUserId,
 } from "@/modules/auth";
 
@@ -32,9 +31,9 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const user = await requireOnboardedAppUser();
+    const userId = await requireOnboardedUserId();
     const input = createDrillInputSchema.parse(await request.json());
-    const response = drillDetailResponseSchema.parse({ drill: await createDrill(user.id, input) });
+    const response = drillDetailResponseSchema.parse({ drill: await createDrill(userId, input) });
     return NextResponse.json(response, { status: 201 });
   } catch (error) {
     return handleRouteError(error, "Failed to create drill.");

@@ -1,6 +1,14 @@
 "use client";
 
-import { useLayoutEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type FormEvent,
+  type ReactNode,
+} from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { badgeByIconKey } from "@/components/shared/context-badges";
@@ -35,6 +43,7 @@ type AddDrillFormProps = {
   onSaveSuccess?: (drillId: string) => void;
   createAction?: (input: CreateDrillInput) => Promise<DrillDetail>;
   onDirtyChange?: (dirty: boolean) => void;
+  onCreationCommitChange?: (committing: boolean) => void;
 };
 
 export type { DrillFormCleanupState, DrillFormInitialValues } from "./drill-form-types";
@@ -50,6 +59,7 @@ export function AddDrillForm({
   onSaveSuccess,
   createAction,
   onDirtyChange,
+  onCreationCommitChange,
 }: AddDrillFormProps) {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -72,6 +82,7 @@ export function AddDrillForm({
   const [statusTagSlugs, setStatusTagSlugs] = useState<string[]>(() => formInitialValues.statusTagSlugs ?? []);
   const [formMessage, setFormMessage] = useState<string | null>(null);
   const [pendingCleanup, setPendingCleanup] = useState<PendingDrillCleanup>({});
+  const errorRef = useRef<HTMLParagraphElement>(null);
   const lastCleanupRevision = useRef<number | null>(null);
   const dirtyFields = useRef<DrillDirtyFields>({
     title: false,
@@ -109,6 +120,9 @@ export function AddDrillForm({
       router.push(`/drills/${drill.id}`);
       router.refresh();
     },
+    onSettled: () => {
+      onCreationCommitChange?.(false);
+    },
   });
   const taxonomy = taxonomyQuery.data;
   const standardTagCategories = taxonomy?.tagCategories ?? [];
@@ -117,6 +131,12 @@ export function AddDrillForm({
   const selectedMethods = useMemo(() => new Set(trainingMethodSlugs), [trainingMethodSlugs]);
   const selectedTags = useMemo(() => new Set(tagSlugs), [tagSlugs]);
   const selectedStatuses = useMemo(() => new Set(statusTagSlugs), [statusTagSlugs]);
+
+  useEffect(() => {
+    if (formMessage || saveMutation.isError) {
+      errorRef.current?.focus({ preventScroll: true });
+    }
+  }, [formMessage, saveMutation.isError]);
 
   useLayoutEffect(() => {
     if (
@@ -218,6 +238,7 @@ export function AddDrillForm({
 
     setFormMessage(null);
     onBeforeSave?.();
+    onCreationCommitChange?.(true);
     saveMutation.mutate({
       title,
       summary,
@@ -244,7 +265,11 @@ export function AddDrillForm({
   }
 
   return (
-    <form className={`${styles.form} ${cleanupState ? captureStyles.scope : ""}`} onSubmit={handleSubmit}>
+    <form
+      className={`${styles.form} ${cleanupState ? captureStyles.scope : ""}`}
+      aria-busy={saveMutation.isPending}
+      onSubmit={handleSubmit}
+    >
       <section className="add-drill-section add-drill-saved-list-section">
         <p className="eyebrow">Saved Lists</p>
         <div className="add-drill-saved-list-tokens">
@@ -392,17 +417,29 @@ export function AddDrillForm({
         <CleanupState
           state={cleanupState}
           pending={pendingCleanup}
+          disabled={saveMutation.isPending}
           onApplyField={applyCleanupField}
           onApplyAll={applyAllCleanup}
         />
       )}
 
       {(formMessage || saveMutation.isError) && (
-        <p className="add-drill-error">{formMessage ?? getMutationErrorMessage(saveMutation.error)}</p>
+        <p
+          ref={errorRef}
+          className="add-drill-error"
+          role="alert"
+          tabIndex={-1}
+        >
+          {formMessage ?? getMutationErrorMessage(saveMutation.error)}
+        </p>
       )}
 
       <div className="add-drill-actions">
-        <button type="button" onClick={() => (onCancel ? onCancel() : router.back())}>
+        <button
+          type="button"
+          disabled={saveMutation.isPending}
+          onClick={() => (onCancel ? onCancel() : router.back())}
+        >
           Cancel
         </button>
         <button type="submit" disabled={saveMutation.isPending || textFieldsPending}>
@@ -449,11 +486,13 @@ function TagToken({ label, selected, onToggle }: { label: string; selected: bool
 function CleanupState({
   state,
   pending,
+  disabled,
   onApplyField,
   onApplyAll,
 }: {
   state: DrillFormCleanupState;
   pending: PendingDrillCleanup;
+  disabled: boolean;
   onApplyField: (field: DrillCleanupField) => void;
   onApplyAll: () => void;
 }) {
@@ -472,7 +511,7 @@ function CleanupState({
         <p className="eyebrow">Cleanup Unavailable</p>
         <p>{state.errorMessage ?? "The immediate draft is still ready to edit and save."}</p>
         {state.onRetry && (
-          <button type="button" onClick={state.onRetry}>
+          <button type="button" disabled={disabled} onClick={state.onRetry}>
             Retry cleanup
           </button>
         )}
@@ -493,7 +532,7 @@ function CleanupState({
           <p className="eyebrow">Cleanup Ready</p>
           <p>Your edits were kept. Review the remaining suggestions.</p>
         </div>
-        <button type="button" onClick={onApplyAll}>
+        <button type="button" disabled={disabled} onClick={onApplyAll}>
           Apply all
         </button>
       </div>
@@ -513,7 +552,7 @@ function CleanupState({
             <article key={field}>
               <div>
                 <h3>{cleanupFieldLabel[field]}</h3>
-                <button type="button" onClick={() => onApplyField(field)}>
+                <button type="button" disabled={disabled} onClick={() => onApplyField(field)}>
                   Apply
                 </button>
               </div>

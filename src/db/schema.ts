@@ -39,6 +39,10 @@ export const users = pgTable(
   (table) => ({
     displayNameIdx: index("users_display_name_idx").on(table.displayName),
     usernameUnique: uniqueIndex("users_username_unique").on(table.username),
+    firstDrillGuideStateCheck: check(
+      "users_first_drill_guide_state_check",
+      sql`${table.firstDrillGuideCompletedAt} is null or ${table.firstDrillGuideSkippedAt} is null`,
+    ),
   }),
 );
 
@@ -203,6 +207,7 @@ export const drills = pgTable(
     summary: text("summary").notNull(),
     notes: text("notes"),
     sourceTranscript: text("source_transcript"),
+    creationKey: varchar("creation_key", { length: 36 }),
     archivedAt: timestamp("archived_at", { withTimezone: true }),
     ...timestamps,
   },
@@ -210,6 +215,10 @@ export const drills = pgTable(
     userIdx: index("drills_user_id_idx").on(table.userId),
     titleIdx: index("drills_title_idx").on(table.title),
     archivedIdx: index("drills_archived_at_idx").on(table.archivedAt),
+    userCreationKeyUnique: uniqueIndex("drills_user_creation_key_unique").on(
+      table.userId,
+      table.creationKey,
+    ),
   }),
 );
 

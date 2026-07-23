@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createOnboardingFirstDrill, skipOnboardingFirstDrill } from "@/data/onboarding";
 import { CaptureDraftScreen } from "@/features/capture/CaptureDraftScreen";
@@ -21,6 +21,11 @@ export function GuidedFirstDrillForm({
   const [coachVisible, setCoachVisible] = useState(initialMode === "voice");
   const [skipPending, setSkipPending] = useState(false);
   const [skipError, setSkipError] = useState<string | null>(null);
+  const skipErrorRef = useRef<HTMLParagraphElement>(null);
+
+  useEffect(() => {
+    if (skipError) skipErrorRef.current?.focus({ preventScroll: true });
+  }, [skipError]);
 
   function openManualForm() {
     setCoachVisible(false);
@@ -62,7 +67,16 @@ export function GuidedFirstDrillForm({
         }}
       />
       {skipPending && <p className={styles.onboardingFlowNotice}>Opening Training Log...</p>}
-      {skipError && <p className={styles.onboardingFlowError} role="alert">{skipError}</p>}
+      {skipError && (
+        <p
+          ref={skipErrorRef}
+          className={styles.onboardingFlowError}
+          role="alert"
+          tabIndex={-1}
+        >
+          {skipError}
+        </p>
+      )}
     </>
   );
 }

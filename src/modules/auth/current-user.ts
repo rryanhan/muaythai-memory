@@ -2,6 +2,10 @@ import { cache } from "react";
 import { db } from "@/db/client";
 import { users } from "@/db/schema";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import {
+  getCachedOnboardingState,
+  type OnboardingState,
+} from "./onboarding-state";
 
 export class AuthenticationRequiredError extends Error {
   readonly status = 401;
@@ -47,8 +51,8 @@ export const requireCurrentUserId = cache(async (): Promise<string> => {
   return (await requireCurrentAuthIdentity()).id;
 });
 
-// Profile and write paths still synchronize the public app user before using
-// profile fields or inserting rows with a users-table foreign key.
+// Profile paths synchronize the public app user before using profile fields.
+// Routine ownership checks use the smaller onboarding-state reader below.
 export const requireCurrentAppUser = cache(async (): Promise<CurrentAppUser> => {
   const { id, email, metadata } = await requireCurrentAuthIdentity();
   const initialDisplayName = deriveDisplayName(metadata, email);
@@ -76,23 +80,35 @@ export const requireCurrentAppUser = cache(async (): Promise<CurrentAppUser> => 
 });
 
 export const requireOnboardedAppUser = cache(async (): Promise<CurrentAppUser> => {
-  const user = await requireCurrentAppUser();
-  if (!isOnboardingComplete(user)) throw new OnboardingRequiredError();
-  return user;
+  await requireOnboardedUserId();
+  return requireCurrentAppUser();
 });
 
 export const requireProfileOnboardedAppUser = cache(async (): Promise<CurrentAppUser> => {
-  const user = await requireCurrentAppUser();
-  if (!isProfileOnboarded(user)) throw new OnboardingRequiredError();
-  return user;
+  await requireProfileOnboardedUserId();
+  return requireCurrentAppUser();
 });
 
 export const requireProfileOnboardedUserId = cache(async (): Promise<string> => {
-  return (await requireProfileOnboardedAppUser()).id;
+  const state = await requireCurrentOnboardingState();
+  if (!isProfileOnboarded(state)) throw new OnboardingRequiredError();
+  return state.id;
 });
 
 export const requireOnboardedUserId = cache(async (): Promise<string> => {
-  return (await requireOnboardedAppUser()).id;
+  const state = await requireCurrentOnboardingState();
+  if (!isOnboardingComplete(state)) throw new OnboardingRequiredError();
+  return state.id;
+});
+
+export const requireCurrentOnboardingState = cache(async (): Promise<OnboardingState> => {
+  const userId = await requireCurrentUserId();
+  const state = await getCachedOnboardingState(userId);
+  if (state) return state;
+
+  // A first authenticated request may arrive before the matching app-user row
+  // has been synchronized. That one-time path still needs the full user write.
+  return toOnboardingState(await requireCurrentAppUser());
 });
 
 // React cache deduplicates claim verification within one server request
@@ -143,21 +159,31 @@ function toCurrentAppUser(
   };
 }
 
-export function isProfileOnboarded(user: CurrentAppUser): boolean {
+export function isProfileOnboarded(user: OnboardingState): boolean {
   return Boolean(user.profileOnboardedAt && user.username);
 }
 
-export function isOnboardingComplete(user: CurrentAppUser): boolean {
+export function isOnboardingComplete(user: OnboardingState): boolean {
   return isProfileOnboarded(user) && Boolean(
     user.firstDrillGuideCompletedAt || user.firstDrillGuideSkippedAt,
   );
 }
 
-export function getOnboardingPath(user: CurrentAppUser, nextPath = "/"): string | null {
+export function getOnboardingPath(user: OnboardingState, nextPath = "/"): string | null {
   const next = encodeURIComponent(nextPath);
   if (!isProfileOnboarded(user)) return `/onboarding/profile?next=${next}`;
   if (!isOnboardingComplete(user)) return `/onboarding/first-drill?next=${next}`;
   return null;
+}
+
+function toOnboardingState(user: CurrentAppUser): OnboardingState {
+  return {
+    id: user.id,
+    username: user.username,
+    profileOnboardedAt: user.profileOnboardedAt,
+    firstDrillGuideCompletedAt: user.firstDrillGuideCompletedAt,
+    firstDrillGuideSkippedAt: user.firstDrillGuideSkippedAt,
+  };
 }
 
 function deriveDisplayName(metadata: Record<string, unknown>, email: string | null): string {

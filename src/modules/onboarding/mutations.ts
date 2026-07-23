@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/db/client";
 import { users } from "@/db/schema";
 import type { CurrentAppUser } from "@/modules/auth";
@@ -58,18 +58,41 @@ export async function completeProfileOnboarding(
 export async function createGuidedFirstDrill(
   userId: string,
   rawInput: OnboardingFirstDrillInput,
+  creationKey: string,
 ): Promise<DrillDetail> {
   const input = onboardingFirstDrillInputSchema.parse(rawInput);
-  return createDrill(userId, input, { completeFirstDrillGuide: true });
+  return createDrill(userId, input, {
+    completeFirstDrillGuide: true,
+    creationKey,
+  });
 }
 
-export async function skipFirstDrillGuide(userId: string): Promise<void> {
+export async function skipFirstDrillGuide(userId: string): Promise<boolean> {
   const [updated] = await db
     .update(users)
-    .set({ firstDrillGuideSkippedAt: new Date(), updatedAt: new Date() })
-    .where(eq(users.id, userId))
+    .set({
+      firstDrillGuideCompletedAt: null,
+      firstDrillGuideSkippedAt: new Date(),
+      updatedAt: new Date(),
+    })
+    .where(and(
+      eq(users.id, userId),
+      isNull(users.firstDrillGuideCompletedAt),
+      isNull(users.firstDrillGuideSkippedAt),
+    ))
     .returning({ id: users.id });
-  if (!updated) throw new OnboardingValidationError("Profile could not be found.", 404);
+  if (updated) return true;
+
+  const [existing] = await db
+    .select({
+      completedAt: users.firstDrillGuideCompletedAt,
+      skippedAt: users.firstDrillGuideSkippedAt,
+    })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+  if (!existing) throw new OnboardingValidationError("Profile could not be found.", 404);
+  return Boolean(existing.skippedAt && !existing.completedAt);
 }
 
 function isUniqueUsernameError(error: unknown): boolean {

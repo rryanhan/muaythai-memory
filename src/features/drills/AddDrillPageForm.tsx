@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { createOnboardingFirstDrill } from "@/data/onboarding";
 import { CaptureDiscardSheet } from "@/features/capture/CaptureDiscardSheet";
 import { useJournalUpload } from "@/features/journal/JournalUploadProvider";
+import { useFirstDrillCommit } from "@/features/onboarding/FirstDrillCommitContext";
 import { AddDrillForm } from "./AddDrillForm";
 
 export function AddDrillPageForm({
@@ -20,10 +21,13 @@ export function AddDrillPageForm({
 }) {
   const router = useRouter();
   const journalUpload = useJournalUpload();
+  const firstDrillCommit = useFirstDrillCommit();
   const [dirty, setDirty] = useState(false);
+  const [creationCommitting, setCreationCommitting] = useState(false);
   const [discardOpen, setDiscardOpen] = useState(false);
   const [pendingExit, setPendingExit] = useState<"cancel" | "history" | null>(null);
   const dirtyRef = useRef(false);
+  const creationCommittingRef = useRef(false);
   const guardKeyRef = useRef<string | null>(null);
   const atGuardEntryRef = useRef(false);
   const ignoreNextPopRef = useRef(false);
@@ -32,7 +36,9 @@ export function AddDrillPageForm({
     if (!onboarding) return;
 
     dirtyRef.current = dirty;
-    if (dirty && !guardKeyRef.current) {
+    creationCommittingRef.current = creationCommitting;
+    const guarded = dirty || creationCommitting;
+    if (guarded && !guardKeyRef.current) {
       const guardKey = `manual-drill-${Date.now()}-${Math.random().toString(36).slice(2)}`;
       guardKeyRef.current = guardKey;
       atGuardEntryRef.current = true;
@@ -44,7 +50,7 @@ export function AddDrillPageForm({
       return;
     }
 
-    if (!dirty && guardKeyRef.current) {
+    if (!guarded && guardKeyRef.current) {
       const guardKey = guardKeyRef.current;
       guardKeyRef.current = null;
       if (atGuardEntryRef.current && window.history.state?.__manualDrillGuard === guardKey) {
@@ -53,13 +59,13 @@ export function AddDrillPageForm({
         window.history.back();
       }
     }
-  }, [dirty, onboarding]);
+  }, [creationCommitting, dirty, onboarding]);
 
   useEffect(() => {
     if (!onboarding) return;
 
     function beforeUnload(event: BeforeUnloadEvent) {
-      if (!dirtyRef.current) return;
+      if (!dirtyRef.current && !creationCommittingRef.current) return;
       event.preventDefault();
       event.returnValue = "";
     }
@@ -72,6 +78,16 @@ export function AddDrillPageForm({
       }
 
       const guardKey = guardKeyRef.current;
+      if (creationCommittingRef.current) {
+        if (event.state?.__manualDrillGuard === guardKey) {
+          atGuardEntryRef.current = true;
+          return;
+        }
+        atGuardEntryRef.current = false;
+        ignoreNextPopRef.current = true;
+        window.history.forward();
+        return;
+      }
       if (!dirtyRef.current || !guardKey) return;
       if (event.state?.__manualDrillGuard === guardKey) {
         atGuardEntryRef.current = true;
@@ -113,6 +129,7 @@ export function AddDrillPageForm({
     const returnRoute = `/onboarding/first-drill?${returnParams.toString()}`;
 
     function returnToGuide() {
+      if (creationCommittingRef.current) return;
       runWithoutPrompt(() => {
         setDiscardOpen(false);
         setPendingExit(null);
@@ -121,6 +138,7 @@ export function AddDrillPageForm({
     }
 
     function keepEditing() {
+      if (creationCommittingRef.current) return;
       if (pendingExit === "history" && !atGuardEntryRef.current) {
         ignoreNextPopRef.current = true;
         atGuardEntryRef.current = true;
@@ -131,6 +149,7 @@ export function AddDrillPageForm({
     }
 
     function discardManualDrill() {
+      if (creationCommittingRef.current) return;
       if (pendingExit === "history") {
         dirtyRef.current = false;
         setDirty(false);
@@ -149,12 +168,20 @@ export function AddDrillPageForm({
       setDirty(nextDirty);
     }
 
+    function handleCreationCommitChange(committing: boolean) {
+      creationCommittingRef.current = committing;
+      setCreationCommitting(committing);
+      firstDrillCommit.setCommitting(committing);
+    }
+
     return (
       <>
         <AddDrillForm
           createAction={createOnboardingFirstDrill}
           onDirtyChange={handleDirtyChange}
+          onCreationCommitChange={handleCreationCommitChange}
           onCancel={() => {
+            if (creationCommittingRef.current) return;
             if (!dirtyRef.current) {
               returnToGuide();
               return;

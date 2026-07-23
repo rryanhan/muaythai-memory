@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { authenticationErrorResponse, requireCurrentAppUser } from "@/modules/auth";
+import {
+  authenticationErrorResponse,
+  invalidateOnboardingState,
+  requireCurrentAppUser,
+} from "@/modules/auth";
 import {
   completeProfileOnboarding,
-  onboardingProfileResponseSchema,
   OnboardingValidationError,
-} from "@/modules/onboarding";
+} from "@/modules/onboarding/mutations";
+import { onboardingProfileResponseSchema } from "@/modules/onboarding/contracts";
 
 export const runtime = "nodejs";
 
@@ -13,6 +17,7 @@ export async function POST(request: NextRequest) {
     const user = await requireCurrentAppUser();
     const input = await request.json();
     const username = await completeProfileOnboarding(user, input);
+    invalidateOnboardingState(user.id);
     return NextResponse.json(onboardingProfileResponseSchema.parse({ username, next: "first-drill" }));
   } catch (error) {
     const authResponse = authenticationErrorResponse(error);

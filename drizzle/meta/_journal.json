@@ -64,6 +64,13 @@
       "when": 1784836420224,
       "tag": "0008_auth_recovery_grants",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1784839879265,
+      "tag": "0009_stabilize_first_drill_onboarding",
+      "breakpoints": true
     }
   ]
 }

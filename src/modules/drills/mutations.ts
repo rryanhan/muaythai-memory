@@ -32,6 +32,15 @@ export class CreateDrillValidationError extends Error {
   }
 }
 
+export class CreateDrillIdempotencyError extends Error {
+  readonly status = 409;
+
+  constructor() {
+    super("This Idempotency-Key was already used for a different drill.");
+    this.name = "CreateDrillIdempotencyError";
+  }
+}
+
 export class UpdateDrillValidationError extends Error {
   readonly issues: string[];
   readonly status: 400 | 404;
@@ -66,9 +75,17 @@ export class SavedListMutationError extends Error {
 export async function createDrill(
   userId: string,
   rawInput: CreateDrillInput,
-  options: { completeFirstDrillGuide?: boolean } = {},
+  options: { completeFirstDrillGuide?: boolean; creationKey?: string } = {},
 ): Promise<DrillDetail> {
   const input = createDrillInputSchema.parse(rawInput);
+  if (options.creationKey) {
+    const existingDrill = await getDrillByCreationKey(userId, options.creationKey);
+    if (existingDrill) {
+      assertIdempotentDrillInput(existingDrill, input);
+      return existingDrill;
+    }
+  }
+
   const trainingMethodSlugs = unique(input.trainingMethodSlugs);
   const tagSlugs = unique(input.tagSlugs);
   const statusSlugs = unique(input.statusTagSlugs);
@@ -88,15 +105,29 @@ export async function createDrill(
   }
 
   const createdDrillId = await db.transaction(async (tx) => {
-    const [drill] = await tx
+    const insert = tx
       .insert(drills)
       .values({
         userId,
         title: input.title,
         summary: input.summary ?? "",
         notes: input.notes,
-      })
-      .returning({ id: drills.id });
+        creationKey: options.creationKey,
+      });
+    const [drill] = options.creationKey
+      ? await insert
+          .onConflictDoNothing({ target: [drills.userId, drills.creationKey] })
+          .returning({ id: drills.id })
+      : await insert.returning({ id: drills.id });
+
+    if (!drill && options.creationKey) {
+      const [existing] = await tx
+        .select({ id: drills.id })
+        .from(drills)
+        .where(and(eq(drills.userId, userId), eq(drills.creationKey, options.creationKey)))
+        .limit(1);
+      if (existing) return existing.id;
+    }
 
     if (!drill) throw new Error("Failed to create drill.");
 
@@ -134,14 +165,16 @@ export async function createDrill(
     }
 
     if (options.completeFirstDrillGuide) {
-      await tx
+      const [completedUser] = await tx
         .update(users)
         .set({
           firstDrillGuideCompletedAt: new Date(),
           firstDrillGuideSkippedAt: null,
           updatedAt: new Date(),
         })
-        .where(eq(users.id, userId));
+        .where(eq(users.id, userId))
+        .returning({ id: users.id });
+      if (!completedUser) throw new Error("Profile could not be found.");
     }
 
     return drill.id;
@@ -149,6 +182,7 @@ export async function createDrill(
 
   const drillDetail = await getDrillById(userId, createdDrillId);
   if (!drillDetail) throw new Error("Created drill could not be loaded.");
+  if (options.creationKey) assertIdempotentDrillInput(drillDetail, input);
   return drillDetail;
 }
 
@@ -328,4 +362,42 @@ function getMissingSlugIssues(label: string, requestedSlugs: string[], foundSlug
 
 function unique(values: string[]): string[] {
   return [...new Set(values)];
+}
+
+async function getDrillByCreationKey(userId: string, creationKey: string): Promise<DrillDetail | null> {
+  const [existing] = await db
+    .select({ id: drills.id })
+    .from(drills)
+    .where(and(eq(drills.userId, userId), eq(drills.creationKey, creationKey)))
+    .limit(1);
+  return existing ? getDrillById(userId, existing.id) : null;
+}
+
+function assertIdempotentDrillInput(drill: DrillDetail, input: ReturnType<typeof createDrillInputSchema.parse>) {
+  const existing = {
+    title: drill.title,
+    summary: drill.summary,
+    notes: drill.notes,
+    steps: drill.steps.map((step) => step.body),
+    trainingMethodSlugs: sortedUnique(drill.trainingMethods.map((method) => method.slug)),
+    tagSlugs: sortedUnique([...drill.tags, ...drill.customTags].map((tag) => tag.slug)),
+    statusTagSlugs: sortedUnique(drill.statusTags.map((status) => status.slug)),
+  };
+  const requested = {
+    title: input.title,
+    summary: input.summary,
+    notes: input.notes,
+    steps: input.steps,
+    trainingMethodSlugs: sortedUnique(input.trainingMethodSlugs),
+    tagSlugs: sortedUnique(input.tagSlugs),
+    statusTagSlugs: sortedUnique(input.statusTagSlugs),
+  };
+
+  if (JSON.stringify(existing) !== JSON.stringify(requested)) {
+    throw new CreateDrillIdempotencyError();
+  }
+}
+
+function sortedUnique(values: string[]): string[] {
+  return unique(values).sort();
 }
