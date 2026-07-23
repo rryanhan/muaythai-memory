@@ -19,12 +19,16 @@ import {
 export const runtime = "nodejs";
 
 export async function POST(request: NextRequest) {
+  let mutationUserId: string | null = null;
+  let mutationAttempted = false;
+
   try {
     const userId = await requireProfileOnboardedUserId();
     const creationKey = onboardingCreationKeySchema.parse(request.headers.get("idempotency-key"));
     const input = onboardingFirstDrillInputSchema.parse(await request.json());
+    mutationUserId = userId;
+    mutationAttempted = true;
     const drill = await createGuidedFirstDrill(userId, input, creationKey);
-    invalidateOnboardingState(userId);
     return NextResponse.json(onboardingFirstDrillResponseSchema.parse({ drill }));
   } catch (error) {
     const authResponse = authenticationErrorResponse(error);
@@ -37,5 +41,19 @@ export async function POST(request: NextRequest) {
     }
     console.error("First drill onboarding failed.", error instanceof Error ? error.message : error);
     return NextResponse.json({ error: "Your first drill could not be saved. Try again." }, { status: 500 });
+  } finally {
+    invalidateAfterMutation(mutationUserId, mutationAttempted);
+  }
+}
+
+function invalidateAfterMutation(userId: string | null, attempted: boolean): void {
+  if (!userId || !attempted) return;
+  try {
+    invalidateOnboardingState(userId);
+  } catch (error) {
+    console.error(
+      "Onboarding state invalidation failed after first-drill save.",
+      error instanceof Error ? error.message : error,
+    );
   }
 }

@@ -2,9 +2,13 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { and, asc, eq } from "drizzle-orm";
 import { db, postgresClient } from "@/db/client";
-import { drills, trainingMethods, users } from "@/db/schema";
+import { drills, tags, trainingMethods, users } from "@/db/schema";
 import type { CurrentAppUser } from "@/modules/auth";
-import { CreateDrillIdempotencyError } from "@/modules/drills/mutations";
+import { createDrillPayloadHash } from "@/modules/drills/idempotency";
+import {
+  CreateDrillIdempotencyError,
+  updateDrill,
+} from "@/modules/drills/mutations";
 import {
   completeProfileOnboarding,
   createGuidedFirstDrill,
@@ -63,13 +67,46 @@ async function main() {
       statusTagSlugs: [],
     };
     const creationKey = randomUUID();
-    const drill = await createGuidedFirstDrill(userA.id, input, creationKey);
+    const immutableTagSlug = `immutable-retry-${suffix}`;
+    const [immutableTag] = await db
+      .insert(tags)
+      .values({
+        userId: userA.id,
+        name: "Immutable Retry Tag",
+        slug: immutableTagSlug,
+        kind: "custom",
+      })
+      .returning({ id: tags.id });
+    const immutableInput = {
+      ...input,
+      tagSlugs: [immutableTagSlug],
+    };
+    const drill = await createGuidedFirstDrill(userA.id, immutableInput, creationKey);
     assert.equal(drill.title, "Onboarding Verification Drill");
-    const identicalRetry = await createGuidedFirstDrill(userA.id, input, creationKey);
+    const [storedContract] = await db
+      .select({ payloadHash: drills.creationPayloadHash })
+      .from(drills)
+      .where(eq(drills.id, drill.id))
+      .limit(1);
+    assert.equal(storedContract?.payloadHash, createDrillPayloadHash(immutableInput));
+
+    const editedTitle = "Edited After Original Save";
+    await updateDrill(userA.id, drill.id, {
+      ...immutableInput,
+      title: editedTitle,
+    });
+    await db.update(tags).set({ active: false }).where(eq(tags.id, immutableTag.id));
+
+    const identicalRetry = await createGuidedFirstDrill(userA.id, immutableInput, creationKey);
     assert.equal(identicalRetry.id, drill.id, "An identical retry must return the original drill.");
+    assert.equal(
+      identicalRetry.title,
+      editedTitle,
+      "A retry must return the owned drill without reconstructing its original payload.",
+    );
 
     await assert.rejects(
-      createGuidedFirstDrill(userA.id, { ...input, title: "Changed retry payload" }, creationKey),
+      createGuidedFirstDrill(userA.id, { ...immutableInput, title: editedTitle }, creationKey),
       (error: unknown) => error instanceof CreateDrillIdempotencyError,
     );
 
@@ -156,7 +193,7 @@ async function main() {
     assert.notEqual(scopedKeyDrill.id, drill.id, "Creation keys must be scoped to the owning user.");
 
     console.log(
-      "Onboarding verification passed: profile validation, scoped idempotency, response-loss retries, concurrency, and terminal guide state are stable.",
+      "Onboarding verification passed: profile validation, immutable scoped idempotency, response-loss retries, concurrency, and terminal guide state are stable.",
     );
   } finally {
     await db.delete(users).where(eq(users.id, userA.id));

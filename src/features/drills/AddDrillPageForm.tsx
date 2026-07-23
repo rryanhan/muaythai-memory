@@ -6,7 +6,15 @@ import { createOnboardingFirstDrill } from "@/data/onboarding";
 import { CaptureDiscardSheet } from "@/features/capture/CaptureDiscardSheet";
 import { useJournalUpload } from "@/features/journal/JournalUploadProvider";
 import { useFirstDrillCommit } from "@/features/onboarding/FirstDrillCommitContext";
+import {
+  isHistoryGuardState,
+  pushHistoryGuard,
+  restoreHistoryGuard,
+  type HistoryGuardEntry,
+} from "@/features/onboarding/history-guard";
 import { AddDrillForm } from "./AddDrillForm";
+
+const manualDrillGuardMarker = "__manualDrillGuard";
 
 export function AddDrillPageForm({
   fromJournal,
@@ -29,31 +37,33 @@ export function AddDrillPageForm({
   const dirtyRef = useRef(false);
   const creationCommittingRef = useRef(false);
   const guardKeyRef = useRef<string | null>(null);
+  const guardEntryRef = useRef<HistoryGuardEntry | null>(null);
   const atGuardEntryRef = useRef(false);
   const ignoreNextPopRef = useRef(false);
+  const navigationReleasedRef = useRef(false);
 
   useEffect(() => {
     if (!onboarding) return;
 
     dirtyRef.current = dirty;
     creationCommittingRef.current = creationCommitting;
-    const guarded = dirty || creationCommitting;
+    const guarded = (dirty || creationCommitting) && !navigationReleasedRef.current;
     if (guarded && !guardKeyRef.current) {
       const guardKey = `manual-drill-${Date.now()}-${Math.random().toString(36).slice(2)}`;
       guardKeyRef.current = guardKey;
+      guardEntryRef.current = pushHistoryGuard(manualDrillGuardMarker, guardKey);
       atGuardEntryRef.current = true;
-      window.history.pushState(
-        { ...window.history.state, __manualDrillGuard: guardKey },
-        "",
-        window.location.href,
-      );
       return;
     }
 
     if (!guarded && guardKeyRef.current) {
       const guardKey = guardKeyRef.current;
       guardKeyRef.current = null;
-      if (atGuardEntryRef.current && window.history.state?.__manualDrillGuard === guardKey) {
+      guardEntryRef.current = null;
+      if (
+        atGuardEntryRef.current
+        && isHistoryGuardState(window.history.state, manualDrillGuardMarker, guardKey)
+      ) {
         ignoreNextPopRef.current = true;
         atGuardEntryRef.current = false;
         window.history.back();
@@ -71,25 +81,31 @@ export function AddDrillPageForm({
     }
 
     function handlePopState(event: PopStateEvent) {
-      if (ignoreNextPopRef.current) {
-        ignoreNextPopRef.current = false;
-        atGuardEntryRef.current = event.state?.__manualDrillGuard === guardKeyRef.current;
-        return;
-      }
-
+      const guardEntry = guardEntryRef.current;
       const guardKey = guardKeyRef.current;
-      if (creationCommittingRef.current) {
-        if (event.state?.__manualDrillGuard === guardKey) {
+      if (creationCommittingRef.current && guardEntry) {
+        event.stopImmediatePropagation();
+        if (isHistoryGuardState(event.state, manualDrillGuardMarker, guardKey)) {
           atGuardEntryRef.current = true;
           return;
         }
-        atGuardEntryRef.current = false;
-        ignoreNextPopRef.current = true;
-        window.history.forward();
+        restoreHistoryGuard(guardEntry);
+        atGuardEntryRef.current = true;
         return;
       }
+
+      if (ignoreNextPopRef.current) {
+        ignoreNextPopRef.current = false;
+        atGuardEntryRef.current = isHistoryGuardState(
+          event.state,
+          manualDrillGuardMarker,
+          guardKeyRef.current,
+        );
+        return;
+      }
+
       if (!dirtyRef.current || !guardKey) return;
-      if (event.state?.__manualDrillGuard === guardKey) {
+      if (isHistoryGuardState(event.state, manualDrillGuardMarker, guardKey)) {
         atGuardEntryRef.current = true;
         return;
       }
@@ -100,20 +116,26 @@ export function AddDrillPageForm({
     }
 
     window.addEventListener("beforeunload", beforeUnload);
-    window.addEventListener("popstate", handlePopState);
+    window.addEventListener("popstate", handlePopState, { capture: true });
     return () => {
       window.removeEventListener("beforeunload", beforeUnload);
-      window.removeEventListener("popstate", handlePopState);
+      window.removeEventListener("popstate", handlePopState, { capture: true });
     };
   }, [onboarding]);
 
   const runWithoutPrompt = useCallback((action: () => void) => {
     dirtyRef.current = false;
+    navigationReleasedRef.current = true;
     setDirty(false);
     const guardKey = guardKeyRef.current;
     guardKeyRef.current = null;
+    guardEntryRef.current = null;
 
-    if (guardKey && atGuardEntryRef.current && window.history.state?.__manualDrillGuard === guardKey) {
+    if (
+      guardKey
+      && atGuardEntryRef.current
+      && isHistoryGuardState(window.history.state, manualDrillGuardMarker, guardKey)
+    ) {
       ignoreNextPopRef.current = true;
       window.addEventListener("popstate", action, { once: true });
       window.history.back();
@@ -154,6 +176,7 @@ export function AddDrillPageForm({
         dirtyRef.current = false;
         setDirty(false);
         guardKeyRef.current = null;
+        guardEntryRef.current = null;
         setDiscardOpen(false);
         setPendingExit(null);
         ignoreNextPopRef.current = true;

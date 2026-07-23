@@ -13,11 +13,15 @@ import { onboardingProfileResponseSchema } from "@/modules/onboarding/contracts"
 export const runtime = "nodejs";
 
 export async function POST(request: NextRequest) {
+  let mutationUserId: string | null = null;
+  let mutationAttempted = false;
+
   try {
     const user = await requireCurrentAppUser();
     const input = await request.json();
+    mutationUserId = user.id;
+    mutationAttempted = true;
     const username = await completeProfileOnboarding(user, input);
-    invalidateOnboardingState(user.id);
     return NextResponse.json(onboardingProfileResponseSchema.parse({ username, next: "first-drill" }));
   } catch (error) {
     const authResponse = authenticationErrorResponse(error);
@@ -30,5 +34,19 @@ export async function POST(request: NextRequest) {
     }
     console.error("Profile onboarding failed.", error instanceof Error ? error.message : error);
     return NextResponse.json({ error: "Profile could not be saved. Try again." }, { status: 500 });
+  } finally {
+    invalidateAfterMutation(mutationUserId, mutationAttempted, "profile");
+  }
+}
+
+function invalidateAfterMutation(userId: string | null, attempted: boolean, mutation: string): void {
+  if (!userId || !attempted) return;
+  try {
+    invalidateOnboardingState(userId);
+  } catch (error) {
+    console.error(
+      `Onboarding state invalidation failed after ${mutation}.`,
+      error instanceof Error ? error.message : error,
+    );
   }
 }

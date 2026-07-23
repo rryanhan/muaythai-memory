@@ -20,6 +20,7 @@ import {
   type UpdateSavedListResponse,
   type UpdateDrillInput,
 } from "./contracts";
+import { createDrillPayloadHash } from "./idempotency";
 import { getDrillById } from "./queries";
 
 export class CreateDrillValidationError extends Error {
@@ -78,10 +79,18 @@ export async function createDrill(
   options: { completeFirstDrillGuide?: boolean; creationKey?: string } = {},
 ): Promise<DrillDetail> {
   const input = createDrillInputSchema.parse(rawInput);
-  if (options.creationKey) {
-    const existingDrill = await getDrillByCreationKey(userId, options.creationKey);
-    if (existingDrill) {
-      assertIdempotentDrillInput(existingDrill, input);
+  const idempotency = options.creationKey
+    ? {
+        creationKey: options.creationKey,
+        payloadHash: createDrillPayloadHash(input),
+      }
+    : null;
+  if (idempotency) {
+    const existing = await getDrillRecordByCreationKey(userId, idempotency.creationKey);
+    if (existing) {
+      assertIdempotentPayloadHash(existing.creationPayloadHash, idempotency.payloadHash);
+      const existingDrill = await getDrillById(userId, existing.id);
+      if (!existingDrill) throw new Error("Created drill could not be loaded.");
       return existingDrill;
     }
   }
@@ -112,21 +121,28 @@ export async function createDrill(
         title: input.title,
         summary: input.summary ?? "",
         notes: input.notes,
-        creationKey: options.creationKey,
+        creationKey: idempotency?.creationKey,
+        creationPayloadHash: idempotency?.payloadHash,
       });
-    const [drill] = options.creationKey
+    const [drill] = idempotency
       ? await insert
           .onConflictDoNothing({ target: [drills.userId, drills.creationKey] })
           .returning({ id: drills.id })
       : await insert.returning({ id: drills.id });
 
-    if (!drill && options.creationKey) {
+    if (!drill && idempotency) {
       const [existing] = await tx
-        .select({ id: drills.id })
+        .select({
+          id: drills.id,
+          creationPayloadHash: drills.creationPayloadHash,
+        })
         .from(drills)
-        .where(and(eq(drills.userId, userId), eq(drills.creationKey, options.creationKey)))
+        .where(and(eq(drills.userId, userId), eq(drills.creationKey, idempotency.creationKey)))
         .limit(1);
-      if (existing) return existing.id;
+      if (existing) {
+        assertIdempotentPayloadHash(existing.creationPayloadHash, idempotency.payloadHash);
+        return existing.id;
+      }
     }
 
     if (!drill) throw new Error("Failed to create drill.");
@@ -182,7 +198,6 @@ export async function createDrill(
 
   const drillDetail = await getDrillById(userId, createdDrillId);
   if (!drillDetail) throw new Error("Created drill could not be loaded.");
-  if (options.creationKey) assertIdempotentDrillInput(drillDetail, input);
   return drillDetail;
 }
 
@@ -364,40 +379,23 @@ function unique(values: string[]): string[] {
   return [...new Set(values)];
 }
 
-async function getDrillByCreationKey(userId: string, creationKey: string): Promise<DrillDetail | null> {
+async function getDrillRecordByCreationKey(userId: string, creationKey: string) {
   const [existing] = await db
-    .select({ id: drills.id })
+    .select({
+      id: drills.id,
+      creationPayloadHash: drills.creationPayloadHash,
+    })
     .from(drills)
     .where(and(eq(drills.userId, userId), eq(drills.creationKey, creationKey)))
     .limit(1);
-  return existing ? getDrillById(userId, existing.id) : null;
+  return existing ?? null;
 }
 
-function assertIdempotentDrillInput(drill: DrillDetail, input: ReturnType<typeof createDrillInputSchema.parse>) {
-  const existing = {
-    title: drill.title,
-    summary: drill.summary,
-    notes: drill.notes,
-    steps: drill.steps.map((step) => step.body),
-    trainingMethodSlugs: sortedUnique(drill.trainingMethods.map((method) => method.slug)),
-    tagSlugs: sortedUnique([...drill.tags, ...drill.customTags].map((tag) => tag.slug)),
-    statusTagSlugs: sortedUnique(drill.statusTags.map((status) => status.slug)),
-  };
-  const requested = {
-    title: input.title,
-    summary: input.summary,
-    notes: input.notes,
-    steps: input.steps,
-    trainingMethodSlugs: sortedUnique(input.trainingMethodSlugs),
-    tagSlugs: sortedUnique(input.tagSlugs),
-    statusTagSlugs: sortedUnique(input.statusTagSlugs),
-  };
-
-  if (JSON.stringify(existing) !== JSON.stringify(requested)) {
+function assertIdempotentPayloadHash(
+  existingHash: string | null,
+  requestedHash: string,
+): void {
+  if (existingHash !== requestedHash) {
     throw new CreateDrillIdempotencyError();
   }
-}
-
-function sortedUnique(values: string[]): string[] {
-  return unique(values).sort();
 }

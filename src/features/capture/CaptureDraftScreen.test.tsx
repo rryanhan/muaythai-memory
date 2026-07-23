@@ -21,6 +21,7 @@ vi.mock("./CaptureDiscardSheet", () => ({
 vi.mock("./CaptureDraftForm", () => ({
   CaptureDraftForm: (props: {
     onCreationCommitChange?: (committing: boolean) => void;
+    onSaveSuccess?: (drillId: string) => void;
     onWorkflowChange?: (state: {
       mode: "voice";
       phase: "review";
@@ -50,6 +51,12 @@ vi.mock("./CaptureDraftForm", () => ({
       >
         Finish creation commit
       </button>
+      <button
+        type="button"
+        onClick={() => props.onSaveSuccess?.("00000000-0000-4000-8000-000000000010")}
+      >
+        Finish save
+      </button>
     </>
   ),
 }));
@@ -57,13 +64,15 @@ vi.mock("./CaptureDraftForm", () => ({
 describe("CaptureDraftScreen creation navigation guard", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    window.history.replaceState({}, "", "/onboarding/first-drill");
+    window.history.replaceState({ entry: "oldest" }, "", "/history/oldest");
+    window.history.pushState({ entry: "middle" }, "", "/history/middle");
+    window.history.pushState({}, "", "/onboarding/first-drill");
   });
 
-  it("disables exits and reverses browser navigation while Save is committing", async () => {
+  it("restores the guard after repeated multi-entry navigation and releases it for save navigation", async () => {
     const user = userEvent.setup();
     const onSkipFirstDrill = vi.fn();
-    const forward = vi.spyOn(window.history, "forward").mockImplementation(() => undefined);
+    const pushState = vi.spyOn(window.history, "pushState");
     render(
       <CaptureDraftScreen
         initialMode="voice"
@@ -77,6 +86,7 @@ describe("CaptureDraftScreen creation navigation guard", () => {
     );
 
     await user.click(screen.getByRole("button", { name: "Mark draft dirty" }));
+    const guardedUrl = window.location.href;
     await waitFor(() => {
       expect(window.history.state?.__captureGuard).toBeTruthy();
     });
@@ -85,12 +95,27 @@ describe("CaptureDraftScreen creation navigation guard", () => {
     expect(screen.getByRole("button", { name: "Exit Capture Drill" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Skip first drill" })).toBeDisabled();
 
-    window.dispatchEvent(new PopStateEvent("popstate", { state: {} }));
-    expect(forward).toHaveBeenCalledTimes(1);
+    window.history.go(-3);
+    await waitFor(() => {
+      expect(pushState).toHaveBeenCalledTimes(2);
+    });
+    expect(window.location.href).toBe(guardedUrl);
+    expect(window.history.state?.__captureGuard).toBeTruthy();
+
+    window.history.go(-1);
+    await waitFor(() => {
+      expect(pushState).toHaveBeenCalledTimes(3);
+    });
+    expect(window.location.href).toBe(guardedUrl);
+    expect(window.history.state?.__captureGuard).toBeTruthy();
     expect(onSkipFirstDrill).not.toHaveBeenCalled();
 
-    await user.click(screen.getByRole("button", { name: "Finish creation commit" }));
-    expect(screen.getByRole("button", { name: "Exit Capture Drill" })).toBeEnabled();
-    expect(screen.getByRole("button", { name: "Skip first drill" })).toBeEnabled();
+    await user.click(screen.getByRole("button", { name: "Finish save" }));
+    await waitFor(() => {
+      expect(mocks.replace).toHaveBeenCalledWith(
+        "/drills/00000000-0000-4000-8000-000000000010",
+      );
+    });
+    expect(mocks.replace).toHaveBeenCalledTimes(1);
   });
 });

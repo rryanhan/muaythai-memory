@@ -1,5 +1,5 @@
 {
-  "id": "6db469ca-3d74-45c0-b11f-83815f2fbca0",
+  "id": "017e43ec-00a4-410c-958b-e6bae5e1d9a5",
   "prevId": "fffe2f62-a382-4b37-9173-2b53171c467e",
   "version": "7",
   "dialect": "postgresql",
@@ -579,6 +579,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "creation_payload_hash": {
+          "name": "creation_payload_hash",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": false
+        },
         "archived_at": {
           "name": "archived_at",
           "type": "timestamp with time zone",
@@ -686,7 +692,12 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
-      "checkConstraints": {},
+      "checkConstraints": {
+        "drills_creation_idempotency_check": {
+          "name": "drills_creation_idempotency_check",
+          "value": "(\"drills\".\"creation_key\" is null and \"drills\".\"creation_payload_hash\" is null) or (\"drills\".\"creation_key\" is not null and \"drills\".\"creation_payload_hash\" is not null)"
+        }
+      },
       "isRLSEnabled": false
     },
     "public.journal_entries": {

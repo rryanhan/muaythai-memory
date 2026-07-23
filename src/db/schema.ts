@@ -208,6 +208,7 @@ export const drills = pgTable(
     notes: text("notes"),
     sourceTranscript: text("source_transcript"),
     creationKey: varchar("creation_key", { length: 36 }),
+    creationPayloadHash: varchar("creation_payload_hash", { length: 64 }),
     archivedAt: timestamp("archived_at", { withTimezone: true }),
     ...timestamps,
   },
@@ -218,6 +219,10 @@ export const drills = pgTable(
     userCreationKeyUnique: uniqueIndex("drills_user_creation_key_unique").on(
       table.userId,
       table.creationKey,
+    ),
+    creationIdempotencyCheck: check(
+      "drills_creation_idempotency_check",
+      sql`(${table.creationKey} is null and ${table.creationPayloadHash} is null) or (${table.creationKey} is not null and ${table.creationPayloadHash} is not null)`,
     ),
   }),
 );

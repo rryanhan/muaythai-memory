@@ -153,6 +153,7 @@ describe("POST /api/onboarding/first-drill", () => {
     expect(missing.status).toBe(400);
     expect(malformed.status).toBe(400);
     expect(mocks.createGuidedFirstDrill).not.toHaveBeenCalled();
+    expect(mocks.invalidateOnboardingState).not.toHaveBeenCalled();
   });
 
   it("returns 409 when a key is reused with a different payload", async () => {
@@ -166,6 +167,28 @@ describe("POST /api/onboarding/first-drill", () => {
     await expect(response.json()).resolves.toEqual({
       error: "This Idempotency-Key was already used for a different drill.",
     });
+    expect(mocks.invalidateOnboardingState).toHaveBeenCalledWith(userId);
+  });
+
+  it("invalidates after a post-commit response failure without replacing the original error", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    mocks.createGuidedFirstDrill.mockRejectedValue(new Error("post-commit read failed"));
+    mocks.invalidateOnboardingState.mockImplementation(() => {
+      throw new Error("cache invalidation failed");
+    });
+
+    const response = await POST(request(input, creationKey));
+
+    expect(response.status).toBe(500);
+    await expect(response.json()).resolves.toEqual({
+      error: "Your first drill could not be saved. Try again.",
+    });
+    expect(mocks.invalidateOnboardingState).toHaveBeenCalledWith(userId);
+    expect(consoleError).toHaveBeenCalledWith(
+      "First drill onboarding failed.",
+      "post-commit read failed",
+    );
+    consoleError.mockRestore();
   });
 });
 
