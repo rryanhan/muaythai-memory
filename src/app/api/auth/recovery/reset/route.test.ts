@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { RECOVERY_GRANT_COOKIE } from "@/modules/auth/recovery-cookies";
 
 const mocks = vi.hoisted(() => ({
@@ -38,6 +38,7 @@ import { POST } from "./route";
 describe("POST /api/auth/recovery/reset", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.stubEnv("NEXT_PUBLIC_APP_URL", "https://staging.example.com");
     mocks.createSupabaseServerClient.mockResolvedValue({
       auth: { signOut: mocks.signOut },
     });
@@ -54,8 +55,25 @@ describe("POST /api/auth/recovery/reset", () => {
     mocks.signOut.mockResolvedValue({ error: null });
   });
 
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   it("rejects a cross-origin mutation before reading recovery state", async () => {
     const response = await POST(request({ origin: "https://attacker.example" }));
+
+    expect(response.status).toBe(403);
+    expect(mocks.performRecoveryPasswordReset).not.toHaveBeenCalled();
+  });
+
+  it("rejects spoofed forwarded headers even when Origin matches them", async () => {
+    const response = await POST(request({
+      extraHeaders: {
+        "x-forwarded-host": "attacker.example",
+        "x-forwarded-proto": "https",
+      },
+      origin: "https://attacker.example",
+    }));
 
     expect(response.status).toBe(403);
     expect(mocks.performRecoveryPasswordReset).not.toHaveBeenCalled();
@@ -111,9 +129,11 @@ describe("POST /api/auth/recovery/reset", () => {
 });
 
 function request({
+  extraHeaders = {},
   next = "/drills",
   origin = "https://staging.example.com",
 }: {
+  extraHeaders?: Record<string, string>;
   next?: string;
   origin?: string;
 } = {}): NextRequest {
@@ -131,6 +151,7 @@ function request({
       ].join("; "),
       "content-type": "application/json",
       origin,
+      ...extraHeaders,
     },
     method: "POST",
   });

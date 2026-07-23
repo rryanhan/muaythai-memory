@@ -8,7 +8,7 @@ import {
   RECOVERY_INTENT_COOKIE,
   setRecoveryGrantCookie,
 } from "@/modules/auth/recovery-cookies";
-import { getPublicRequestOrigin } from "@/modules/auth/request-origin";
+import { getCanonicalAppOrigin } from "@/modules/auth/request-origin";
 import { getRecoverySessionIdentity } from "@/modules/auth/recovery-session";
 import { issueRecoveryGrantRecord } from "@/modules/auth/recovery-store";
 import {
@@ -24,7 +24,7 @@ import {
 export async function GET(request: NextRequest) {
   const nextPath = safeInternalPath(request.nextUrl.searchParams.get("next"));
   const code = request.nextUrl.searchParams.get("code");
-  const requestOrigin = getPublicRequestOrigin(request);
+  const requestOrigin = getCanonicalAppOrigin(request);
   const recoveryFlow = request.nextUrl.searchParams.get("flow") === "recovery";
 
   if (!code) {

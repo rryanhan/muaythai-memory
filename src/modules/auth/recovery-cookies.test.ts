@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   clearRecoveryGrantCookie,
   clearSupabaseAuthCookies,
@@ -8,8 +8,21 @@ import {
 } from "./recovery-cookies";
 
 describe("recovery cookies", () => {
+  beforeEach(() => {
+    vi.stubEnv("NEXT_PUBLIC_APP_URL", "https://staging.example.com");
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   it("sets the signed recovery grant as a secure server-only cookie", () => {
-    const request = new NextRequest("https://staging.example.com/auth/confirm");
+    const request = new NextRequest("http://internal:3000/auth/confirm", {
+      headers: {
+        "x-forwarded-host": "attacker.example",
+        "x-forwarded-proto": "http",
+      },
+    });
     const response = NextResponse.json({ ok: true });
 
     setRecoveryGrantCookie(response, "signed-grant", request);

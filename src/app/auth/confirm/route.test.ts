@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { RECOVERY_GRANT_COOKIE } from "@/modules/auth/recovery-cookies";
 
 const mocks = vi.hoisted(() => ({
@@ -41,6 +41,7 @@ const USER_ID = "00000000-0000-4000-8000-000000000001";
 describe("GET /auth/confirm", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.stubEnv("NEXT_PUBLIC_APP_URL", "https://staging.example.com");
     mocks.createSupabaseServerClient.mockResolvedValue({
       auth: {
         exchangeCodeForSession: mocks.exchangeCodeForSession,
@@ -68,6 +69,10 @@ describe("GET /auth/confirm", () => {
     });
     mocks.issueRecoveryGrantRecord.mockResolvedValue(undefined);
     mocks.signOut.mockResolvedValue({ error: null });
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
   });
 
   it("mints a grant only after an actual recovery exchange and durable insert", async () => {
@@ -157,11 +162,13 @@ describe("GET /auth/confirm", () => {
 
 function recoveryRequest(): NextRequest {
   return new NextRequest(
-    "https://staging.example.com/auth/confirm"
+    "http://internal:3000/auth/confirm"
       + "?flow=recovery&state=browser-state&code=pkce-code&next=%2Fdrills",
     {
       headers: {
         cookie: "mtm-recovery-intent=signed-intent",
+        "x-forwarded-host": "attacker.example",
+        "x-forwarded-proto": "http",
       },
     },
   );

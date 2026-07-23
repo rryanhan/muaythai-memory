@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { RECOVERY_INTENT_COOKIE } from "@/modules/auth/recovery-cookies";
 
 const mocks = vi.hoisted(() => ({
@@ -22,6 +22,7 @@ import { POST } from "./route";
 describe("POST /api/auth/recovery/request", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.stubEnv("NEXT_PUBLIC_APP_URL", "https://staging.example.com");
     mocks.createSupabaseServerClient.mockResolvedValue({
       auth: { resetPasswordForEmail: mocks.resetPasswordForEmail },
     });
@@ -33,6 +34,10 @@ describe("POST /api/auth/recovery/request", () => {
     mocks.resetPasswordForEmail.mockResolvedValue({ error: null });
   });
 
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   it("rejects a cross-origin request before calling Supabase", async () => {
     const response = await POST(request("https://attacker.example"));
 
@@ -40,11 +45,22 @@ describe("POST /api/auth/recovery/request", () => {
     expect(mocks.resetPasswordForEmail).not.toHaveBeenCalled();
   });
 
-  it("sends a recovery callback to the public proxy origin and sets an HttpOnly intent", async () => {
+  it("rejects spoofed forwarded headers even when Origin matches them", async () => {
+    const response = await POST(request("https://attacker.example", {
+      host: "internal:3000",
+      "x-forwarded-host": "attacker.example",
+      "x-forwarded-proto": "https",
+    }));
+
+    expect(response.status).toBe(403);
+    expect(mocks.resetPasswordForEmail).not.toHaveBeenCalled();
+  });
+
+  it("sends the recovery callback to the canonical origin and sets an HttpOnly intent", async () => {
     const response = await POST(request("https://staging.example.com", {
       host: "internal:3000",
-      "x-forwarded-host": "staging.example.com",
-      "x-forwarded-proto": "https",
+      "x-forwarded-host": "attacker.example",
+      "x-forwarded-proto": "http",
     }));
 
     expect(response.status).toBe(200);
