@@ -48,6 +48,25 @@ npm run db:migrate:production -- --confirm-production
 APP_ENV_FILE=.env.production-maintenance.local npm run db:verify-taxonomy
 ```
 
+Verify the server-only database boundary after migrating either environment:
+
+```bash
+npm run db:verify-access-control -- --expect=staging
+npm run db:verify-access-control -- --expect=production
+```
+
+The verifier connects through `DATABASE_POOLER_URL`, confirms that every
+expected public domain table exists, rejects effective table, column, sequence,
+function, or procedure access for Supabase's `anon` and `authenticated` roles,
+checks inherited role privileges and the `postgres` migration role's
+future-object defaults, and performs harmless reads through the application
+database connection. `--expect` selects the matching ignored environment file
+and validates its deployment marker, Supabase project, and database hosts
+before connecting. File values override conflicting ambient variables inside
+an isolated configuration object, and missing file credentials never fall back
+to ambient secrets; credentials are neither exported nor printed. Use
+`--env-file=<path>` only when intentionally verifying a non-default file.
+
 Run `npm run db:seed` once when provisioning a blank hosted project to create
 the shared Training Methods, Tags, and Saved Lists. Never run
 `npm run db:seed-drills` against production.
