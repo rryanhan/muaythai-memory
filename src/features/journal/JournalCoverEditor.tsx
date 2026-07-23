@@ -37,7 +37,7 @@ export function JournalCoverEditor({ file, initialTimeSeconds, onCancel, onUseCo
     if (video) video.currentTime = nextTime;
   }
 
-  async function useCover() {
+  async function handleUseCover() {
     if (pending) return;
     const controller = new AbortController();
     extractionAbortRef.current = controller;
@@ -116,7 +116,7 @@ export function JournalCoverEditor({ file, initialTimeSeconds, onCancel, onUseCo
           {error && <p className={styles.coverError} role="alert">{error}</p>}
           <div className={styles.coverActions}>
             <button type="button" disabled={pending} data-drawer-initial-focus onClick={onCancel}>Cancel</button>
-            <button type="button" disabled={pending || !duration || Boolean(error)} onClick={() => void useCover()}>
+            <button type="button" disabled={pending || !duration || Boolean(error)} onClick={() => void handleUseCover()}>
               {pending ? "Preparing..." : "Use Cover"}
             </button>
           </div>

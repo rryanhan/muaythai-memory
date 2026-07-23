@@ -23,6 +23,8 @@ describe("POST /api/auth/recovery/request", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.stubEnv("NEXT_PUBLIC_APP_URL", "https://staging.example.com");
+    vi.stubEnv("VERCEL_ENV", "production");
+    vi.stubEnv("VERCEL_TARGET_ENV", "production");
     mocks.createSupabaseServerClient.mockResolvedValue({
       auth: { resetPasswordForEmail: mocks.resetPasswordForEmail },
     });
@@ -77,6 +79,36 @@ describe("POST /api/auth/recovery/request", () => {
     expect(setCookie).toContain("HttpOnly");
     expect(setCookie).toContain("Secure");
     expect(setCookie).toContain("SameSite=lax");
+  });
+
+  it("keeps a preview recovery callback and host-only intent on the trusted preview host", async () => {
+    vi.stubEnv("VERCEL_BRANCH_URL", "muaythai-git-feature.vercel.app");
+    vi.stubEnv("VERCEL_ENV", "preview");
+    vi.stubEnv("VERCEL_TARGET_ENV", "preview");
+    vi.stubEnv("VERCEL_URL", "muaythai-a1b2c3.vercel.app");
+
+    const response = await POST(request(
+      "https://muaythai-git-feature.vercel.app",
+      {
+        host: "internal:3000",
+        "x-forwarded-host": "attacker.example",
+        "x-forwarded-proto": "http",
+      },
+    ));
+
+    expect(response.status).toBe(200);
+    expect(mocks.resetPasswordForEmail).toHaveBeenCalledWith(
+      "fighter@example.com",
+      {
+        redirectTo:
+          "https://muaythai-git-feature.vercel.app/auth/confirm"
+          + "?flow=recovery&state=browser-state&next=%2Fdrills",
+      },
+    );
+    const setCookie = response.headers.get("set-cookie") ?? "";
+    expect(setCookie).toContain(`${RECOVERY_INTENT_COOKIE}=signed-intent`);
+    expect(setCookie).toContain("Secure");
+    expect(setCookie).not.toMatch(/domain=/i);
   });
 });
 

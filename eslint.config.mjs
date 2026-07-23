@@ -20,12 +20,6 @@ export default defineConfig([
       "react-hooks/rules-of-hooks": "off",
     },
   },
-  {
-    files: ["src/features/journal/JournalCoverEditor.tsx"],
-    rules: {
-      "react-hooks/rules-of-hooks": "off",
-    },
-  },
   globalIgnores([
     ".next/**",
     "build/**",

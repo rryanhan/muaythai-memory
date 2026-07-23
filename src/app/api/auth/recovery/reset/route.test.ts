@@ -39,6 +39,8 @@ describe("POST /api/auth/recovery/reset", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.stubEnv("NEXT_PUBLIC_APP_URL", "https://staging.example.com");
+    vi.stubEnv("VERCEL_ENV", "production");
+    vi.stubEnv("VERCEL_TARGET_ENV", "production");
     mocks.createSupabaseServerClient.mockResolvedValue({
       auth: { signOut: mocks.signOut },
     });

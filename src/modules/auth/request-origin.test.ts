@@ -19,12 +19,77 @@ describe("auth request origin", () => {
     const environment = {
       NEXT_PUBLIC_APP_URL: "https://staging.example.com/app-path",
       NODE_ENV: "production",
+      VERCEL_ENV: "preview",
+      VERCEL_TARGET_ENV: "staging",
+      VERCEL_URL: "ignored-preview.vercel.app",
     };
 
     expect(getCanonicalAppOrigin(request, environment)).toBe(
       "https://staging.example.com",
     );
     expect(isSameOriginRequest(request, environment)).toBe(true);
+  });
+
+  it("selects only trusted Vercel system origins for preview deployments", () => {
+    const environment = {
+      NEXT_PUBLIC_APP_URL: "https://staging.example.com",
+      NODE_ENV: "production",
+      VERCEL_BRANCH_URL: "muaythai-git-feature.vercel.app",
+      VERCEL_ENV: "preview",
+      VERCEL_TARGET_ENV: "preview",
+      VERCEL_URL: "muaythai-a1b2c3.vercel.app",
+    };
+    const branchRequest = new NextRequest(
+      "http://internal:3000/api/auth/recovery/request",
+      {
+        headers: {
+          origin: "https://muaythai-git-feature.vercel.app",
+          "x-forwarded-host": "attacker.example",
+          "x-forwarded-proto": "http",
+        },
+        method: "POST",
+      },
+    );
+    const deploymentRequest = new NextRequest(
+      "https://muaythai-a1b2c3.vercel.app/auth/confirm?code=pkce-code",
+      {
+        headers: {
+          "x-forwarded-host": "attacker.example",
+          "x-forwarded-proto": "http",
+        },
+      },
+    );
+
+    expect(getCanonicalAppOrigin(branchRequest, environment)).toBe(
+      "https://muaythai-git-feature.vercel.app",
+    );
+    expect(isSameOriginRequest(branchRequest, environment)).toBe(true);
+    expect(getCanonicalAppOrigin(deploymentRequest, environment)).toBe(
+      "https://muaythai-a1b2c3.vercel.app",
+    );
+  });
+
+  it("rejects untrusted preview origins even when forwarded headers match", () => {
+    const request = new NextRequest(
+      "http://internal:3000/api/auth/recovery/request",
+      {
+        headers: {
+          origin: "https://attacker.example",
+          "x-forwarded-host": "attacker.example",
+          "x-forwarded-proto": "https",
+        },
+        method: "POST",
+      },
+    );
+
+    expect(isSameOriginRequest(request, {
+      NEXT_PUBLIC_APP_URL: "https://staging.example.com",
+      NODE_ENV: "production",
+      VERCEL_BRANCH_URL: "muaythai-git-feature.vercel.app",
+      VERCEL_ENV: "preview",
+      VERCEL_TARGET_ENV: "preview",
+      VERCEL_URL: "muaythai-a1b2c3.vercel.app",
+    })).toBe(false);
   });
 
   it("rejects spoofed forwarded headers even when Origin matches them", () => {
@@ -69,10 +134,10 @@ describe("auth request origin", () => {
 
   it("falls back only to a loopback request URL in local development", () => {
     const localRequest = new NextRequest(
-      "http://localhost:3005/api/auth/recovery/reset",
+      "http://localhost:3000/api/auth/recovery/reset",
       {
         headers: {
-          origin: "http://localhost:3005",
+          origin: "http://localhost:3000",
           "x-forwarded-host": "attacker.example",
           "x-forwarded-proto": "https",
         },
@@ -82,10 +147,14 @@ describe("auth request origin", () => {
 
     expect(getCanonicalAppOrigin(localRequest, {
       NODE_ENV: "development",
-    })).toBe("http://localhost:3005");
+    })).toBe("http://localhost:3000");
     expect(isSameOriginRequest(localRequest, {
       NODE_ENV: "development",
     })).toBe(true);
+    expect(getCanonicalAppOrigin(localRequest, {
+      NEXT_PUBLIC_APP_URL: "http://localhost:3000",
+      NODE_ENV: "production",
+    })).toBe("http://localhost:3000");
 
     expect(() => getCanonicalAppOrigin(localRequest, {
       NODE_ENV: "production",
