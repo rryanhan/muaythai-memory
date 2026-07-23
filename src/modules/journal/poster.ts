@@ -1,6 +1,12 @@
 import { randomUUID } from "node:crypto";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import {
+  MAX_SAFE_UPLOADED_IMAGE_EDGE,
+  MAX_SAFE_UPLOADED_IMAGE_PIXELS,
+  detectImageMime,
+  inspectEncodedImage,
+} from "@/modules/media/image-metadata";
+import {
   JOURNAL_MEDIA_BUCKET,
   JOURNAL_POSTER_MAX_BYTES,
   JOURNAL_POSTER_MIME_TYPES,
@@ -17,14 +23,33 @@ export class JournalPosterError extends Error {
   }
 }
 
+export function createJournalPosterObjectPath(
+  userId: string,
+  entryId: string,
+  mimeType: string,
+): string {
+  const extension = mimeType === "image/webp" ? "webp" : "jpg";
+  return `${userId}/${entryId}/poster-${randomUUID()}.${extension}`;
+}
+
 export async function uploadJournalPosterObject(
   userId: string,
   entryId: string,
   file: File,
+  requestedPath?: string,
 ): Promise<string> {
   const { bytes, mimeType } = await validateJournalPoster(file);
   const extension = mimeType === "image/webp" ? "webp" : "jpg";
-  const path = `${userId}/${entryId}/poster-${randomUUID()}.${extension}`;
+  const path = requestedPath ?? createJournalPosterObjectPath(userId, entryId, mimeType);
+  const prefix = `${userId}/${entryId}/`;
+  const objectName = path.startsWith(prefix) ? path.slice(prefix.length) : "";
+  const expectedName = new RegExp(
+    `^poster-[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\\.${extension}$`,
+    "i",
+  );
+  if (!expectedName.test(objectName)) {
+    throw new JournalPosterError("Journal poster path did not match its image format.");
+  }
   const { error } = await createSupabaseAdminClient().storage.from(JOURNAL_MEDIA_BUCKET).upload(path, bytes, {
     cacheControl: "31536000",
     contentType: mimeType,
@@ -34,7 +59,9 @@ export async function uploadJournalPosterObject(
   return path;
 }
 
-async function validateJournalPoster(file: File): Promise<{ bytes: Uint8Array; mimeType: JournalPosterMime }> {
+export async function validateJournalPoster(
+  file: File,
+): Promise<{ bytes: Uint8Array; mimeType: JournalPosterMime }> {
   if (file.size === 0) throw new JournalPosterError("The generated journal poster was empty.");
   if (file.size > JOURNAL_POSTER_MAX_BYTES) throw new JournalPosterError("Journal posters must be 1 MB or smaller.", 413);
   if (!JOURNAL_POSTER_MIME_TYPES.includes(file.type as JournalPosterMime)) {
@@ -42,14 +69,21 @@ async function validateJournalPoster(file: File): Promise<{ bytes: Uint8Array; m
   }
 
   const bytes = new Uint8Array(await file.arrayBuffer());
-  const valid = file.type === "image/jpeg"
-    ? bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff
-    : bytes.length >= 12 && ascii(bytes, 0, 4) === "RIFF" && ascii(bytes, 8, 12) === "WEBP";
-  if (!valid) throw new JournalPosterError("The generated poster did not match its image format.");
+  const detectedMime = detectImageMime(bytes);
+  if (detectedMime && detectedMime !== file.type) {
+    throw new JournalPosterError("The generated poster did not match its image format.");
+  }
+  const inspection = inspectEncodedImage(bytes, {
+    allowedMimes: JOURNAL_POSTER_MIME_TYPES,
+    maxEdge: MAX_SAFE_UPLOADED_IMAGE_EDGE,
+    maxPixels: MAX_SAFE_UPLOADED_IMAGE_PIXELS,
+  });
+  if (!inspection.ok && inspection.reason === "dimensions") {
+    throw new JournalPosterError("Journal poster dimensions must be 4096 pixels and 16 megapixels or smaller.", 413);
+  }
+  if (!inspection.ok) {
+    throw new JournalPosterError("The generated poster is malformed or incomplete.");
+  }
 
   return { bytes, mimeType: file.type as JournalPosterMime };
-}
-
-function ascii(bytes: Uint8Array, start: number, end: number): string {
-  return String.fromCharCode(...bytes.slice(start, end));
 }

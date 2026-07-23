@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { updateProfile } from "@/data/profile";
+import { prepareImageForClientDecode } from "@/features/media/prepare-image-for-decode";
 import type { CurrentAppUser } from "@/modules/auth";
 import { AvatarCropSheet } from "./AvatarCropSheet";
 import { ProfileAvatar } from "./ProfileAvatar";
@@ -29,6 +30,7 @@ export function ProfileEditForm({ initialProfile, onDirtyChange, onCancel, onSav
   const [pending, setPending] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const avatarPreparationAbortRef = useRef<AbortController | null>(null);
   const dirty =
     username.trim() !== (initialProfile.username ?? initialProfile.displayName) ||
     firstName.trim() !== (initialProfile.firstName ?? "") ||
@@ -46,6 +48,8 @@ export function ProfileEditForm({ initialProfile, onDirtyChange, onCancel, onSav
 
   useEffect(() => onDirtyChange(dirty), [dirty, onDirtyChange]);
 
+  useEffect(() => () => avatarPreparationAbortRef.current?.abort(), []);
+
   useEffect(() => {
     if (!avatar) {
       setPreviewUrl(null);
@@ -57,7 +61,7 @@ export function ProfileEditForm({ initialProfile, onDirtyChange, onCancel, onSav
     return () => URL.revokeObjectURL(objectUrl);
   }, [avatar]);
 
-  function chooseAvatar(file: File | undefined) {
+  async function chooseAvatar(file: File | undefined) {
     if (!file) return;
     if (!acceptedAvatarTypes.has(file.type)) {
       setErrorMessage("Use a JPEG, PNG, or WebP image.");
@@ -70,11 +74,30 @@ export function ProfileEditForm({ initialProfile, onDirtyChange, onCancel, onSav
       return;
     }
 
+    avatarPreparationAbortRef.current?.abort();
+    const controller = new AbortController();
+    avatarPreparationAbortRef.current = controller;
     setErrorMessage(null);
-    setCropSource(file);
+    try {
+      const preparedFile = await prepareImageForClientDecode(file, {
+        label: "Profile photo",
+        maxDecodeEdge: 4_096,
+        signal: controller.signal,
+      });
+      if (avatarPreparationAbortRef.current === controller) setCropSource(preparedFile);
+    } catch (error) {
+      if (!(error instanceof DOMException && error.name === "AbortError")) {
+        setErrorMessage(error instanceof Error ? error.message : "Profile photo could not be prepared.");
+        resetFileInput();
+      }
+    } finally {
+      if (avatarPreparationAbortRef.current === controller) avatarPreparationAbortRef.current = null;
+    }
   }
 
   function removePhoto() {
+    avatarPreparationAbortRef.current?.abort();
+    avatarPreparationAbortRef.current = null;
     setAvatar(null);
     setRemoveAvatar(Boolean(initialProfile.avatarUrl));
     resetFileInput();
@@ -118,7 +141,7 @@ export function ProfileEditForm({ initialProfile, onDirtyChange, onCancel, onSav
               ref={fileInputRef}
               type="file"
               accept="image/jpeg,image/png,image/webp"
-              onChange={(event) => chooseAvatar(event.target.files?.[0])}
+              onChange={(event) => void chooseAvatar(event.target.files?.[0])}
             />
           </label>
           {(initialProfile.avatarUrl || avatar) && (

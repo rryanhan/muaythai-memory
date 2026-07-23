@@ -1,5 +1,7 @@
+import { prepareImageForClientDecode } from "@/features/media/prepare-image-for-decode";
+
 const POSTER_MAX_EDGE = 720;
-const POSTER_TIMEOUT_MS = 10_000;
+export const POSTER_EXTRACTION_TIMEOUT_MS = 10_000;
 const ANALYSIS_EDGE = 72;
 const SAMPLE_FRACTIONS = [0.08, 0.2, 0.36, 0.54, 0.72] as const;
 
@@ -15,15 +17,24 @@ export type VideoFrameScore = {
   darkRatio: number;
 };
 
+export type PosterExtractionOptions = {
+  signal?: AbortSignal;
+  timeoutMs?: number;
+};
+
 // Poster creation remains browser-side so private video bytes do not need a
 // second server-side decode pass or a deployment-specific ffmpeg binary.
-export async function createVideoPoster(file: File): Promise<GeneratedVideoPoster | null> {
-  return withVideo(file, async (video) => {
+export async function createVideoPoster(
+  file: File,
+  options: PosterExtractionOptions = {},
+): Promise<GeneratedVideoPoster | null> {
+  return withVideo(file, async (video, signal) => {
     const times = sampleTimes(video.duration);
     let best: { score: number; timeSeconds: number } | null = null;
 
     for (const timeSeconds of times) {
-      await seekVideo(video, timeSeconds);
+      throwIfAborted(signal);
+      await seekVideo(video, timeSeconds, signal);
       const frame = drawVideoFrame(video, ANALYSIS_EDGE);
       if (!frame) continue;
       const result = scoreVideoFrame(frame.context.getImageData(0, 0, frame.canvas.width, frame.canvas.height).data);
@@ -33,27 +44,39 @@ export async function createVideoPoster(file: File): Promise<GeneratedVideoPoste
     }
 
     if (!best) return null;
-    await seekVideo(video, best.timeSeconds);
-    const poster = await exportVideoFrame(video);
+    await seekVideo(video, best.timeSeconds, signal);
+    const poster = await exportVideoFrame(video, signal);
     return poster ? { file: poster, timeSeconds: best.timeSeconds } : null;
-  });
+  }, options);
 }
 
-export async function createVideoPosterAtTime(file: File, timeSeconds: number): Promise<GeneratedVideoPoster> {
-  const poster = await withVideo(file, async (video) => {
+export async function createVideoPosterAtTime(
+  file: File,
+  timeSeconds: number,
+  options: PosterExtractionOptions = {},
+): Promise<GeneratedVideoPoster> {
+  const poster = await withVideo(file, async (video, signal) => {
     const safeTime = clampVideoTime(timeSeconds, video.duration);
-    await seekVideo(video, safeTime);
-    const output = await exportVideoFrame(video);
+    await seekVideo(video, safeTime, signal);
+    const output = await exportVideoFrame(video, signal);
     return output ? { file: output, timeSeconds: safeTime } : null;
-  });
+  }, options);
   if (!poster) throw new Error("A cover could not be created at that point in the video.");
   return poster;
 }
 
-export async function createPosterFromImage(file: File): Promise<File> {
-  const sourceUrl = URL.createObjectURL(file);
+export async function createPosterFromImage(
+  file: File,
+  options: Pick<PosterExtractionOptions, "signal"> = {},
+): Promise<File> {
+  const preparedFile = await prepareImageForClientDecode(file, {
+    label: "Cover image",
+    maxDecodeEdge: 2_048,
+    signal: options.signal,
+  });
+  const sourceUrl = URL.createObjectURL(preparedFile);
   try {
-    const image = await loadImage(sourceUrl);
+    const image = await loadImage(sourceUrl, options.signal);
     const scale = Math.min(1, POSTER_MAX_EDGE / Math.max(image.naturalWidth, image.naturalHeight));
     const canvas = document.createElement("canvas");
     canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
@@ -63,7 +86,7 @@ export async function createPosterFromImage(file: File): Promise<File> {
     context.imageSmoothingEnabled = true;
     context.imageSmoothingQuality = "high";
     context.drawImage(image, 0, 0, canvas.width, canvas.height);
-    const output = await exportCanvas(canvas);
+    const output = await exportCanvas(canvas, options.signal);
     if (!output) throw new Error("Cover image could not be exported.");
     return output;
   } finally {
@@ -98,7 +121,13 @@ export function scoreVideoFrame(data: Uint8ClampedArray): VideoFrameScore {
   };
 }
 
-async function withVideo<T>(file: File, task: (video: HTMLVideoElement) => Promise<T>): Promise<T | null> {
+async function withVideo<T>(
+  file: File,
+  task: (video: HTMLVideoElement, signal: AbortSignal) => Promise<T>,
+  options: PosterExtractionOptions,
+): Promise<T | null> {
+  throwIfAborted(options.signal);
+  const budget = createExtractionBudget(options);
   const sourceUrl = URL.createObjectURL(file);
   const video = document.createElement("video");
   video.preload = "auto";
@@ -107,12 +136,15 @@ async function withVideo<T>(file: File, task: (video: HTMLVideoElement) => Promi
   video.src = sourceUrl;
 
   try {
-    await waitForEvent(video, "loadeddata", POSTER_TIMEOUT_MS);
+    await waitForEvent(video, "loadeddata", budget.signal);
     if (!video.videoWidth || !video.videoHeight) return null;
-    return await task(video);
-  } catch {
+    return await task(video, budget.signal);
+  } catch (error) {
+    if (options.signal?.aborted) throw abortReason(options.signal);
+    if (!budget.signal.aborted && isAbortError(error)) throw error;
     return null;
   } finally {
+    budget.dispose();
     video.removeAttribute("src");
     video.load();
     URL.revokeObjectURL(sourceUrl);
@@ -130,10 +162,11 @@ function clampVideoTime(timeSeconds: number, duration: number): number {
   return Math.min(Math.max(timeSeconds, edgePadding), Math.max(edgePadding, duration - edgePadding));
 }
 
-async function seekVideo(video: HTMLVideoElement, timeSeconds: number): Promise<void> {
+async function seekVideo(video: HTMLVideoElement, timeSeconds: number, signal: AbortSignal): Promise<void> {
+  throwIfAborted(signal);
   if (Math.abs(video.currentTime - timeSeconds) < 0.015) return;
   video.currentTime = timeSeconds;
-  await waitForEvent(video, "seeked", POSTER_TIMEOUT_MS);
+  await waitForEvent(video, "seeked", signal);
 }
 
 function drawVideoFrame(video: HTMLVideoElement, maxEdge: number) {
@@ -147,26 +180,33 @@ function drawVideoFrame(video: HTMLVideoElement, maxEdge: number) {
   return { canvas, context };
 }
 
-async function exportVideoFrame(video: HTMLVideoElement): Promise<File | null> {
+async function exportVideoFrame(video: HTMLVideoElement, signal: AbortSignal): Promise<File | null> {
+  throwIfAborted(signal);
   const frame = drawVideoFrame(video, POSTER_MAX_EDGE);
-  return frame ? exportCanvas(frame.canvas) : null;
+  return frame ? exportCanvas(frame.canvas, signal) : null;
 }
 
-async function exportCanvas(canvas: HTMLCanvasElement): Promise<File | null> {
-  const webp = await canvasToBlob(canvas, "image/webp", 0.84);
+async function exportCanvas(canvas: HTMLCanvasElement, signal?: AbortSignal): Promise<File | null> {
+  const webp = await canvasToBlob(canvas, "image/webp", 0.84, signal);
   if (webp?.type === "image/webp") return new File([webp], "journal-poster.webp", { type: "image/webp" });
-  const jpeg = await canvasToBlob(canvas, "image/jpeg", 0.86);
+  const jpeg = await canvasToBlob(canvas, "image/jpeg", 0.86, signal);
   return jpeg ? new File([jpeg], "journal-poster.jpg", { type: "image/jpeg" }) : null;
 }
 
-function waitForEvent(video: HTMLVideoElement, eventName: "loadeddata" | "seeked", timeoutMs: number): Promise<void> {
+function waitForEvent(
+  video: HTMLVideoElement,
+  eventName: "loadeddata" | "seeked",
+  signal: AbortSignal,
+): Promise<void> {
   return new Promise((resolve, reject) => {
-    const timeout = window.setTimeout(() => finish(() => reject(new Error("Video frame timed out."))), timeoutMs);
+    function handleAbort() {
+      finish(() => reject(abortReason(signal)));
+    }
 
     function finish(callback: () => void) {
-      window.clearTimeout(timeout);
       video.removeEventListener(eventName, handleSuccess);
       video.removeEventListener("error", handleError);
+      signal.removeEventListener("abort", handleAbort);
       callback();
     }
 
@@ -178,20 +218,90 @@ function waitForEvent(video: HTMLVideoElement, eventName: "loadeddata" | "seeked
       finish(() => reject(new Error("Video frame could not be decoded.")));
     }
 
-    video.addEventListener(eventName, handleSuccess, { once: true });
-    video.addEventListener("error", handleError, { once: true });
+    if (signal.aborted) {
+      handleAbort();
+      return;
+    }
+    video.addEventListener(eventName, handleSuccess);
+    video.addEventListener("error", handleError);
+    signal.addEventListener("abort", handleAbort, { once: true });
   });
 }
 
-function loadImage(src: string): Promise<HTMLImageElement> {
+function loadImage(src: string, signal?: AbortSignal): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const image = new Image();
-    image.onload = () => resolve(image);
-    image.onerror = () => reject(new Error("Cover image could not be decoded."));
+    function finish(callback: () => void) {
+      image.onload = null;
+      image.onerror = null;
+      signal?.removeEventListener("abort", handleAbort);
+      callback();
+    }
+    function handleAbort() {
+      image.src = "";
+      finish(() => reject(abortReason(signal)));
+    }
+    if (signal?.aborted) {
+      handleAbort();
+      return;
+    }
+    image.onload = () => finish(() => resolve(image));
+    image.onerror = () => finish(() => reject(new Error("Cover image could not be decoded.")));
+    signal?.addEventListener("abort", handleAbort, { once: true });
     image.src = src;
   });
 }
 
-function canvasToBlob(canvas: HTMLCanvasElement, type: string, quality: number): Promise<Blob | null> {
-  return new Promise((resolve) => canvas.toBlob(resolve, type, quality));
+function canvasToBlob(
+  canvas: HTMLCanvasElement,
+  type: string,
+  quality: number,
+  signal?: AbortSignal,
+): Promise<Blob | null> {
+  return new Promise((resolve, reject) => {
+    function handleAbort() {
+      reject(abortReason(signal));
+    }
+    if (signal?.aborted) {
+      handleAbort();
+      return;
+    }
+    signal?.addEventListener("abort", handleAbort, { once: true });
+    canvas.toBlob((blob) => {
+      signal?.removeEventListener("abort", handleAbort);
+      if (!signal?.aborted) resolve(blob);
+    }, type, quality);
+  });
+}
+
+function createExtractionBudget(options: PosterExtractionOptions): {
+  signal: AbortSignal;
+  dispose: () => void;
+} {
+  const controller = new AbortController();
+  const handleExternalAbort = () => controller.abort(abortReason(options.signal));
+  options.signal?.addEventListener("abort", handleExternalAbort, { once: true });
+  const timeout = window.setTimeout(() => {
+    controller.abort(new DOMException("Video frame extraction timed out.", "TimeoutError"));
+  }, options.timeoutMs ?? POSTER_EXTRACTION_TIMEOUT_MS);
+
+  return {
+    signal: controller.signal,
+    dispose() {
+      window.clearTimeout(timeout);
+      options.signal?.removeEventListener("abort", handleExternalAbort);
+    },
+  };
+}
+
+function throwIfAborted(signal?: AbortSignal): void {
+  if (signal?.aborted) throw abortReason(signal);
+}
+
+function abortReason(signal?: AbortSignal): unknown {
+  return signal?.reason ?? new DOMException("Video frame extraction was cancelled.", "AbortError");
+}
+
+function isAbortError(error: unknown): boolean {
+  return error instanceof DOMException && error.name === "AbortError";
 }

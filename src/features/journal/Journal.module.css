@@ -52,6 +52,8 @@
 
 .back:focus-visible,
 .fileButton:focus-within,
+.coverCommands button:focus-visible,
+.coverCommands label:focus-within,
 .field input:focus-visible,
 .field textarea:focus-visible,
 .field select:focus-visible,

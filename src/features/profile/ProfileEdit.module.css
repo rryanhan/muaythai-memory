@@ -294,6 +294,10 @@
   background: var(--graphite);
 }
 
+.cropStage[data-exporting="true"] {
+  pointer-events: none;
+}
+
 .zoomControl {
   display: grid;
   grid-template-columns: 24px minmax(0, 1fr) 24px;

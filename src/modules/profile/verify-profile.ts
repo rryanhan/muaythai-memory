@@ -8,6 +8,8 @@ import { profileUsernameSchema } from "./contracts";
 import { detectAvatarImageMime } from "./image-format";
 import { updateProfile } from "./mutations";
 import type { CurrentAppUser } from "@/modules/auth";
+import { detectAvatarOutputMime } from "@/features/profile/create-cropped-avatar";
+import { pngBytes } from "@/modules/media/test-image-fixtures";
 
 async function main() {
   assert.equal(profileUsernameSchema.parse("  Ryan_Han  "), "ryan_han");
@@ -15,13 +17,19 @@ async function main() {
   assert.equal(profileUsernameSchema.safeParse("x".repeat(31)).success, false);
 
   const png = new File(
-    [new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])],
+    [pngBytes(1, 1)],
     "avatar.png",
     { type: "image/png" },
   );
   const validatedPng = await validateAvatarFile(png);
   assert.equal(validatedPng.mime, "image/png");
   assert.equal(detectAvatarImageMime(new Uint8Array(await png.arrayBuffer())), "image/png");
+  assert.equal(
+    await detectAvatarOutputMime(new Blob([
+      new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    ], { type: "image/webp" })),
+    "image/png",
+  );
 
   await assert.rejects(
     validateAvatarFile(new File([new Uint8Array([0xff, 0xd8, 0xff])], "spoof.png", { type: "image/png" })),

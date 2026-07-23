@@ -1,8 +1,13 @@
 import { randomUUID } from "node:crypto";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import {
+  MAX_SAFE_UPLOADED_IMAGE_EDGE,
+  MAX_SAFE_UPLOADED_IMAGE_PIXELS,
+  detectImageMime,
+  inspectEncodedImage,
+} from "@/modules/media/image-metadata";
+import {
   AVATAR_IMAGE_MIME_TYPES,
-  detectAvatarImageMime,
   type AvatarImageMime,
 } from "./image-format";
 
@@ -91,8 +96,20 @@ export async function validateAvatarFile(file: File): Promise<{ bytes: Uint8Arra
   }
 
   const bytes = new Uint8Array(await file.arrayBuffer());
-  if (detectAvatarImageMime(bytes) !== file.type) {
+  const detectedMime = detectImageMime(bytes);
+  if (detectedMime && detectedMime !== file.type) {
     throw new AvatarValidationError("The selected file does not match its image format.");
+  }
+  const inspection = inspectEncodedImage(bytes, {
+    allowedMimes: PROFILE_AVATAR_MIME_TYPES,
+    maxEdge: MAX_SAFE_UPLOADED_IMAGE_EDGE,
+    maxPixels: MAX_SAFE_UPLOADED_IMAGE_PIXELS,
+  });
+  if (!inspection.ok && inspection.reason === "dimensions") {
+    throw new AvatarValidationError("Profile photo dimensions must be 4096 pixels and 16 megapixels or smaller.", 413);
+  }
+  if (!inspection.ok) {
+    throw new AvatarValidationError("The selected image is malformed or incomplete.");
   }
 
   return { bytes, mime: file.type };

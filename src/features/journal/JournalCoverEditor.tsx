@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Drawer } from "vaul";
+import { useDrawerFocus } from "@/features/media/use-drawer-focus";
 import { createVideoPosterAtTime, type GeneratedVideoPoster } from "./create-video-poster";
 import styles from "./JournalMedia.module.css";
 
@@ -14,6 +15,8 @@ type JournalCoverEditorProps = {
 
 export function JournalCoverEditor({ file, initialTimeSeconds, onCancel, onUseCover }: JournalCoverEditorProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const extractionAbortRef = useRef<AbortController | null>(null);
+  const contentRef = useDrawerFocus(true);
   const [sourceUrl, setSourceUrl] = useState<string | null>(null);
   const [duration, setDuration] = useState(0);
   const [timeSeconds, setTimeSeconds] = useState(initialTimeSeconds ?? 0);
@@ -26,6 +29,8 @@ export function JournalCoverEditor({ file, initialTimeSeconds, onCancel, onUseCo
     return () => URL.revokeObjectURL(nextUrl);
   }, [file]);
 
+  useEffect(() => () => extractionAbortRef.current?.abort(), []);
+
   function seek(nextTime: number) {
     const video = videoRef.current;
     setTimeSeconds(nextTime);
@@ -34,21 +39,36 @@ export function JournalCoverEditor({ file, initialTimeSeconds, onCancel, onUseCo
 
   async function useCover() {
     if (pending) return;
+    const controller = new AbortController();
+    extractionAbortRef.current = controller;
     setPending(true);
     setError(null);
     try {
-      onUseCover(await createVideoPosterAtTime(file, timeSeconds));
+      onUseCover(await createVideoPosterAtTime(file, timeSeconds, { signal: controller.signal }));
     } catch (caught) {
+      if (caught instanceof DOMException && caught.name === "AbortError") return;
       setPending(false);
       setError(caught instanceof Error ? caught.message : "Cover could not be prepared.");
+    } finally {
+      if (extractionAbortRef.current === controller) extractionAbortRef.current = null;
     }
   }
 
   return (
-    <Drawer.Root open direction="bottom" dismissible={!pending} onOpenChange={(open) => !open && !pending && onCancel()}>
+    <Drawer.Root
+      open
+      direction="bottom"
+      dismissible={!pending}
+      autoFocus={false}
+      onOpenChange={(open) => !open && !pending && onCancel()}
+    >
       <Drawer.Portal>
         <Drawer.Overlay className={styles.coverBackdrop} />
-        <Drawer.Content className={styles.coverSheet} aria-describedby="journal-cover-description">
+        <Drawer.Content
+          ref={contentRef}
+          className={styles.coverSheet}
+          aria-describedby="journal-cover-description"
+        >
           <Drawer.Handle className="drawer-handle" />
           <header className={styles.coverHeader}>
             <div>
@@ -95,7 +115,7 @@ export function JournalCoverEditor({ file, initialTimeSeconds, onCancel, onUseCo
 
           {error && <p className={styles.coverError} role="alert">{error}</p>}
           <div className={styles.coverActions}>
-            <button type="button" disabled={pending} onClick={onCancel}>Cancel</button>
+            <button type="button" disabled={pending} data-drawer-initial-focus onClick={onCancel}>Cancel</button>
             <button type="button" disabled={pending || !duration || Boolean(error)} onClick={() => void useCover()}>
               {pending ? "Preparing..." : "Use Cover"}
             </button>
