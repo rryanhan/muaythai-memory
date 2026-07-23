@@ -37,6 +37,7 @@ vi.mock("react-easy-crop", async () => {
       React.useEffect(() => {
         const onCropComplete = props.onCropComplete as (area: unknown, pixels: unknown) => void;
         onCropComplete({}, { height: 400, width: 400, x: 10, y: 20 });
+        (props.onMediaLoaded as () => void)();
       }, []);
       return (
         <button
@@ -120,5 +121,26 @@ describe("AvatarCropSheet", () => {
     unmount();
     expect(opener).toHaveFocus();
     opener.remove();
+  });
+
+  it("shows a visible error and blocks export when the browser decoder returns a blank image", async () => {
+    render(
+      <AvatarCropSheet
+        file={new File(["avatar"], "avatar.png", { type: "image/png" })}
+        onCancel={vi.fn()}
+        onUsePhoto={vi.fn()}
+      />,
+    );
+    await waitFor(() => expect(screen.getByRole("button", { name: "Use Photo" })).toBeEnabled());
+
+    act(() => {
+      const mediaProps = cropperMock.props?.mediaProps as { onError: () => void };
+      mediaProps.onError();
+    });
+
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Profile photo could not be decoded. Choose another image.",
+    );
+    expect(screen.getByRole("button", { name: "Use Photo" })).toBeDisabled();
   });
 });

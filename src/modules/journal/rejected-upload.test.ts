@@ -35,6 +35,7 @@ describe("cleanupRejectedJournalUpload", () => {
 
     expect(result).toEqual({
       ok: false,
+      stage: "storage",
       error: { message: "storage unavailable" },
     });
     expect(removeObjects).toHaveBeenCalledWith([
@@ -54,7 +55,25 @@ describe("cleanupRejectedJournalUpload", () => {
         removeObjects: vi.fn().mockRejectedValue(failure),
         deleteUploadRecord,
       },
-    )).resolves.toEqual({ ok: false, error: failure });
+    )).resolves.toEqual({ ok: false, stage: "storage", error: failure });
     expect(deleteUploadRecord).not.toHaveBeenCalled();
+  });
+
+  it("reports database deletion failure after Storage cleanup succeeds", async () => {
+    const failure = new Error("database unavailable");
+    const deleteUploadRecord = vi.fn().mockRejectedValue(failure);
+
+    await expect(cleanupRejectedJournalUpload(
+      ["user/entry/video.mp4", "user/entry/poster.webp"],
+      {
+        removeObjects: vi.fn().mockResolvedValue({ error: null }),
+        deleteUploadRecord,
+      },
+    )).resolves.toEqual({
+      ok: false,
+      stage: "database",
+      error: failure,
+    });
+    expect(deleteUploadRecord).toHaveBeenCalledOnce();
   });
 });

@@ -21,11 +21,15 @@ export function AvatarCropSheet({ file, onCancel, onUsePhoto }: AvatarCropSheetP
   const [crop, setCrop] = useState<Point>({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
   const [cropPixels, setCropPixels] = useState<Area | null>(null);
+  const [imageDecoded, setImageDecoded] = useState(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const nextUrl = URL.createObjectURL(file);
+    setImageDecoded(false);
+    setCropPixels(null);
+    setError(null);
     setImageUrl(nextUrl);
     return () => URL.revokeObjectURL(nextUrl);
   }, [file]);
@@ -92,6 +96,14 @@ export function AvatarCropSheet({ file, onCancel, onUsePhoto }: AvatarCropSheetP
                 onCropComplete={(_area, pixels) => {
                   if (!pending) setCropPixels(pixels);
                 }}
+                onMediaLoaded={() => setImageDecoded(true)}
+                mediaProps={{
+                  onError: () => {
+                    setImageDecoded(false);
+                    setCropPixels(null);
+                    setError("Profile photo could not be decoded. Choose another image.");
+                  },
+                }}
                 onTouchRequest={() => !pending}
                 onWheelRequest={() => !pending}
                 cropperProps={pending
@@ -125,7 +137,11 @@ export function AvatarCropSheet({ file, onCancel, onUsePhoto }: AvatarCropSheetP
 
           <div className={styles.cropActions}>
             <button type="button" disabled={pending} data-drawer-initial-focus onClick={onCancel}>Cancel</button>
-            <button type="button" disabled={pending || !cropPixels} onClick={() => void confirmCrop()}>
+            <button
+              type="button"
+              disabled={pending || !cropPixels || !imageDecoded || Boolean(error)}
+              onClick={() => void confirmCrop()}
+            >
               {pending ? "Preparing..." : "Use Photo"}
             </button>
           </div>

@@ -9,6 +9,7 @@ import { detectAvatarImageMime } from "./image-format";
 import { updateProfile } from "./mutations";
 import type { CurrentAppUser } from "@/modules/auth";
 import { detectAvatarOutputMime } from "@/features/profile/create-cropped-avatar";
+import { pngBytes } from "@/modules/media/test-image-fixtures";
 
 async function main() {
   assert.equal(profileUsernameSchema.parse("  Ryan_Han  "), "ryan_han");
@@ -16,7 +17,7 @@ async function main() {
   assert.equal(profileUsernameSchema.safeParse("x".repeat(31)).success, false);
 
   const png = new File(
-    [new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])],
+    [pngBytes(1, 1)],
     "avatar.png",
     { type: "image/png" },
   );

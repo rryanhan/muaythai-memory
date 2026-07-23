@@ -4,7 +4,7 @@ export type RejectedUploadStorageError = {
 
 export type RejectedUploadCleanupResult =
   | { ok: true }
-  | { ok: false; error: unknown };
+  | { ok: false; stage: "storage" | "database"; error: unknown };
 
 export async function cleanupRejectedJournalUpload(
   paths: string[],
@@ -17,10 +17,14 @@ export async function cleanupRejectedJournalUpload(
   try {
     removal = await dependencies.removeObjects(paths);
   } catch (error) {
-    return { ok: false, error };
+    return { ok: false, stage: "storage", error };
   }
 
-  if (removal.error) return { ok: false, error: removal.error };
-  await dependencies.deleteUploadRecord();
+  if (removal.error) return { ok: false, stage: "storage", error: removal.error };
+  try {
+    await dependencies.deleteUploadRecord();
+  } catch (error) {
+    return { ok: false, stage: "database", error };
+  }
   return { ok: true };
 }

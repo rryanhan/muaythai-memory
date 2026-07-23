@@ -82,56 +82,102 @@ export async function createJournalUploadIntent(
 }
 
 export async function completeJournalUpload(userId: string, entryId: string): Promise<JournalEntryDetail> {
-  const current = await getOwnedJournalRow(userId, entryId);
-  if (!current) throw new JournalMutationError("Journal entry not found.", 404);
-  if (current.status === "ready") {
-    const readyEntry = await getJournalEntryById(userId, entryId);
-    if (!readyEntry) throw new JournalMutationError("Journal entry not found.", 404);
-    return readyEntry;
-  }
-  if (!current.posterPath) {
-    throw new JournalMutationError("Choose a journal cover before completing the upload.", 409);
-  }
-
   const supabase = createSupabaseAdminClient();
   const bucket = supabase.storage.from(JOURNAL_MEDIA_BUCKET);
-  const { data: info, error } = await bucket.info(current.storagePath);
-  if (error || !info) throw new JournalMutationError("The uploaded video could not be confirmed. Try again.", 409);
-
-  const contentType = info.contentType ?? "";
-  if (
-    info.size !== current.sizeBytes ||
-    !isJournalVideoMime(contentType) ||
-    contentType !== current.mimeType
-  ) {
-    const paths = [current.storagePath, current.posterPath].filter((path): path is string => Boolean(path));
-    const cleanup = await cleanupRejectedJournalUpload(paths, {
-      removeObjects: (objectPaths) => bucket.remove(objectPaths),
-      async deleteUploadRecord() {
-        await db.delete(journalEntries).where(
-          and(eq(journalEntries.id, entryId), eq(journalEntries.userId, userId)),
-        );
-      },
-    });
-    if (!cleanup.ok) {
-      console.error(
-        "Rejected journal upload cleanup failed.",
-        cleanup.error instanceof Error ? cleanup.error.message : cleanup.error,
-      );
-      throw new JournalMutationError(
-        "The uploaded video was rejected, but its files could not be cleaned up. Try again.",
-        503,
-      );
+  const outcome = await db.transaction(async (tx) => {
+    const current = await getLockedJournalUpload(tx, userId, entryId);
+    if (!current) throw new JournalMutationError("Journal entry not found.", 404);
+    if (current.status === "ready") return { kind: "ready" } as const;
+    if (current.status !== "uploading") {
+      throw new JournalMutationError("Journal entry could not be completed.", 409);
     }
-    throw new JournalMutationError("The uploaded video did not match the selected file.", 400);
-  }
+    if (!current.posterPath) {
+      throw new JournalMutationError("Choose a journal cover before completing the upload.", 409);
+    }
 
-  const [updated] = await db
-    .update(journalEntries)
-    .set({ status: "ready", updatedAt: new Date() })
-    .where(and(eq(journalEntries.id, entryId), eq(journalEntries.userId, userId), eq(journalEntries.status, "uploading")))
-    .returning({ id: journalEntries.id });
-  if (!updated) throw new JournalMutationError("Journal entry could not be completed.", 409);
+    const rejectUpload = async (reason: "missing" | "mismatch") => {
+      const paths = [current.storagePath, current.posterPath].filter((path): path is string => Boolean(path));
+      const cleanup = await cleanupRejectedJournalUpload(paths, {
+        async removeObjects(objectPaths) {
+          try {
+            const result = await bucket.remove(objectPaths);
+            return {
+              error: result.error && !isStorageNotFoundError(result.error) ? result.error : null,
+            };
+          } catch (error) {
+            if (isStorageNotFoundError(error)) return { error: null };
+            throw error;
+          }
+        },
+        async deleteUploadRecord() {
+          const [deleted] = await tx
+            .delete(journalEntries)
+            .where(and(eq(journalEntries.id, entryId), eq(journalEntries.userId, userId)))
+            .returning({ id: journalEntries.id });
+          if (!deleted) throw new Error("Journal upload record was not deleted.");
+        },
+      });
+      if (!cleanup.ok) {
+        console.error(
+          `Rejected journal upload ${cleanup.stage} cleanup failed.`,
+          cleanup.error instanceof Error ? cleanup.error.message : cleanup.error,
+        );
+        throw new JournalMutationError(
+          cleanup.stage === "database"
+            ? "The rejected files were removed, but the upload record remains. Retry to finish cleanup."
+            : "The uploaded video was rejected, but its files could not be cleaned up. Try again.",
+          503,
+        );
+      }
+      return { kind: "rejected", reason } as const;
+    };
+
+    let infoResult: Awaited<ReturnType<typeof bucket.info>>;
+    try {
+      infoResult = await bucket.info(current.storagePath);
+    } catch (error) {
+      if (isStorageNotFoundError(error)) return rejectUpload("missing");
+      throw new JournalMutationError("The uploaded video could not be confirmed. Try again.", 409);
+    }
+
+    if (infoResult.error) {
+      if (isStorageNotFoundError(infoResult.error)) return rejectUpload("missing");
+      throw new JournalMutationError("The uploaded video could not be confirmed. Try again.", 409);
+    }
+    if (!infoResult.data) {
+      throw new JournalMutationError("The uploaded video could not be confirmed. Try again.", 409);
+    }
+
+    const contentType = infoResult.data.contentType ?? "";
+    if (
+      infoResult.data.size !== current.sizeBytes
+      || !isJournalVideoMime(contentType)
+      || contentType !== current.mimeType
+    ) {
+      return rejectUpload("mismatch");
+    }
+
+    const [updated] = await tx
+      .update(journalEntries)
+      .set({ status: "ready", updatedAt: new Date() })
+      .where(and(
+        eq(journalEntries.id, entryId),
+        eq(journalEntries.userId, userId),
+        eq(journalEntries.status, "uploading"),
+      ))
+      .returning({ id: journalEntries.id });
+    if (!updated) throw new JournalMutationError("Journal entry could not be completed.", 409);
+    return { kind: "completed" } as const;
+  });
+
+  if (outcome.kind === "rejected") {
+    throw new JournalMutationError(
+      outcome.reason === "missing"
+        ? "The uploaded video is no longer available. Select it again."
+        : "The uploaded video did not match the selected file.",
+      outcome.reason === "missing" ? 409 : 400,
+    );
+  }
 
   const entry = await getJournalEntryById(userId, entryId);
   if (!entry) throw new JournalMutationError("Completed journal entry could not be loaded.", 404);
@@ -139,29 +185,43 @@ export async function completeJournalUpload(userId: string, entryId: string): Pr
 }
 
 export async function saveJournalPoster(userId: string, entryId: string, file: File): Promise<void> {
-  const current = await getOwnedJournalRow(userId, entryId);
-  if (!current) throw new JournalMutationError("Journal entry not found.", 404);
-  if (current.status !== "uploading") {
+  const posterPath = await uploadJournalPosterObject(userId, entryId, file);
+  let outcome:
+    | { kind: "saved"; previousPosterPath: string | null }
+    | { kind: "missing" | "not-uploading" };
+  try {
+    outcome = await db.transaction(async (tx) => {
+      const current = await getLockedJournalUpload(tx, userId, entryId);
+      if (!current) return { kind: "missing" } as const;
+      if (current.status !== "uploading") return { kind: "not-uploading" } as const;
+
+      const [updated] = await tx
+        .update(journalMedia)
+        .set({ posterPath, updatedAt: new Date() })
+        .where(and(eq(journalMedia.id, current.mediaId), eq(journalMedia.journalEntryId, entryId)))
+        .returning({ id: journalMedia.id });
+      if (!updated) throw new JournalMutationError("Journal entry not found.", 404);
+      return { kind: "saved", previousPosterPath: current.posterPath } as const;
+    });
+  } catch (error) {
+    await removeLosingPoster(posterPath, error);
+    throw error;
+  }
+
+  if (outcome.kind !== "saved") {
+    await removeLosingPoster(posterPath);
+    if (outcome.kind === "missing") throw new JournalMutationError("Journal entry not found.", 404);
     throw new JournalMutationError("Journal poster can only be added while the video is uploading.", 409);
   }
 
-  const posterPath = await uploadJournalPosterObject(userId, entryId, file);
-  try {
-    const [updated] = await db
-      .update(journalMedia)
-      .set({ posterPath, updatedAt: new Date() })
-      .where(eq(journalMedia.journalEntryId, entryId))
-      .returning({ id: journalMedia.id });
-    if (!updated) throw new JournalMutationError("Journal entry not found.", 404);
-    if (current.posterPath && current.posterPath !== posterPath) {
-      await createSupabaseAdminClient().storage
-        .from(JOURNAL_MEDIA_BUCKET)
-        .remove([current.posterPath])
-        .catch(() => undefined);
+  if (outcome.previousPosterPath && outcome.previousPosterPath !== posterPath) {
+    const cleanupError = await removeJournalStoragePaths([outcome.previousPosterPath]);
+    if (cleanupError) {
+      console.error(
+        "Previous journal poster cleanup failed.",
+        cleanupError instanceof Error ? cleanupError.message : cleanupError,
+      );
     }
-  } catch (error) {
-    await createSupabaseAdminClient().storage.from(JOURNAL_MEDIA_BUCKET).remove([posterPath]).catch(() => undefined);
-    throw error;
   }
 }
 
@@ -248,6 +308,62 @@ async function assertOwnedDrill(userId: string, drillId: string): Promise<void> 
     .where(and(eq(drills.id, drillId), eq(drills.userId, userId)))
     .limit(1);
   if (!drill) throw new JournalMutationError("Linked drill not found.", 404);
+}
+
+type JournalTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+async function getLockedJournalUpload(
+  tx: JournalTransaction,
+  userId: string,
+  entryId: string,
+) {
+  const [row] = await tx
+    .select({
+      id: journalEntries.id,
+      status: journalEntries.status,
+      mediaId: journalMedia.id,
+      storagePath: journalMedia.storagePath,
+      mimeType: journalMedia.mimeType,
+      sizeBytes: journalMedia.sizeBytes,
+      posterPath: journalMedia.posterPath,
+    })
+    .from(journalEntries)
+    .innerJoin(journalMedia, eq(journalMedia.journalEntryId, journalEntries.id))
+    .where(and(eq(journalEntries.id, entryId), eq(journalEntries.userId, userId)))
+    .for("update", { of: journalEntries })
+    .limit(1);
+  return row ?? null;
+}
+
+async function removeLosingPoster(path: string, originalError?: unknown): Promise<void> {
+  const cleanupError = await removeJournalStoragePaths([path]);
+  if (!cleanupError) return;
+  if (originalError) {
+    console.error(
+      "Journal poster commit failed before cleanup.",
+      originalError instanceof Error ? originalError.message : originalError,
+    );
+  }
+  console.error(
+    "Losing journal poster cleanup failed.",
+    cleanupError instanceof Error ? cleanupError.message : cleanupError,
+  );
+  throw new JournalMutationError("An unused journal poster could not be cleaned up. Try again.", 503);
+}
+
+async function removeJournalStoragePaths(paths: string[]): Promise<unknown | null> {
+  try {
+    const { error } = await createSupabaseAdminClient().storage.from(JOURNAL_MEDIA_BUCKET).remove(paths);
+    return error;
+  } catch (error) {
+    return error;
+  }
+}
+
+function isStorageNotFoundError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const candidate = error as { status?: unknown; statusCode?: unknown };
+  return candidate.status === 404 || candidate.statusCode === 404 || candidate.statusCode === "404";
 }
 
 function getResumableStorageEndpoint(): string {
