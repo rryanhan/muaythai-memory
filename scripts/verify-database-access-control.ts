@@ -1,7 +1,9 @@
-import { config } from "dotenv";
 import postgres, { type Sql } from "postgres";
-import { getEnvironmentFilePath } from "@/config/environment-file";
 import { getRuntimeDatabaseConfig } from "@/db/connection-config";
+import {
+  loadAccessControlEnvironment,
+  type AccessControlEnvironment,
+} from "./database-access-control-environment";
 
 const API_ROLES = ["anon", "authenticated"] as const;
 const REQUIRED_DATABASE_ROLES = [...API_ROLES, "postgres"] as const;
@@ -25,7 +27,7 @@ type CurrentRoleRow = { currentRole: string };
 type ObjectCountRow = {
   tableCount: number;
   sequenceCount: number;
-  functionCount: number;
+  routineCount: number;
 };
 type PrivilegeRow = {
   roleName: string;
@@ -36,19 +38,15 @@ type PrivilegeRow = {
 type DefaultPrivilegeRow = {
   scope: string;
   objectKind: string;
+  roleName: string;
   grantee: string;
   privilege: string;
 };
 
-config({ path: getEnvironmentFilePath() });
-
-const { connectionString } = getRuntimeDatabaseConfig();
-const sql = postgres(connectionString, {
-  max: 1,
-  prepare: false,
-});
-
-async function main() {
+async function verifyAccessControl(
+  sql: Sql,
+  deployment: AccessControlEnvironment["summary"],
+) {
   const existingRoles = await sql<NameRow[]>`
     select rolname as name
     from pg_roles
@@ -86,14 +84,14 @@ async function main() {
   const tablePrivileges = await getTablePrivileges(sql);
   const columnPrivileges = await getColumnPrivileges(sql);
   const sequencePrivileges = await getSequencePrivileges(sql);
-  const functionPrivileges = await getFunctionPrivileges(sql);
+  const routinePrivileges = await getRoutinePrivileges(sql);
   const defaultPrivileges = await getUnsafeDefaultPrivileges(sql);
 
   const objectPrivileges = [
     ...tablePrivileges,
     ...columnPrivileges,
     ...sequencePrivileges,
-    ...functionPrivileges,
+    ...routinePrivileges,
   ];
 
   const [{ currentRole }] = await sql<CurrentRoleRow[]>`
@@ -106,18 +104,24 @@ async function main() {
 
   await verifyApplicationReads(sql);
 
-  expectNoPrivileges("public object", objectPrivileges);
-  expectNoDefaultPrivileges(defaultPrivileges);
+  const accessFailures = [
+    formatPrivilegeFailure("public object", objectPrivileges),
+    formatDefaultPrivilegeFailure(defaultPrivileges),
+  ].filter((failure): failure is string => failure !== null);
+  expect(accessFailures.length === 0, accessFailures.join("\n\n"));
 
   const counts = objectCounts[0];
   console.log(
     `Access-control verification passed for ${EXPECTED_PUBLIC_TABLES.length} expected domain tables.`,
   );
   console.log(
-    `Checked ${counts.tableCount} public tables/views, ${counts.sequenceCount} sequences, and ${counts.functionCount} functions for anon/authenticated access.`,
+    `Checked ${counts.tableCount} public tables/views, ${counts.sequenceCount} sequences, and ${counts.routineCount} routines for anon/authenticated access.`,
   );
   console.log(
     `Verified postgres default privileges and harmless reads through application role ${currentRole}.`,
+  );
+  console.log(
+    `Verified ${deployment.environment} Supabase project ${deployment.projectRef}.`,
   );
 }
 
@@ -135,7 +139,7 @@ async function getObjectCounts(database: Sql) {
         from pg_proc p
         join pg_namespace pn on pn.oid = p.pronamespace
         where pn.nspname = 'public'
-      ) as "functionCount"
+      ) as "routineCount"
     from pg_class c
     join pg_namespace n on n.oid = c.relnamespace
     where n.nspname = 'public'
@@ -155,7 +159,8 @@ async function getTablePrivileges(database: Sql) {
         ('DELETE'),
         ('TRUNCATE'),
         ('REFERENCES'),
-        ('TRIGGER')
+        ('TRIGGER'),
+        ('MAINTAIN')
     ),
     public_relations as materialized (
       select c.oid, c.relname
@@ -254,13 +259,13 @@ async function getSequencePrivileges(database: Sql) {
   `;
 }
 
-async function getFunctionPrivileges(database: Sql) {
+async function getRoutinePrivileges(database: Sql) {
   return database<PrivilegeRow[]>`
     with target_roles(role_name) as (
       values ('anon'), ('authenticated')
     ),
-    public_functions as materialized (
-      select p.oid
+    public_routines as materialized (
+      select p.oid, p.prokind
       from pg_proc p
       join pg_namespace n on n.oid = p.pronamespace
       where n.nspname = 'public'
@@ -268,10 +273,13 @@ async function getFunctionPrivileges(database: Sql) {
     select
       roles.role_name as "roleName",
       p.oid::regprocedure::text as "objectName",
-      'function' as "objectKind",
+      case
+        when p.prokind = 'p' then 'procedure'
+        else 'function'
+      end as "objectKind",
       'EXECUTE' as privilege
     from target_roles roles
-    cross join public_functions p
+    cross join public_routines p
     where has_function_privilege(roles.role_name, p.oid, 'EXECUTE')
     order by roles.role_name, p.oid::regprocedure::text
   `;
@@ -288,7 +296,7 @@ async function getUnsafeDefaultPrivileges(database: Sql) {
       values
         ('r'::"char", 'table'),
         ('S'::"char", 'sequence'),
-        ('f'::"char", 'function')
+        ('f'::"char", 'routine')
     ),
     global_defaults as (
       select
@@ -335,17 +343,51 @@ async function getUnsafeDefaultPrivileges(database: Sql) {
         select * from schema_defaults
       ) defaults
       cross join lateral aclexplode(defaults.acl) grants
+    ),
+    target_roles as (
+      select oid, rolname
+      from pg_roles
+      where rolname in ('anon', 'authenticated')
+    ),
+    effective_grants as (
+      select
+        expanded.scope,
+        expanded.object_kind,
+        roles.rolname as role_name,
+        'PUBLIC'::text as grantee,
+        expanded.privilege_type
+      from expanded
+      cross join target_roles roles
+      where expanded.grantee = 0
+
+      union all
+
+      select
+        expanded.scope,
+        expanded.object_kind,
+        roles.rolname as role_name,
+        grantee.rolname as grantee,
+        expanded.privilege_type
+      from expanded
+      join pg_roles grantee on grantee.oid = expanded.grantee
+      cross join target_roles roles
+      where expanded.grantee <> 0
+        -- USAGE follows recursive role membership but excludes memberships
+        -- whose privileges are not inherited without SET ROLE.
+        and pg_has_role(roles.oid, expanded.grantee, 'USAGE')
     )
     select
-      expanded.scope,
-      expanded.object_kind as "objectKind",
-      coalesce(grantee.rolname, 'PUBLIC') as grantee,
-      expanded.privilege_type as privilege
-    from expanded
-    left join pg_roles grantee on grantee.oid = expanded.grantee
-    where expanded.grantee = 0
-      or grantee.rolname in ('anon', 'authenticated')
-    order by expanded.scope, expanded.object_kind, grantee
+      effective_grants.scope,
+      effective_grants.object_kind as "objectKind",
+      effective_grants.role_name as "roleName",
+      effective_grants.grantee,
+      effective_grants.privilege_type as privilege
+    from effective_grants
+    order by
+      effective_grants.role_name,
+      effective_grants.scope,
+      effective_grants.object_kind,
+      effective_grants.grantee
   `;
 }
 
@@ -359,28 +401,29 @@ async function verifyApplicationReads(database: Sql) {
   });
 }
 
-function expectNoPrivileges(label: string, rows: PrivilegeRow[]) {
-  expect(
-    rows.length === 0,
-    `${label} access remains (${rows.length} grants):\n${formatRows(
-      rows.map(
-        (row) =>
-          `${row.roleName} ${row.privilege} on ${row.objectKind} ${row.objectName}`,
-      ),
-    )}`,
-  );
+function formatPrivilegeFailure(
+  label: string,
+  rows: PrivilegeRow[],
+): string | null {
+  if (rows.length === 0) return null;
+  return `${label} access remains (${rows.length} grants):\n${formatRows(
+    rows.map(
+      (row) =>
+        `${row.roleName} ${row.privilege} on ${row.objectKind} ${row.objectName}`,
+    ),
+  )}`;
 }
 
-function expectNoDefaultPrivileges(rows: DefaultPrivilegeRow[]) {
-  expect(
-    rows.length === 0,
-    `Unsafe postgres default privileges remain (${rows.length} grants):\n${formatRows(
-      rows.map(
-        (row) =>
-          `${row.grantee} ${row.privilege} on future ${row.objectKind} objects (${row.scope})`,
-      ),
-    )}`,
-  );
+function formatDefaultPrivilegeFailure(
+  rows: DefaultPrivilegeRow[],
+): string | null {
+  if (rows.length === 0) return null;
+  return `Unsafe postgres default privileges remain (${rows.length} grants):\n${formatRows(
+    rows.map(
+      (row) =>
+        `${row.roleName} inherits ${row.privilege} on future ${row.objectKind} objects via ${row.grantee} (${row.scope})`,
+    ),
+  )}`;
 }
 
 function formatRows(rows: string[]) {
@@ -395,11 +438,24 @@ function expect(condition: boolean, message: string): asserts condition {
   if (!condition) throw new Error(message);
 }
 
-main()
-  .catch((error) => {
-    console.error(error instanceof Error ? error.message : error);
-    process.exitCode = 1;
-  })
-  .finally(async () => {
-    await sql.end();
+async function run() {
+  const deployment = loadAccessControlEnvironment(process.argv.slice(2));
+  const { connectionString } = getRuntimeDatabaseConfig(
+    deployment.environment,
+  );
+  const sql = postgres(connectionString, {
+    max: 1,
+    prepare: false,
   });
+
+  try {
+    await verifyAccessControl(sql, deployment.summary);
+  } finally {
+    await sql.end();
+  }
+}
+
+run().catch((error) => {
+  console.error(error instanceof Error ? error.message : error);
+  process.exitCode = 1;
+});

@@ -110,9 +110,10 @@ capture data continue to flow through typed Next API routes and Drizzle.
 Current authorization is enforced in those server modules by passing the
 verified user id into every read and write. Domain tables remain server-only:
 the `anon` and `authenticated` database roles have no privileges on public
-tables, sequences, or functions, including through the `postgres` role's
-default privileges. Run `npm run db:verify-access-control` after migrations to
-verify that boundary. Row Level Security must still be designed before any
+tables, sequences, functions, or procedures, including through recursive role
+membership and the `postgres` role's default privileges. Run
+`npm run db:verify-access-control -- --expect=staging` after staging migrations
+to verify that boundary. Row Level Security must still be designed before any
 domain table is queried directly from a browser or third-party client.
 
 Supabase dashboard setup for authentication:

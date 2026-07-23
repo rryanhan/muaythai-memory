@@ -55,7 +55,7 @@ Run migrations before deploying application code:
 npm run env:verify:staging
 npm run db:migrate:staging
 APP_ENV_FILE=.env.staging.local npm run db:verify-taxonomy
-APP_ENV_FILE=.env.staging.local npm run db:verify-access-control
+npm run db:verify-access-control -- --expect=staging
 ```
 
 ## Supabase Auth

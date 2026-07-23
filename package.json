@@ -16,6 +16,7 @@
     "db:preflight": "tsx src/db/preflight.ts",
     "db:verify-config": "tsx scripts/verify-database-config.ts",
     "db:verify-access-control": "tsx scripts/verify-database-access-control.ts",
+    "db:verify-access-control:test": "tsx --test scripts/database-access-control-environment.test.ts",
     "env:verify:staging": "APP_ENV_FILE=.env.staging.local tsx scripts/verify-deployment-environment.ts --expect=staging",
     "env:verify:production": "APP_ENV_FILE=.env.production-maintenance.local tsx scripts/verify-deployment-environment.ts --expect=production",
     "db:generate": "drizzle-kit generate",
