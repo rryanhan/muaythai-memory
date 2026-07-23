@@ -23,14 +23,33 @@ export class JournalPosterError extends Error {
   }
 }
 
+export function createJournalPosterObjectPath(
+  userId: string,
+  entryId: string,
+  mimeType: string,
+): string {
+  const extension = mimeType === "image/webp" ? "webp" : "jpg";
+  return `${userId}/${entryId}/poster-${randomUUID()}.${extension}`;
+}
+
 export async function uploadJournalPosterObject(
   userId: string,
   entryId: string,
   file: File,
+  requestedPath?: string,
 ): Promise<string> {
   const { bytes, mimeType } = await validateJournalPoster(file);
   const extension = mimeType === "image/webp" ? "webp" : "jpg";
-  const path = `${userId}/${entryId}/poster-${randomUUID()}.${extension}`;
+  const path = requestedPath ?? createJournalPosterObjectPath(userId, entryId, mimeType);
+  const prefix = `${userId}/${entryId}/`;
+  const objectName = path.startsWith(prefix) ? path.slice(prefix.length) : "";
+  const expectedName = new RegExp(
+    `^poster-[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\\.${extension}$`,
+    "i",
+  );
+  if (!expectedName.test(objectName)) {
+    throw new JournalPosterError("Journal poster path did not match its image format.");
+  }
   const { error } = await createSupabaseAdminClient().storage.from(JOURNAL_MEDIA_BUCKET).upload(path, bytes, {
     cacheControl: "31536000",
     contentType: mimeType,

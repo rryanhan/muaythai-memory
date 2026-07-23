@@ -12,14 +12,21 @@ type UploadRow = {
 
 const mocks = vi.hoisted(() => ({
   bucketInfo: vi.fn(),
+  bucketList: vi.fn(),
   bucketRemove: vi.fn(),
+  createJournalPosterObjectPath: vi.fn(),
   createSupabaseAdminClient: vi.fn(),
   deleteFailures: 0,
   forUpdate: vi.fn(),
   getJournalEntryById: vi.fn(),
   getOwnedJournalRow: vi.fn(),
+  missingRemovalsReturnNotFound: false,
+  objects: [] as string[],
+  posterPaths: [] as string[],
+  removeFailures: 0,
   row: null as UploadRow | null,
   transaction: vi.fn(),
+  updateFailures: 0,
   uploadJournalPosterObject: vi.fn(),
 }));
 
@@ -34,6 +41,7 @@ vi.mock("@/lib/supabase/admin", () => ({
 }));
 
 vi.mock("./poster", () => ({
+  createJournalPosterObjectPath: mocks.createJournalPosterObjectPath,
   uploadJournalPosterObject: mocks.uploadJournalPosterObject,
 }));
 
@@ -42,15 +50,53 @@ vi.mock("./queries", () => ({
   getOwnedJournalRow: mocks.getOwnedJournalRow,
 }));
 
-import { completeJournalUpload, saveJournalPoster } from "./mutations";
+import { completeJournalUpload, deleteJournalEntry, saveJournalPoster } from "./mutations";
+
+const oldPosterPath = "user/entry/poster-11111111-1111-4111-8111-111111111111.webp";
+const firstPosterPath = "user/entry/poster-22222222-2222-4222-8222-222222222222.webp";
+const secondPosterPath = "user/entry/poster-33333333-3333-4333-8333-333333333333.webp";
+const otherEntryPosterPath = "user/other-entry/poster-44444444-4444-4444-8444-444444444444.webp";
 
 beforeEach(() => {
   mocks.bucketInfo.mockReset();
-  mocks.bucketRemove.mockReset().mockResolvedValue({ data: [], error: null });
+  mocks.bucketList.mockReset().mockImplementation(async (
+    prefix: string,
+    options: { limit: number; offset: number },
+  ) => {
+    const directChildren = mocks.objects
+      .filter((path) => path.startsWith(`${prefix}/`) && !path.slice(prefix.length + 1).includes("/"))
+      .map((path) => ({ name: path.slice(prefix.length + 1) }));
+    return {
+      data: directChildren.slice(options.offset, options.offset + options.limit),
+      error: null,
+    };
+  });
+  mocks.bucketRemove.mockReset().mockImplementation(async (paths: string[]) => {
+    if (mocks.removeFailures > 0) {
+      mocks.removeFailures -= 1;
+      return {
+        data: null,
+        error: { message: "Storage unavailable", status: 503, statusCode: "503" },
+      };
+    }
+    const found = paths.some((path) => mocks.objects.includes(path));
+    if (!found && mocks.missingRemovalsReturnNotFound) {
+      return {
+        data: null,
+        error: { message: "Object not found", status: 404, statusCode: "404" },
+      };
+    }
+    mocks.objects = mocks.objects.filter((path) => !paths.includes(path));
+    return { data: [], error: null };
+  });
+  mocks.createJournalPosterObjectPath.mockReset().mockImplementation(
+    () => mocks.posterPaths.shift() ?? firstPosterPath,
+  );
   mocks.createSupabaseAdminClient.mockReset().mockReturnValue({
     storage: {
       from: () => ({
         info: mocks.bucketInfo,
+        list: mocks.bucketList,
         remove: mocks.bucketRemove,
       }),
     },
@@ -58,14 +104,29 @@ beforeEach(() => {
   mocks.deleteFailures = 0;
   mocks.forUpdate.mockReset();
   mocks.getJournalEntryById.mockReset().mockResolvedValue({ id: "entry" });
-  mocks.getOwnedJournalRow.mockReset();
+  mocks.getOwnedJournalRow.mockReset().mockImplementation(
+    async () => mocks.row ? { ...mocks.row } : null,
+  );
+  mocks.missingRemovalsReturnNotFound = false;
+  mocks.objects = ["user/entry/video.mp4", oldPosterPath];
+  mocks.posterPaths = [firstPosterPath];
+  mocks.removeFailures = 0;
   mocks.row = uploadRow();
-  mocks.uploadJournalPosterObject.mockReset().mockResolvedValue("user/entry/poster-new.webp");
+  mocks.updateFailures = 0;
+  mocks.uploadJournalPosterObject.mockReset().mockImplementation(async (
+    _userId: string,
+    _entryId: string,
+    _file: File,
+    path: string,
+  ) => {
+    mocks.objects.push(path);
+    return path;
+  });
   installSerializedTransactions();
 });
 
 describe("journal upload mutation locking", () => {
-  it("serializes completion against a poster replacement and cleans the losing poster", async () => {
+  it("serializes completion before poster upload so a losing object is never created", async () => {
     const info = deferred<{
       data: { contentType: string; size: number };
       error: null;
@@ -79,17 +140,19 @@ describe("journal upload mutation locking", () => {
       "entry",
       new File(["poster"], "poster.webp", { type: "image/webp" }),
     );
-    await vi.waitFor(() => expect(mocks.uploadJournalPosterObject).toHaveBeenCalledOnce());
+    await vi.waitFor(() => expect(mocks.forUpdate).toHaveBeenCalledOnce());
+    expect(mocks.uploadJournalPosterObject).not.toHaveBeenCalled();
 
     info.resolve({ data: { contentType: "video/mp4", size: 10 }, error: null });
 
     await expect(completion).resolves.toEqual({ id: "entry" });
     await expect(posterSave).rejects.toThrow(/only be added while the video is uploading/);
     expect(mocks.row).toMatchObject({
-      posterPath: "user/entry/poster-old.webp",
+      posterPath: oldPosterPath,
       status: "ready",
     });
-    expect(mocks.bucketRemove).toHaveBeenCalledWith(["user/entry/poster-new.webp"]);
+    expect(mocks.bucketRemove).not.toHaveBeenCalled();
+    expect(mocks.objects).toContain(oldPosterPath);
     expect(mocks.forUpdate).toHaveBeenCalledTimes(2);
   });
 
@@ -104,12 +167,7 @@ describe("journal upload mutation locking", () => {
         data: null,
         error: { message: "Object not found", status: 404, statusCode: "404" },
       });
-    mocks.bucketRemove
-      .mockResolvedValueOnce({ data: [], error: null })
-      .mockResolvedValueOnce({
-        data: null,
-        error: { message: "Object not found", status: 404, statusCode: "404" },
-      });
+    mocks.missingRemovalsReturnNotFound = true;
 
     await expect(completeJournalUpload("user", "entry"))
       .rejects.toThrow(/upload record remains.*Retry to finish cleanup/);
@@ -133,19 +191,93 @@ describe("journal upload mutation locking", () => {
     expect(mocks.bucketRemove).not.toHaveBeenCalled();
   });
 
-  it("surfaces a resolved Storage error while cleaning a poster that lost the lock", async () => {
-    mocks.row = { ...uploadRow(), status: "ready" };
-    mocks.bucketRemove.mockResolvedValue({
-      data: null,
-      error: { message: "Storage unavailable", status: 503, statusCode: "503" },
-    });
+  it("recovers a losing poster cleanup failure on retry without deleting the current poster", async () => {
+    mocks.posterPaths = [firstPosterPath, secondPosterPath];
+    mocks.removeFailures = 1;
+    mocks.updateFailures = 1;
 
     await expect(saveJournalPoster(
       "user",
       "entry",
       new File(["poster"], "poster.webp", { type: "image/webp" }),
-    )).rejects.toThrow(/unused journal poster could not be cleaned up/);
-    expect(mocks.bucketRemove).toHaveBeenCalledWith(["user/entry/poster-new.webp"]);
+    )).rejects.toThrow(/unused journal poster could not be cleaned up.*reconcile/);
+    expect(mocks.row?.posterPath).toBe(oldPosterPath);
+    expect(mocks.objects).toEqual([
+      "user/entry/video.mp4",
+      oldPosterPath,
+      firstPosterPath,
+    ]);
+    expect(mocks.bucketRemove).toHaveBeenNthCalledWith(1, [firstPosterPath]);
+
+    await expect(saveJournalPoster(
+      "user",
+      "entry",
+      new File(["poster"], "poster.webp", { type: "image/webp" }),
+    )).resolves.toBeUndefined();
+    expect(mocks.row?.posterPath).toBe(secondPosterPath);
+    expect(mocks.objects).toEqual(["user/entry/video.mp4", secondPosterPath]);
+    expect(mocks.bucketRemove).toHaveBeenNthCalledWith(2, [firstPosterPath]);
+    expect(mocks.bucketRemove).toHaveBeenNthCalledWith(3, [oldPosterPath]);
+  });
+
+  it("recovers a superseded poster cleanup failure during completion and keeps the current poster", async () => {
+    mocks.removeFailures = 1;
+    mocks.objects.push(otherEntryPosterPath);
+
+    await expect(saveJournalPoster(
+      "user",
+      "entry",
+      new File(["poster"], "poster.webp", { type: "image/webp" }),
+    )).rejects.toThrow(/previous poster cleanup is pending.*reconcile/);
+    expect(mocks.row?.posterPath).toBe(firstPosterPath);
+    expect(mocks.objects).toEqual([
+      "user/entry/video.mp4",
+      oldPosterPath,
+      otherEntryPosterPath,
+      firstPosterPath,
+    ]);
+    expect(mocks.bucketRemove).toHaveBeenNthCalledWith(1, [oldPosterPath]);
+
+    mocks.bucketInfo.mockResolvedValue({
+      data: { contentType: "video/mp4", size: 10 },
+      error: null,
+    });
+    await expect(completeJournalUpload("user", "entry")).resolves.toEqual({ id: "entry" });
+
+    expect(mocks.row).toMatchObject({
+      posterPath: firstPosterPath,
+      status: "ready",
+    });
+    expect(mocks.objects).toEqual([
+      "user/entry/video.mp4",
+      otherEntryPosterPath,
+      firstPosterPath,
+    ]);
+    expect(mocks.bucketRemove).toHaveBeenNthCalledWith(2, [oldPosterPath]);
+    for (const [prefix] of mocks.bucketList.mock.calls) {
+      expect(prefix).toBe("user/entry");
+    }
+    for (const [paths] of mocks.bucketRemove.mock.calls) {
+      expect(paths).not.toContain(firstPosterPath);
+    }
+  });
+
+  it("deletes discovered poster orphans only within the owned entry prefix", async () => {
+    mocks.objects.push(firstPosterPath, otherEntryPosterPath);
+
+    await expect(deleteJournalEntry("user", "entry")).resolves.toBe("entry");
+
+    expect(mocks.row).toBeNull();
+    expect(mocks.bucketRemove).toHaveBeenCalledWith([
+      "user/entry/video.mp4",
+      oldPosterPath,
+      firstPosterPath,
+    ]);
+    expect(mocks.objects).toEqual([otherEntryPosterPath]);
+    expect(mocks.bucketList).toHaveBeenCalledWith(
+      "user/entry",
+      expect.objectContaining({ limit: 100, offset: 0 }),
+    );
   });
 });
 
@@ -205,6 +337,10 @@ function fakeTransaction(local: { row: UploadRow | null }) {
         return builder;
       });
       builder.returning = vi.fn(async () => {
+        if (mocks.updateFailures > 0) {
+          mocks.updateFailures -= 1;
+          throw new Error("database unavailable");
+        }
         if (!local.row) return [];
         local.row = { ...local.row, ...values };
         return [{ id: local.row.id }];
@@ -227,7 +363,7 @@ function uploadRow(): UploadRow {
     id: "entry",
     mediaId: "media",
     mimeType: "video/mp4",
-    posterPath: "user/entry/poster-old.webp",
+    posterPath: oldPosterPath,
     sizeBytes: 10,
     status: "uploading",
     storagePath: "user/entry/video.mp4",

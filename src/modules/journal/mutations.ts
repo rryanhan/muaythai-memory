@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { and, eq, inArray, lt } from "drizzle-orm";
+import { and, eq, lt } from "drizzle-orm";
 import { db } from "@/db/client";
 import { drills, journalEntries, journalMedia } from "@/db/schema";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
@@ -18,7 +18,7 @@ import {
   type UpdateJournalEntryInput,
 } from "./contracts";
 import { getJournalEntryById, getOwnedJournalRow } from "./queries";
-import { uploadJournalPosterObject } from "./poster";
+import { createJournalPosterObjectPath, uploadJournalPosterObject } from "./poster";
 import { cleanupRejectedJournalUpload } from "./rejected-upload";
 
 export class JournalMutationError extends Error {
@@ -87,6 +87,16 @@ export async function completeJournalUpload(userId: string, entryId: string): Pr
   const outcome = await db.transaction(async (tx) => {
     const current = await getLockedJournalUpload(tx, userId, entryId);
     if (!current) throw new JournalMutationError("Journal entry not found.", 404);
+    const posterCleanupError = await reconcileJournalPosterObjects(
+      bucket,
+      userId,
+      entryId,
+      current.posterPath,
+    );
+    if (posterCleanupError) {
+      logStorageCleanupError("Journal poster reconciliation failed.", posterCleanupError);
+      throw new JournalMutationError("Journal poster cleanup could not be completed. Try again.", 503);
+    }
     if (current.status === "ready") return { kind: "ready" } as const;
     if (current.status !== "uploading") {
       throw new JournalMutationError("Journal entry could not be completed.", 409);
@@ -185,41 +195,70 @@ export async function completeJournalUpload(userId: string, entryId: string): Pr
 }
 
 export async function saveJournalPoster(userId: string, entryId: string, file: File): Promise<void> {
-  const posterPath = await uploadJournalPosterObject(userId, entryId, file);
+  const bucket = createSupabaseAdminClient().storage.from(JOURNAL_MEDIA_BUCKET);
+  const posterPath = createJournalPosterObjectPath(userId, entryId, file.type);
+  let uploadAttempted = false;
   let outcome:
-    | { kind: "saved"; previousPosterPath: string | null }
+    | { kind: "saved"; posterPath: string; previousPosterPath: string | null }
     | { kind: "missing" | "not-uploading" };
   try {
     outcome = await db.transaction(async (tx) => {
       const current = await getLockedJournalUpload(tx, userId, entryId);
       if (!current) return { kind: "missing" } as const;
+      const posterCleanupError = await reconcileJournalPosterObjects(
+        bucket,
+        userId,
+        entryId,
+        current.posterPath,
+      );
+      if (posterCleanupError) {
+        logStorageCleanupError("Journal poster reconciliation failed.", posterCleanupError);
+        throw new JournalMutationError("Journal poster cleanup could not be completed. Try again.", 503);
+      }
       if (current.status !== "uploading") return { kind: "not-uploading" } as const;
 
+      uploadAttempted = true;
+      await uploadJournalPosterObject(userId, entryId, file, posterPath);
       const [updated] = await tx
         .update(journalMedia)
         .set({ posterPath, updatedAt: new Date() })
         .where(and(eq(journalMedia.id, current.mediaId), eq(journalMedia.journalEntryId, entryId)))
         .returning({ id: journalMedia.id });
       if (!updated) throw new JournalMutationError("Journal entry not found.", 404);
-      return { kind: "saved", previousPosterPath: current.posterPath } as const;
+      return { kind: "saved", posterPath, previousPosterPath: current.posterPath } as const;
     });
   } catch (error) {
-    await removeLosingPoster(posterPath, error);
+    if (uploadAttempted) {
+      const cleanupError = await cleanupFailedPosterAttempt(
+        bucket,
+        userId,
+        entryId,
+        posterPath,
+      );
+      if (cleanupError) {
+        logStorageCleanupError("Journal poster commit failed before cleanup.", error);
+        logStorageCleanupError("Losing journal poster cleanup failed.", cleanupError);
+        throw new JournalMutationError(
+          "An unused journal poster could not be cleaned up. Retry to reconcile it.",
+          503,
+        );
+      }
+    }
     throw error;
   }
 
   if (outcome.kind !== "saved") {
-    await removeLosingPoster(posterPath);
     if (outcome.kind === "missing") throw new JournalMutationError("Journal entry not found.", 404);
     throw new JournalMutationError("Journal poster can only be added while the video is uploading.", 409);
   }
 
-  if (outcome.previousPosterPath && outcome.previousPosterPath !== posterPath) {
-    const cleanupError = await removeJournalStoragePaths([outcome.previousPosterPath]);
+  if (outcome.previousPosterPath && outcome.previousPosterPath !== outcome.posterPath) {
+    const cleanupError = await removeStoragePaths(bucket, [outcome.previousPosterPath]);
     if (cleanupError) {
-      console.error(
-        "Previous journal poster cleanup failed.",
-        cleanupError instanceof Error ? cleanupError.message : cleanupError,
+      logStorageCleanupError("Previous journal poster cleanup failed.", cleanupError);
+      throw new JournalMutationError(
+        "The journal poster was saved, but previous poster cleanup is pending. Retry to reconcile it.",
+        503,
       );
     }
   }
@@ -256,49 +295,77 @@ export async function updateJournalEntry(
 }
 
 export async function deleteJournalEntry(userId: string, entryId: string): Promise<string> {
-  const current = await getOwnedJournalRow(userId, entryId);
-  if (!current) throw new JournalMutationError("Journal entry not found.", 404);
+  const bucket = createSupabaseAdminClient().storage.from(JOURNAL_MEDIA_BUCKET);
+  return db.transaction(async (tx) => {
+    const current = await getLockedJournalUpload(tx, userId, entryId);
+    if (!current) throw new JournalMutationError("Journal entry not found.", 404);
 
-  const supabase = createSupabaseAdminClient();
-  const paths = [current.storagePath, current.posterPath].filter((path): path is string => Boolean(path));
-  const { error } = await supabase.storage.from(JOURNAL_MEDIA_BUCKET).remove(paths);
-  if (error) throw new JournalMutationError("Journal video could not be removed. Try again.", 503);
+    const cleanupError = await removeJournalEntryStorageObjects(
+      bucket,
+      userId,
+      entryId,
+      [current.storagePath, current.posterPath].filter((path): path is string => Boolean(path)),
+    );
+    if (cleanupError) {
+      logStorageCleanupError("Journal entry Storage cleanup failed.", cleanupError);
+      throw new JournalMutationError("Journal video could not be removed. Try again.", 503);
+    }
 
-  const [deleted] = await db
-    .delete(journalEntries)
-    .where(and(eq(journalEntries.id, entryId), eq(journalEntries.userId, userId)))
-    .returning({ id: journalEntries.id });
-  if (!deleted) throw new JournalMutationError("Journal entry not found.", 404);
-  return deleted.id;
+    const [deleted] = await tx
+      .delete(journalEntries)
+      .where(and(eq(journalEntries.id, entryId), eq(journalEntries.userId, userId)))
+      .returning({ id: journalEntries.id });
+    if (!deleted) throw new JournalMutationError("Journal entry not found.", 404);
+    return deleted.id;
+  });
 }
 
 export async function cleanupAbandonedJournalUploads(now = new Date()): Promise<{ removed: number; failed: number }> {
   const cutoff = new Date(now.getTime() - JOURNAL_ABANDONED_UPLOAD_HOURS * 60 * 60 * 1000);
   const rows = await db
-    .select({ id: journalEntries.id, storagePath: journalMedia.storagePath, posterPath: journalMedia.posterPath })
+    .select({
+      id: journalEntries.id,
+      userId: journalEntries.userId,
+      storagePath: journalMedia.storagePath,
+      posterPath: journalMedia.posterPath,
+    })
     .from(journalEntries)
     .innerJoin(journalMedia, eq(journalMedia.journalEntryId, journalEntries.id))
     .where(and(eq(journalEntries.status, "uploading"), lt(journalEntries.createdAt, cutoff)));
   if (rows.length === 0) return { removed: 0, failed: 0 };
 
   const bucket = createSupabaseAdminClient().storage.from(JOURNAL_MEDIA_BUCKET);
-  const removableIds: string[] = [];
+  let removed = 0;
   let failed = 0;
 
   for (const row of rows) {
-    const paths = [row.storagePath, row.posterPath].filter((path): path is string => Boolean(path));
-    const { error } = await bucket.remove(paths);
-    if (error) {
+    try {
+      const result = await db.transaction(async (tx) => {
+        const current = await getLockedJournalUpload(tx, row.userId, row.id);
+        if (!current || current.status !== "uploading") return false;
+        const cleanupError = await removeJournalEntryStorageObjects(
+          bucket,
+          row.userId,
+          row.id,
+          [current.storagePath, current.posterPath].filter((path): path is string => Boolean(path)),
+        );
+        if (cleanupError) {
+          logStorageCleanupError("Abandoned journal upload Storage cleanup failed.", cleanupError);
+          throw cleanupError;
+        }
+        const [deleted] = await tx
+          .delete(journalEntries)
+          .where(and(eq(journalEntries.id, row.id), eq(journalEntries.userId, row.userId)))
+          .returning({ id: journalEntries.id });
+        if (!deleted) throw new Error("Abandoned journal upload record was not deleted.");
+        return true;
+      });
+      if (result) removed += 1;
+    } catch {
       failed += 1;
-      continue;
     }
-    removableIds.push(row.id);
   }
-
-  if (removableIds.length > 0) {
-    await db.delete(journalEntries).where(inArray(journalEntries.id, removableIds));
-  }
-  return { removed: removableIds.length, failed };
+  return { removed, failed };
 }
 
 async function assertOwnedDrill(userId: string, drillId: string): Promise<void> {
@@ -311,6 +378,12 @@ async function assertOwnedDrill(userId: string, drillId: string): Promise<void> 
 }
 
 type JournalTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
+type JournalStorageBucket = ReturnType<
+  ReturnType<typeof createSupabaseAdminClient>["storage"]["from"]
+>;
+
+const JOURNAL_POSTER_OBJECT_NAME =
+  /^poster-[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.(?:jpg|webp)$/i;
 
 async function getLockedJournalUpload(
   tx: JournalTransaction,
@@ -335,29 +408,128 @@ async function getLockedJournalUpload(
   return row ?? null;
 }
 
-async function removeLosingPoster(path: string, originalError?: unknown): Promise<void> {
-  const cleanupError = await removeJournalStoragePaths([path]);
-  if (!cleanupError) return;
-  if (originalError) {
-    console.error(
-      "Journal poster commit failed before cleanup.",
-      originalError instanceof Error ? originalError.message : originalError,
-    );
-  }
-  console.error(
-    "Losing journal poster cleanup failed.",
-    cleanupError instanceof Error ? cleanupError.message : cleanupError,
-  );
-  throw new JournalMutationError("An unused journal poster could not be cleaned up. Try again.", 503);
-}
-
-async function removeJournalStoragePaths(paths: string[]): Promise<unknown | null> {
+async function cleanupFailedPosterAttempt(
+  bucket: JournalStorageBucket,
+  userId: string,
+  entryId: string,
+  failedPosterPath: string,
+): Promise<unknown | null> {
   try {
-    const { error } = await createSupabaseAdminClient().storage.from(JOURNAL_MEDIA_BUCKET).remove(paths);
-    return error;
+    return await db.transaction(async (tx) => {
+      const current = await getLockedJournalUpload(tx, userId, entryId);
+      if (!current) return removeStoragePaths(bucket, [failedPosterPath]);
+      return reconcileJournalPosterObjects(
+        bucket,
+        userId,
+        entryId,
+        current.posterPath,
+        [failedPosterPath],
+      );
+    });
   } catch (error) {
     return error;
   }
+}
+
+async function reconcileJournalPosterObjects(
+  bucket: JournalStorageBucket,
+  userId: string,
+  entryId: string,
+  keepPath: string | null,
+  knownPaths: string[] = [],
+): Promise<unknown | null> {
+  const prefix = journalEntryStoragePrefix(userId, entryId);
+  const paths = new Set<string>();
+  for (const path of knownPaths) {
+    if (path !== keepPath && isJournalPosterPath(path, prefix)) paths.add(path);
+  }
+
+  const listing = await listJournalEntryStorageObjects(bucket, prefix);
+  for (const path of listing.paths) {
+    if (path !== keepPath && isJournalPosterPath(path, prefix)) paths.add(path);
+  }
+
+  const removalError = await removeStoragePaths(bucket, [...paths]);
+  return removalError ?? listing.error;
+}
+
+async function removeJournalEntryStorageObjects(
+  bucket: JournalStorageBucket,
+  userId: string,
+  entryId: string,
+  knownPaths: string[],
+): Promise<unknown | null> {
+  const prefix = journalEntryStoragePrefix(userId, entryId);
+  const paths = new Set<string>();
+  for (const path of knownPaths) {
+    if (isDirectChildPath(path, prefix)) paths.add(path);
+  }
+
+  const listing = await listJournalEntryStorageObjects(bucket, prefix);
+  for (const path of listing.paths) paths.add(path);
+  const removalError = await removeStoragePaths(bucket, [...paths]);
+  return removalError ?? listing.error;
+}
+
+async function listJournalEntryStorageObjects(
+  bucket: JournalStorageBucket,
+  prefix: string,
+): Promise<{ paths: string[]; error: unknown | null }> {
+  const paths: string[] = [];
+  let offset = 0;
+  try {
+    while (true) {
+      const { data, error } = await bucket.list(prefix, {
+        limit: 100,
+        offset,
+        sortBy: { column: "name", order: "asc" },
+      });
+      if (error) return { paths, error };
+
+      for (const object of data ?? []) {
+        const path = `${prefix}/${object.name}`;
+        if (isDirectChildPath(path, prefix)) paths.push(path);
+      }
+      if (!data || data.length < 100) return { paths, error: null };
+      offset += data.length;
+    }
+  } catch (error) {
+    return { paths, error };
+  }
+}
+
+async function removeStoragePaths(
+  bucket: JournalStorageBucket,
+  paths: string[],
+): Promise<unknown | null> {
+  for (let index = 0; index < paths.length; index += 100) {
+    try {
+      const { error } = await bucket.remove(paths.slice(index, index + 100));
+      if (error && !isStorageNotFoundError(error)) return error;
+    } catch (error) {
+      if (!isStorageNotFoundError(error)) return error;
+    }
+  }
+  return null;
+}
+
+function journalEntryStoragePrefix(userId: string, entryId: string): string {
+  return `${userId}/${entryId}`;
+}
+
+function isDirectChildPath(path: string, prefix: string): boolean {
+  if (!path.startsWith(`${prefix}/`)) return false;
+  const name = path.slice(prefix.length + 1);
+  return name.length > 0 && !name.includes("/") && name !== "." && name !== "..";
+}
+
+function isJournalPosterPath(path: string, prefix: string): boolean {
+  return isDirectChildPath(path, prefix)
+    && JOURNAL_POSTER_OBJECT_NAME.test(path.slice(prefix.length + 1));
+}
+
+function logStorageCleanupError(message: string, error: unknown): void {
+  console.error(message, error instanceof Error ? error.message : error);
 }
 
 function isStorageNotFoundError(error: unknown): boolean {

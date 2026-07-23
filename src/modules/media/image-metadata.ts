@@ -22,6 +22,7 @@ type ImageInspectionOptions = {
 
 const IMAGE_PARSE_MAX_BYTES = 5 * 1024 * 1024;
 const PNG_SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a] as const;
+const CRC32_TABLE = createCrc32Table();
 
 export async function readEncodedImageMetadata(file: File): Promise<EncodedImageMetadata | null> {
   if (file.size === 0 || file.size > IMAGE_PARSE_MAX_BYTES) return null;
@@ -34,25 +35,28 @@ export function inspectEncodedImage(
   bytes: Uint8Array,
   options: ImageInspectionOptions = {},
 ): EncodedImageInspection {
+  if (bytes.length > IMAGE_PARSE_MAX_BYTES) return { ok: false, reason: "malformed" };
   const mime = detectImageMime(bytes);
   if (!mime || (options.allowedMimes && !options.allowedMimes.includes(mime))) {
     return { ok: false, reason: "unsupported" };
   }
 
-  const dimensions = mime === "image/png"
-    ? readPngStructure(bytes)
-    : mime === "image/jpeg"
-      ? readJpegStructure(bytes)
-      : readWebpStructure(bytes);
-  if (!dimensions) return { ok: false, reason: "malformed" };
-
   const maxEdge = options.maxEdge ?? Number.POSITIVE_INFINITY;
   const maxPixels = options.maxPixels ?? Number.POSITIVE_INFINITY;
-  if (
-    dimensions.width > maxEdge
-    || dimensions.height > maxEdge
-    || dimensions.width * dimensions.height > maxPixels
-  ) {
+  let dimensions: { width: number; height: number } | null;
+  if (mime === "image/png") {
+    const header = readPngHeader(bytes);
+    if (!header) return { ok: false, reason: "malformed" };
+    if (exceedsImageLimits(header, maxEdge, maxPixels)) {
+      return { ok: false, reason: "dimensions" };
+    }
+    dimensions = readPngStructure(bytes);
+  } else {
+    dimensions = mime === "image/jpeg" ? readJpegStructure(bytes) : readWebpStructure(bytes);
+  }
+  if (!dimensions) return { ok: false, reason: "malformed" };
+
+  if (exceedsImageLimits(dimensions, maxEdge, maxPixels)) {
     return { ok: false, reason: "dimensions" };
   }
 
@@ -70,6 +74,32 @@ export function detectImageMime(bytes: Uint8Array): SupportedImageMime | null {
     return "image/webp";
   }
   return null;
+}
+
+function readPngHeader(bytes: Uint8Array): { width: number; height: number } | null {
+  if (
+    bytes.length < 33
+    || !PNG_SIGNATURE.every((value, index) => bytes[index] === value)
+    || readUint32BigEndian(bytes, 8) !== 13
+    || ascii(bytes, 12, 16) !== "IHDR"
+  ) {
+    return null;
+  }
+
+  const width = readUint32BigEndian(bytes, 16);
+  const height = readUint32BigEndian(bytes, 20);
+  const bitDepth = bytes[24];
+  const colorType = bytes[25];
+  if (
+    !validDimensions(width, height)
+    || !validPngBitDepth(bitDepth, colorType)
+    || bytes[26] !== 0
+    || bytes[27] !== 0
+    || (bytes[28] !== 0 && bytes[28] !== 1)
+  ) {
+    return null;
+  }
+  return { width, height };
 }
 
 function readPngStructure(bytes: Uint8Array): { width: number; height: number } | null {
@@ -324,13 +354,32 @@ function validDimensions(width: number, height: number): { width: number; height
     : null;
 }
 
-function crc32(bytes: Uint8Array, start: number, end: number): number {
-  let crc = 0xffffffff;
-  for (let index = start; index < end; index += 1) {
-    crc ^= bytes[index];
+function exceedsImageLimits(
+  dimensions: { width: number; height: number },
+  maxEdge: number,
+  maxPixels: number,
+): boolean {
+  return dimensions.width > maxEdge
+    || dimensions.height > maxEdge
+    || dimensions.width * dimensions.height > maxPixels;
+}
+
+function createCrc32Table(): Uint32Array<ArrayBuffer> {
+  const table = new Uint32Array(new ArrayBuffer(256 * Uint32Array.BYTES_PER_ELEMENT));
+  for (let value = 0; value < table.length; value += 1) {
+    let crc = value;
     for (let bit = 0; bit < 8; bit += 1) {
       crc = (crc >>> 1) ^ ((crc & 1) ? 0xedb88320 : 0);
     }
+    table[value] = crc >>> 0;
+  }
+  return table;
+}
+
+function crc32(bytes: Uint8Array, start: number, end: number): number {
+  let crc = 0xffffffff;
+  for (let index = start; index < end; index += 1) {
+    crc = CRC32_TABLE[(crc ^ bytes[index]) & 0xff] ^ (crc >>> 8);
   }
   return (crc ^ 0xffffffff) >>> 0;
 }
