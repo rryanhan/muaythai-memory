@@ -6,6 +6,12 @@ import { RoutedBottomNav } from "@/components/navigation/RoutedBottomNav";
 import type { AppView } from "@/components/navigation/BottomNav";
 import type { CreateDrillInput, DrillDetail } from "@/data/types";
 import routeStyles from "@/features/drills/DrillRouteShell.module.css";
+import {
+  isHistoryGuardState,
+  pushHistoryGuard,
+  restoreHistoryGuard,
+  type HistoryGuardEntry,
+} from "@/features/onboarding/history-guard";
 import { CaptureDiscardSheet } from "./CaptureDiscardSheet";
 import {
   CaptureDraftForm,
@@ -41,6 +47,7 @@ const phaseCopy: Record<CaptureWorkflowState["phase"], string> = {
   processing: "Turning your memo into a drill.",
   review: "Check the transcript and drill before saving.",
 };
+const captureGuardMarker = "__captureGuard";
 
 export function CaptureDraftScreen({ initialMode, origin, onboarding }: CaptureDraftScreenProps) {
   const router = useRouter();
@@ -53,54 +60,83 @@ export function CaptureDraftScreen({ initialMode, origin, onboarding }: CaptureD
   });
   const [discardOpen, setDiscardOpen] = useState(false);
   const [pendingNavigation, setPendingNavigation] = useState<PendingNavigation>(null);
+  const [creationCommitting, setCreationCommitting] = useState(false);
+  const [skipCommitting, setSkipCommitting] = useState(false);
   const dirtyRef = useRef(false);
+  const creationCommittingRef = useRef(false);
+  const skipCommittingRef = useRef(false);
   const guardKeyRef = useRef<string | null>(null);
+  const guardEntryRef = useRef<HistoryGuardEntry | null>(null);
   const atGuardEntryRef = useRef(false);
   const ignoreNextPopRef = useRef(false);
+  const navigationReleasedRef = useRef(false);
 
   useEffect(() => {
     dirtyRef.current = workflow.hasUnsavedWork;
+    creationCommittingRef.current = creationCommitting;
+    skipCommittingRef.current = skipCommitting;
+    const guarded = (
+      workflow.hasUnsavedWork
+      || creationCommitting
+      || skipCommitting
+    ) && !navigationReleasedRef.current;
 
-    if (workflow.hasUnsavedWork && !guardKeyRef.current) {
+    if (guarded && !guardKeyRef.current) {
       const guardKey = `capture-${Date.now()}-${Math.random().toString(36).slice(2)}`;
       guardKeyRef.current = guardKey;
+      guardEntryRef.current = pushHistoryGuard(captureGuardMarker, guardKey);
       atGuardEntryRef.current = true;
-      window.history.pushState(
-        { ...window.history.state, __captureGuard: guardKey },
-        "",
-        window.location.href,
-      );
       return;
     }
 
-    if (!workflow.hasUnsavedWork && guardKeyRef.current) {
+    if (!guarded && guardKeyRef.current) {
       const guardKey = guardKeyRef.current;
       guardKeyRef.current = null;
-      if (atGuardEntryRef.current && window.history.state?.__captureGuard === guardKey) {
+      guardEntryRef.current = null;
+      if (
+        atGuardEntryRef.current
+        && isHistoryGuardState(window.history.state, captureGuardMarker, guardKey)
+      ) {
         ignoreNextPopRef.current = true;
         atGuardEntryRef.current = false;
         window.history.back();
       }
     }
-  }, [workflow.hasUnsavedWork]);
+  }, [creationCommitting, skipCommitting, workflow.hasUnsavedWork]);
 
   useEffect(() => {
     function handleBeforeUnload(event: BeforeUnloadEvent) {
-      if (!dirtyRef.current) return;
+      if (!dirtyRef.current && !creationCommittingRef.current && !skipCommittingRef.current) return;
       event.preventDefault();
       event.returnValue = "";
     }
 
     function handlePopState(event: PopStateEvent) {
-      if (ignoreNextPopRef.current) {
-        ignoreNextPopRef.current = false;
-        atGuardEntryRef.current = event.state?.__captureGuard === guardKeyRef.current;
+      const guardEntry = guardEntryRef.current;
+      const guardKey = guardKeyRef.current;
+      if ((creationCommittingRef.current || skipCommittingRef.current) && guardEntry) {
+        event.stopImmediatePropagation();
+        if (isHistoryGuardState(event.state, captureGuardMarker, guardKey)) {
+          atGuardEntryRef.current = true;
+          return;
+        }
+        restoreHistoryGuard(guardEntry);
+        atGuardEntryRef.current = true;
         return;
       }
 
-      const guardKey = guardKeyRef.current;
+      if (ignoreNextPopRef.current) {
+        ignoreNextPopRef.current = false;
+        atGuardEntryRef.current = isHistoryGuardState(
+          event.state,
+          captureGuardMarker,
+          guardKeyRef.current,
+        );
+        return;
+      }
+
       if (!dirtyRef.current || !guardKey) return;
-      if (event.state?.__captureGuard === guardKey) {
+      if (isHistoryGuardState(event.state, captureGuardMarker, guardKey)) {
         atGuardEntryRef.current = true;
         return;
       }
@@ -111,20 +147,26 @@ export function CaptureDraftScreen({ initialMode, origin, onboarding }: CaptureD
     }
 
     window.addEventListener("beforeunload", handleBeforeUnload);
-    window.addEventListener("popstate", handlePopState);
+    window.addEventListener("popstate", handlePopState, { capture: true });
     return () => {
       window.removeEventListener("beforeunload", handleBeforeUnload);
-      window.removeEventListener("popstate", handlePopState);
+      window.removeEventListener("popstate", handlePopState, { capture: true });
     };
   }, []);
 
   const runWithoutPrompt = useCallback(
     (action: () => void) => {
       dirtyRef.current = false;
+      navigationReleasedRef.current = true;
       const guardKey = guardKeyRef.current;
       guardKeyRef.current = null;
+      guardEntryRef.current = null;
 
-      if (guardKey && atGuardEntryRef.current && window.history.state?.__captureGuard === guardKey) {
+      if (
+        guardKey
+        && atGuardEntryRef.current
+        && isHistoryGuardState(window.history.state, captureGuardMarker, guardKey)
+      ) {
         ignoreNextPopRef.current = true;
         window.addEventListener(
           "popstate",
@@ -151,6 +193,7 @@ export function CaptureDraftScreen({ initialMode, origin, onboarding }: CaptureD
 
   const requestNavigation = useCallback(
     (destination: string) => {
+      if (creationCommittingRef.current || skipCommittingRef.current) return;
       if (!dirtyRef.current) {
         navigateWithoutPrompt(destination);
         return;
@@ -163,6 +206,7 @@ export function CaptureDraftScreen({ initialMode, origin, onboarding }: CaptureD
   );
 
   function keepCapture() {
+    if (creationCommittingRef.current || skipCommittingRef.current) return;
     if (pendingNavigation?.kind === "history" && !atGuardEntryRef.current) {
       ignoreNextPopRef.current = true;
       atGuardEntryRef.current = true;
@@ -173,6 +217,7 @@ export function CaptureDraftScreen({ initialMode, origin, onboarding }: CaptureD
   }
 
   function discardCapture() {
+    if (creationCommittingRef.current || skipCommittingRef.current) return;
     const navigation = pendingNavigation;
     setDiscardOpen(false);
     setPendingNavigation(null);
@@ -180,15 +225,28 @@ export function CaptureDraftScreen({ initialMode, origin, onboarding }: CaptureD
     if (navigation?.kind === "history") {
       dirtyRef.current = false;
       guardKeyRef.current = null;
+      guardEntryRef.current = null;
       ignoreNextPopRef.current = true;
       window.history.back();
       return;
     }
 
     if (navigation?.kind === "skip" && onboarding) {
-      void onboarding.onSkipFirstDrill().then((destination) => {
-        if (destination) navigateWithoutPrompt(destination);
-      });
+      skipCommittingRef.current = true;
+      setSkipCommitting(true);
+      void onboarding.onSkipFirstDrill()
+        .then((destination) => {
+          if (destination) {
+            navigateWithoutPrompt(destination);
+            return;
+          }
+          skipCommittingRef.current = false;
+          setSkipCommitting(false);
+        })
+        .catch(() => {
+          skipCommittingRef.current = false;
+          setSkipCommitting(false);
+        });
       return;
     }
 
@@ -196,6 +254,7 @@ export function CaptureDraftScreen({ initialMode, origin, onboarding }: CaptureD
   }
 
   function requestSkipFirstDrill() {
+    if (creationCommittingRef.current || skipCommittingRef.current) return;
     setPendingNavigation({ kind: "skip" });
     setDiscardOpen(true);
   }
@@ -208,6 +267,7 @@ export function CaptureDraftScreen({ initialMode, origin, onboarding }: CaptureD
           type="button"
           className="drill-detail-page-back"
           aria-label="Exit Capture Drill"
+          disabled={creationCommitting || skipCommitting}
           onClick={() => (onboarding ? requestSkipFirstDrill() : requestNavigation(originRoute))}
         >
           <span aria-hidden="true">←</span>
@@ -223,13 +283,22 @@ export function CaptureDraftScreen({ initialMode, origin, onboarding }: CaptureD
         onWorkflowChange={setWorkflow}
         onRequestExit={() => requestNavigation(originRoute)}
         onSaveSuccess={(drillId) => navigateWithoutPrompt(`/drills/${drillId}`)}
+        onCreationCommitChange={(committing) => {
+          creationCommittingRef.current = committing;
+          setCreationCommitting(committing);
+        }}
         createAction={onboarding?.createAction}
         methodCoach={onboarding?.methodCoach}
         onUseManual={onboarding?.onUseManual}
         returnToVoiceOnCancel={Boolean(onboarding)}
       />
       {onboarding ? (
-        <button className={styles.skipFirstDrill} type="button" onClick={requestSkipFirstDrill}>
+        <button
+          className={styles.skipFirstDrill}
+          type="button"
+          disabled={creationCommitting || skipCommitting}
+          onClick={requestSkipFirstDrill}
+        >
           Skip first drill
         </button>
       ) : (

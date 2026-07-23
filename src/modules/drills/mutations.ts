@@ -1,6 +1,7 @@
 import { and, eq, inArray, isNull, or } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
+  drillCreationKeys,
   drillStatusTags,
   drillSteps,
   drillTags,
@@ -20,6 +21,11 @@ import {
   type UpdateSavedListResponse,
   type UpdateDrillInput,
 } from "./contracts";
+import {
+  createDrillPayloadHash,
+  resolveDrillCreationLedgerEntry,
+  type DrillCreationLedgerEntry,
+} from "./idempotency";
 import { getDrillById } from "./queries";
 
 export class CreateDrillValidationError extends Error {
@@ -29,6 +35,22 @@ export class CreateDrillValidationError extends Error {
     super("Drill could not be created.");
     this.name = "CreateDrillValidationError";
     this.issues = issues;
+  }
+}
+
+export class CreateDrillIdempotencyError extends Error {
+  readonly status = 409;
+
+  constructor(message = "This Idempotency-Key was already used for a different drill.") {
+    super(message);
+    this.name = "CreateDrillIdempotencyError";
+  }
+}
+
+export class CreateDrillIdempotencyGoneError extends CreateDrillIdempotencyError {
+  constructor() {
+    super("The drill created with this Idempotency-Key no longer exists.");
+    this.name = "CreateDrillIdempotencyGoneError";
   }
 }
 
@@ -66,9 +88,25 @@ export class SavedListMutationError extends Error {
 export async function createDrill(
   userId: string,
   rawInput: CreateDrillInput,
-  options: { completeFirstDrillGuide?: boolean } = {},
+  options: { completeFirstDrillGuide?: boolean; creationKey?: string } = {},
 ): Promise<DrillDetail> {
   const input = createDrillInputSchema.parse(rawInput);
+  const idempotency = options.creationKey
+    ? {
+        creationKey: options.creationKey,
+        payloadHash: createDrillPayloadHash(input),
+      }
+    : null;
+  if (idempotency) {
+    const existing = await getDrillCreationLedgerEntry(userId, idempotency.creationKey);
+    if (existing) {
+      const existingDrillId = resolveExistingDrillId(existing, idempotency.payloadHash);
+      const existingDrill = await getDrillById(userId, existingDrillId);
+      if (!existingDrill) throw new CreateDrillIdempotencyGoneError();
+      return existingDrill;
+    }
+  }
+
   const trainingMethodSlugs = unique(input.trainingMethodSlugs);
   const tagSlugs = unique(input.tagSlugs);
   const statusSlugs = unique(input.statusTagSlugs);
@@ -88,6 +126,36 @@ export async function createDrill(
   }
 
   const createdDrillId = await db.transaction(async (tx) => {
+    if (idempotency) {
+      const [reservation] = await tx
+        .insert(drillCreationKeys)
+        .values({
+          userId,
+          creationKey: idempotency.creationKey,
+          payloadHash: idempotency.payloadHash,
+        })
+        .onConflictDoNothing({
+          target: [drillCreationKeys.userId, drillCreationKeys.creationKey],
+        })
+        .returning({ creationKey: drillCreationKeys.creationKey });
+
+      if (!reservation) {
+        const [existing] = await tx
+          .select({
+            drillId: drillCreationKeys.drillId,
+            payloadHash: drillCreationKeys.payloadHash,
+          })
+          .from(drillCreationKeys)
+          .where(and(
+            eq(drillCreationKeys.userId, userId),
+            eq(drillCreationKeys.creationKey, idempotency.creationKey),
+          ))
+          .limit(1);
+        if (!existing) throw new Error("Creation key reservation could not be loaded.");
+        return resolveExistingDrillId(existing, idempotency.payloadHash);
+      }
+    }
+
     const [drill] = await tx
       .insert(drills)
       .values({
@@ -99,6 +167,18 @@ export async function createDrill(
       .returning({ id: drills.id });
 
     if (!drill) throw new Error("Failed to create drill.");
+
+    if (idempotency) {
+      const [boundReservation] = await tx
+        .update(drillCreationKeys)
+        .set({ drillId: drill.id })
+        .where(and(
+          eq(drillCreationKeys.userId, userId),
+          eq(drillCreationKeys.creationKey, idempotency.creationKey),
+        ))
+        .returning({ creationKey: drillCreationKeys.creationKey });
+      if (!boundReservation) throw new Error("Creation key reservation could not be bound.");
+    }
 
     await tx.insert(drillSteps).values(
       input.steps.map((body, index) => ({
@@ -134,14 +214,16 @@ export async function createDrill(
     }
 
     if (options.completeFirstDrillGuide) {
-      await tx
+      const [completedUser] = await tx
         .update(users)
         .set({
           firstDrillGuideCompletedAt: new Date(),
           firstDrillGuideSkippedAt: null,
           updatedAt: new Date(),
         })
-        .where(eq(users.id, userId));
+        .where(eq(users.id, userId))
+        .returning({ id: users.id });
+      if (!completedUser) throw new Error("Profile could not be found.");
     }
 
     return drill.id;
@@ -328,4 +410,36 @@ function getMissingSlugIssues(label: string, requestedSlugs: string[], foundSlug
 
 function unique(values: string[]): string[] {
   return [...new Set(values)];
+}
+
+async function getDrillCreationLedgerEntry(
+  userId: string,
+  creationKey: string,
+): Promise<DrillCreationLedgerEntry | null> {
+  const [existing] = await db
+    .select({
+      drillId: drillCreationKeys.drillId,
+      payloadHash: drillCreationKeys.payloadHash,
+    })
+    .from(drillCreationKeys)
+    .where(and(
+      eq(drillCreationKeys.userId, userId),
+      eq(drillCreationKeys.creationKey, creationKey),
+    ))
+    .limit(1);
+  return existing ?? null;
+}
+
+function resolveExistingDrillId(
+  entry: DrillCreationLedgerEntry,
+  requestedPayloadHash: string,
+): string {
+  const resolution = resolveDrillCreationLedgerEntry(entry, requestedPayloadHash);
+  if (resolution.status === "payload-mismatch") {
+    throw new CreateDrillIdempotencyError();
+  }
+  if (resolution.status === "deleted") {
+    throw new CreateDrillIdempotencyGoneError();
+  }
+  return resolution.drillId;
 }

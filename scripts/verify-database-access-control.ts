@@ -9,6 +9,7 @@ const API_ROLES = ["anon", "authenticated"] as const;
 const REQUIRED_DATABASE_ROLES = [...API_ROLES, "postgres"] as const;
 const EXPECTED_PUBLIC_TABLES = [
   "auth_recovery_grants",
+  "drill_creation_keys",
   "drill_status_tags",
   "drill_steps",
   "drill_tags",

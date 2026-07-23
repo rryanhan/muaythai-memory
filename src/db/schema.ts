@@ -39,6 +39,10 @@ export const users = pgTable(
   (table) => ({
     displayNameIdx: index("users_display_name_idx").on(table.displayName),
     usernameUnique: uniqueIndex("users_username_unique").on(table.username),
+    firstDrillGuideStateCheck: check(
+      "users_first_drill_guide_state_check",
+      sql`${table.firstDrillGuideCompletedAt} is null or ${table.firstDrillGuideSkippedAt} is null`,
+    ),
   }),
 );
 
@@ -210,6 +214,23 @@ export const drills = pgTable(
     userIdx: index("drills_user_id_idx").on(table.userId),
     titleIdx: index("drills_title_idx").on(table.title),
     archivedIdx: index("drills_archived_at_idx").on(table.archivedAt),
+  }),
+);
+
+// Creation keys outlive drills so deleting a drill cannot make a committed
+// onboarding request reusable. The drill reference is tombstoned on deletion.
+export const drillCreationKeys = pgTable(
+  "drill_creation_keys",
+  {
+    userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    creationKey: varchar("creation_key", { length: 36 }).notNull(),
+    payloadHash: varchar("payload_hash", { length: 64 }).notNull(),
+    drillId: uuid("drill_id").references(() => drills.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.userId, table.creationKey] }),
+    drillIdx: index("drill_creation_keys_drill_id_idx").on(table.drillId),
   }),
 );
 

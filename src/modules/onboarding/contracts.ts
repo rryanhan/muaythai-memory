@@ -24,8 +24,10 @@ export const onboardingFirstDrillResponseSchema = z.object({
 });
 
 export const onboardingSkipResponseSchema = z.object({
-  skipped: z.literal(true),
+  skipped: z.boolean(),
 });
+
+export const onboardingCreationKeySchema = z.string().uuid();
 
 export const onboardingFirstDrillInputSchema = createDrillInputSchema;
 

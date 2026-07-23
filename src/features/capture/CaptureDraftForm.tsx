@@ -42,6 +42,7 @@ type CaptureDraftFormProps = {
   onRequestExit?: () => void;
   onSaveSuccess?: (drillId: string) => void;
   createAction?: (input: CreateDrillInput) => Promise<DrillDetail>;
+  onCreationCommitChange?: (committing: boolean) => void;
   methodCoach?: CaptureMethodCoach;
   onUseManual?: () => void;
   returnToVoiceOnCancel?: boolean;
@@ -78,6 +79,7 @@ export function CaptureDraftForm({
   onRequestExit,
   onSaveSuccess,
   createAction,
+  onCreationCommitChange,
   methodCoach,
   onUseManual,
   returnToVoiceOnCancel = false,
@@ -93,6 +95,7 @@ export function CaptureDraftForm({
   const [cleanupError, setCleanupError] = useState<string | null>(null);
   const [cleanupPending, setCleanupPending] = useState(false);
   const [textFieldsRevealed, setTextFieldsRevealed] = useState(false);
+  const [creationCommitting, setCreationCommitting] = useState(false);
   const abortController = useRef<AbortController | null>(null);
   const nextSessionId = useRef(1);
   const activeSessionId = useRef<number | null>(null);
@@ -262,6 +265,7 @@ export function CaptureDraftForm({
   }
 
   function regenerateFromTranscript() {
+    if (creationCommitting) return;
     if (!session || transcriptRevision.trim().length < 12) return;
     const confirmed = window.confirm(
       "Regenerating will replace the current drill fields, Training Methods, and tags with a new draft based on this transcript.",
@@ -297,6 +301,7 @@ export function CaptureDraftForm({
             </div>
             <button
               type="button"
+              disabled={creationCommitting}
               onClick={() => {
                 setTranscriptRevision(session.transcript);
                 setTranscriptEditorOpen((open) => !open);
@@ -315,12 +320,16 @@ export function CaptureDraftForm({
                 aria-label="Edit original transcript"
               />
               <div>
-                <button type="button" onClick={() => setTranscriptEditorOpen(false)}>
+                <button
+                  type="button"
+                  disabled={creationCommitting}
+                  onClick={() => setTranscriptEditorOpen(false)}
+                >
                   Cancel
                 </button>
                 <button
                   type="button"
-                  disabled={transcriptRevision.trim().length < 12}
+                  disabled={creationCommitting || transcriptRevision.trim().length < 12}
                   onClick={regenerateFromTranscript}
                 >
                   Regenerate draft
@@ -348,6 +357,10 @@ export function CaptureDraftForm({
           onCancel={returnToVoiceOnCancel ? returnToVoiceInput : onRequestExit}
           onSaveSuccess={onSaveSuccess}
           createAction={createAction}
+          onCreationCommitChange={(committing) => {
+            setCreationCommitting(committing);
+            onCreationCommitChange?.(committing);
+          }}
         />
       </div>
     );
