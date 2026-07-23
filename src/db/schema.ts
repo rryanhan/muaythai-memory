@@ -301,12 +301,27 @@ export const journalEntries = pgTable(
     occurredOn: date("occurred_on", { mode: "string" }).notNull(),
     caption: text("caption"),
     status: varchar("status", { length: 32 }).notNull().default("uploading"),
+    mediaOperation: varchar("media_operation", { length: 32 }),
+    mediaOperationToken: uuid("media_operation_token"),
+    mediaOperationStartedAt: timestamp("media_operation_started_at", { withTimezone: true }),
     ...timestamps,
   },
   (table) => ({
     userOccurredIdx: index("journal_entries_user_occurred_idx").on(table.userId, table.occurredOn),
     userStatusIdx: index("journal_entries_user_status_idx").on(table.userId, table.status),
     drillIdx: index("journal_entries_drill_id_idx").on(table.drillId),
+    mediaOperationCheck: check(
+      "journal_entries_media_operation_check",
+      sql`(
+        ${table.mediaOperation} is null
+        and ${table.mediaOperationToken} is null
+        and ${table.mediaOperationStartedAt} is null
+      ) or (
+        ${table.mediaOperation} in ('poster', 'complete', 'delete', 'cleanup')
+        and ${table.mediaOperationToken} is not null
+        and ${table.mediaOperationStartedAt} is not null
+      )`,
+    ),
   }),
 );
 

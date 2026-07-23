@@ -19,7 +19,6 @@ import {
 } from "./contracts";
 import { getJournalEntryById, getOwnedJournalRow } from "./queries";
 import { createJournalPosterObjectPath, uploadJournalPosterObject } from "./poster";
-import { cleanupRejectedJournalUpload } from "./rejected-upload";
 
 export class JournalMutationError extends Error {
   readonly status: number;
@@ -82,178 +81,123 @@ export async function createJournalUploadIntent(
 }
 
 export async function completeJournalUpload(userId: string, entryId: string): Promise<JournalEntryDetail> {
-  const supabase = createSupabaseAdminClient();
-  const bucket = supabase.storage.from(JOURNAL_MEDIA_BUCKET);
-  const outcome = await db.transaction(async (tx) => {
-    const current = await getLockedJournalUpload(tx, userId, entryId);
-    if (!current) throw new JournalMutationError("Journal entry not found.", 404);
-    const posterCleanupError = await reconcileJournalPosterObjects(
-      bucket,
-      userId,
-      entryId,
-      current.posterPath,
-    );
-    if (posterCleanupError) {
-      logStorageCleanupError("Journal poster reconciliation failed.", posterCleanupError);
-      throw new JournalMutationError("Journal poster cleanup could not be completed. Try again.", 503);
-    }
-    if (current.status === "ready") return { kind: "ready" } as const;
-    if (current.status !== "uploading") {
-      throw new JournalMutationError("Journal entry could not be completed.", 409);
-    }
-    if (!current.posterPath) {
-      throw new JournalMutationError("Choose a journal cover before completing the upload.", 409);
-    }
+  const claim = await claimCompletion(userId, entryId);
+  if (claim.kind === "ready") return loadCompletedEntry(userId, entryId);
 
-    const rejectUpload = async (reason: "missing" | "mismatch") => {
-      const paths = [current.storagePath, current.posterPath].filter((path): path is string => Boolean(path));
-      const cleanup = await cleanupRejectedJournalUpload(paths, {
-        async removeObjects(objectPaths) {
-          try {
-            const result = await bucket.remove(objectPaths);
-            return {
-              error: result.error && !isStorageNotFoundError(result.error) ? result.error : null,
-            };
-          } catch (error) {
-            if (isStorageNotFoundError(error)) return { error: null };
-            throw error;
-          }
-        },
-        async deleteUploadRecord() {
-          const [deleted] = await tx
-            .delete(journalEntries)
-            .where(and(eq(journalEntries.id, entryId), eq(journalEntries.userId, userId)))
-            .returning({ id: journalEntries.id });
-          if (!deleted) throw new Error("Journal upload record was not deleted.");
-        },
-      });
-      if (!cleanup.ok) {
-        console.error(
-          `Rejected journal upload ${cleanup.stage} cleanup failed.`,
-          cleanup.error instanceof Error ? cleanup.error.message : cleanup.error,
-        );
-        throw new JournalMutationError(
-          cleanup.stage === "database"
-            ? "The rejected files were removed, but the upload record remains. Retry to finish cleanup."
-            : "The uploaded video was rejected, but its files could not be cleaned up. Try again.",
-          503,
-        );
-      }
-      return { kind: "rejected", reason } as const;
-    };
-
-    let infoResult: Awaited<ReturnType<typeof bucket.info>>;
-    try {
-      infoResult = await bucket.info(current.storagePath);
-    } catch (error) {
-      if (isStorageNotFoundError(error)) return rejectUpload("missing");
-      throw new JournalMutationError("The uploaded video could not be confirmed. Try again.", 409);
-    }
-
-    if (infoResult.error) {
-      if (isStorageNotFoundError(infoResult.error)) return rejectUpload("missing");
-      throw new JournalMutationError("The uploaded video could not be confirmed. Try again.", 409);
-    }
-    if (!infoResult.data) {
-      throw new JournalMutationError("The uploaded video could not be confirmed. Try again.", 409);
-    }
-
-    const contentType = infoResult.data.contentType ?? "";
-    if (
-      infoResult.data.size !== current.sizeBytes
-      || !isJournalVideoMime(contentType)
-      || contentType !== current.mimeType
-    ) {
-      return rejectUpload("mismatch");
-    }
-
-    const [updated] = await tx
-      .update(journalEntries)
-      .set({ status: "ready", updatedAt: new Date() })
-      .where(and(
-        eq(journalEntries.id, entryId),
-        eq(journalEntries.userId, userId),
-        eq(journalEntries.status, "uploading"),
-      ))
-      .returning({ id: journalEntries.id });
-    if (!updated) throw new JournalMutationError("Journal entry could not be completed.", 409);
-    return { kind: "completed" } as const;
-  });
-
-  if (outcome.kind === "rejected") {
-    throw new JournalMutationError(
-      outcome.reason === "missing"
-        ? "The uploaded video is no longer available. Select it again."
-        : "The uploaded video did not match the selected file.",
-      outcome.reason === "missing" ? 409 : 400,
-    );
+  const bucket = createSupabaseAdminClient().storage.from(JOURNAL_MEDIA_BUCKET);
+  const posterCleanupError = await reconcileJournalPosterObjects(
+    bucket,
+    userId,
+    entryId,
+    claim.current.posterPath,
+  );
+  if (posterCleanupError) {
+    logStorageCleanupError("Journal poster reconciliation failed.", posterCleanupError);
+    await releaseOperation(userId, entryId, "complete", claim.token);
+    throw new JournalMutationError("Journal poster cleanup could not be completed. Try again.", 503);
   }
 
-  const entry = await getJournalEntryById(userId, entryId);
-  if (!entry) throw new JournalMutationError("Completed journal entry could not be loaded.", 404);
-  return entry;
+  let infoResult: Awaited<ReturnType<typeof bucket.info>>;
+  try {
+    infoResult = await bucket.info(claim.current.storagePath);
+  } catch (error) {
+    if (isStorageNotFoundError(error)) {
+      return rejectCompletedUpload(userId, entryId, claim, bucket, "missing");
+    }
+    await releaseOperation(userId, entryId, "complete", claim.token);
+    throw new JournalMutationError("The uploaded video could not be confirmed. Try again.", 409);
+  }
+
+  if (infoResult.error) {
+    if (isStorageNotFoundError(infoResult.error)) {
+      return rejectCompletedUpload(userId, entryId, claim, bucket, "missing");
+    }
+    await releaseOperation(userId, entryId, "complete", claim.token);
+    throw new JournalMutationError("The uploaded video could not be confirmed. Try again.", 409);
+  }
+  if (!infoResult.data) {
+    await releaseOperation(userId, entryId, "complete", claim.token);
+    throw new JournalMutationError("The uploaded video could not be confirmed. Try again.", 409);
+  }
+
+  const contentType = infoResult.data.contentType ?? "";
+  if (
+    infoResult.data.size !== claim.current.sizeBytes
+    || !isJournalVideoMime(contentType)
+    || contentType !== claim.current.mimeType
+  ) {
+    return rejectCompletedUpload(userId, entryId, claim, bucket, "mismatch");
+  }
+
+  let finalized: boolean;
+  try {
+    finalized = await finalizeReadyUpload(userId, entryId, claim.token);
+  } catch (error) {
+    logStorageCleanupError("Journal completion database finalize failed.", error);
+    throw new JournalMutationError("Journal entry could not be completed. Try again.", 503);
+  }
+  if (!finalized) {
+    const completed = await getJournalEntryById(userId, entryId);
+    if (completed) return completed;
+    throw new JournalMutationError("Journal entry could not be completed.", 409);
+  }
+  return loadCompletedEntry(userId, entryId);
 }
 
 export async function saveJournalPoster(userId: string, entryId: string, file: File): Promise<void> {
   const bucket = createSupabaseAdminClient().storage.from(JOURNAL_MEDIA_BUCKET);
   const posterPath = createJournalPosterObjectPath(userId, entryId, file.type);
-  let uploadAttempted = false;
-  let outcome:
-    | { kind: "saved"; posterPath: string; previousPosterPath: string | null }
-    | { kind: "missing" | "not-uploading" };
-  try {
-    outcome = await db.transaction(async (tx) => {
-      const current = await getLockedJournalUpload(tx, userId, entryId);
-      if (!current) return { kind: "missing" } as const;
-      const posterCleanupError = await reconcileJournalPosterObjects(
-        bucket,
-        userId,
-        entryId,
-        current.posterPath,
-      );
-      if (posterCleanupError) {
-        logStorageCleanupError("Journal poster reconciliation failed.", posterCleanupError);
-        throw new JournalMutationError("Journal poster cleanup could not be completed. Try again.", 503);
-      }
-      if (current.status !== "uploading") return { kind: "not-uploading" } as const;
+  const claim = await claimPosterSave(userId, entryId);
 
-      uploadAttempted = true;
-      await uploadJournalPosterObject(userId, entryId, file, posterPath);
-      const [updated] = await tx
-        .update(journalMedia)
-        .set({ posterPath, updatedAt: new Date() })
-        .where(and(eq(journalMedia.id, current.mediaId), eq(journalMedia.journalEntryId, entryId)))
-        .returning({ id: journalMedia.id });
-      if (!updated) throw new JournalMutationError("Journal entry not found.", 404);
-      return { kind: "saved", posterPath, previousPosterPath: current.posterPath } as const;
-    });
+  try {
+    await uploadJournalPosterObject(userId, entryId, file, posterPath);
   } catch (error) {
-    if (uploadAttempted) {
-      const cleanupError = await cleanupFailedPosterAttempt(
-        bucket,
-        userId,
-        entryId,
-        posterPath,
+    const cleanupError = await cleanupUncommittedPoster(bucket, userId, entryId, posterPath);
+    await releaseOperation(userId, entryId, "poster", claim.token);
+    if (cleanupError) {
+      logStorageCleanupError("Journal poster upload failed before cleanup.", error);
+      logStorageCleanupError("Losing journal poster cleanup failed.", cleanupError);
+      throw new JournalMutationError(
+        "An unused journal poster could not be cleaned up. Retry to reconcile it.",
+        503,
       );
-      if (cleanupError) {
-        logStorageCleanupError("Journal poster commit failed before cleanup.", error);
-        logStorageCleanupError("Losing journal poster cleanup failed.", cleanupError);
-        throw new JournalMutationError(
-          "An unused journal poster could not be cleaned up. Retry to reconcile it.",
-          503,
-        );
-      }
     }
     throw error;
   }
 
-  if (outcome.kind !== "saved") {
-    if (outcome.kind === "missing") throw new JournalMutationError("Journal entry not found.", 404);
+  let finalized: { previousPosterPath: string | null } | null;
+  try {
+    finalized = await finalizePosterSave(userId, entryId, claim.token, posterPath);
+  } catch (error) {
+    const cleanupError = await cleanupUncommittedPoster(bucket, userId, entryId, posterPath);
+    await releaseOperation(userId, entryId, "poster", claim.token);
+    if (cleanupError) {
+      logStorageCleanupError("Journal poster commit failed before cleanup.", error);
+      logStorageCleanupError("Losing journal poster cleanup failed.", cleanupError);
+      throw new JournalMutationError(
+        "An unused journal poster could not be cleaned up. Retry to reconcile it.",
+        503,
+      );
+    }
+    throw error;
+  }
+
+  if (!finalized) {
+    const cleanupError = await cleanupUncommittedPoster(bucket, userId, entryId, posterPath);
+    if (cleanupError) {
+      logStorageCleanupError("Losing journal poster cleanup failed.", cleanupError);
+      throw new JournalMutationError(
+        "An unused journal poster could not be cleaned up. Retry to reconcile it.",
+        503,
+      );
+    }
+    const current = await getOwnedJournalRow(userId, entryId);
+    if (!current) throw new JournalMutationError("Journal entry not found.", 404);
     throw new JournalMutationError("Journal poster can only be added while the video is uploading.", 409);
   }
 
-  if (outcome.previousPosterPath && outcome.previousPosterPath !== outcome.posterPath) {
-    const cleanupError = await removeStoragePaths(bucket, [outcome.previousPosterPath]);
+  if (finalized.previousPosterPath && finalized.previousPosterPath !== posterPath) {
+    const cleanupError = await removeStoragePaths(bucket, [finalized.previousPosterPath]);
     if (cleanupError) {
       logStorageCleanupError("Previous journal poster cleanup failed.", cleanupError);
       throw new JournalMutationError(
@@ -295,29 +239,29 @@ export async function updateJournalEntry(
 }
 
 export async function deleteJournalEntry(userId: string, entryId: string): Promise<string> {
+  const claim = await claimDeletion(userId, entryId);
   const bucket = createSupabaseAdminClient().storage.from(JOURNAL_MEDIA_BUCKET);
-  return db.transaction(async (tx) => {
-    const current = await getLockedJournalUpload(tx, userId, entryId);
-    if (!current) throw new JournalMutationError("Journal entry not found.", 404);
+  const cleanupError = await removeJournalEntryStorageObjects(
+    bucket,
+    userId,
+    entryId,
+    [claim.current.storagePath, claim.current.posterPath].filter((path): path is string => Boolean(path)),
+  );
+  if (cleanupError) {
+    logStorageCleanupError("Journal entry Storage cleanup failed.", cleanupError);
+    await releaseOperation(userId, entryId, "delete", claim.token);
+    throw new JournalMutationError("Journal video could not be removed. Try again.", 503);
+  }
 
-    const cleanupError = await removeJournalEntryStorageObjects(
-      bucket,
-      userId,
-      entryId,
-      [current.storagePath, current.posterPath].filter((path): path is string => Boolean(path)),
-    );
-    if (cleanupError) {
-      logStorageCleanupError("Journal entry Storage cleanup failed.", cleanupError);
-      throw new JournalMutationError("Journal video could not be removed. Try again.", 503);
-    }
-
-    const [deleted] = await tx
-      .delete(journalEntries)
-      .where(and(eq(journalEntries.id, entryId), eq(journalEntries.userId, userId)))
-      .returning({ id: journalEntries.id });
-    if (!deleted) throw new JournalMutationError("Journal entry not found.", 404);
-    return deleted.id;
-  });
+  let finalized: boolean;
+  try {
+    finalized = await finalizeDeletion(userId, entryId, "delete", claim.token);
+  } catch (error) {
+    logStorageCleanupError("Journal entry database deletion failed.", error);
+    throw new JournalMutationError("Journal video was removed, but its entry cleanup must be retried.", 503);
+  }
+  if (finalized || !(await getOwnedJournalRow(userId, entryId))) return entryId;
+  throw new JournalMutationError("Journal entry is already being removed.", 409);
 }
 
 export async function cleanupAbandonedJournalUploads(now = new Date()): Promise<{ removed: number; failed: number }> {
@@ -326,11 +270,8 @@ export async function cleanupAbandonedJournalUploads(now = new Date()): Promise<
     .select({
       id: journalEntries.id,
       userId: journalEntries.userId,
-      storagePath: journalMedia.storagePath,
-      posterPath: journalMedia.posterPath,
     })
     .from(journalEntries)
-    .innerJoin(journalMedia, eq(journalMedia.journalEntryId, journalEntries.id))
     .where(and(eq(journalEntries.status, "uploading"), lt(journalEntries.createdAt, cutoff)));
   if (rows.length === 0) return { removed: 0, failed: 0 };
 
@@ -339,29 +280,27 @@ export async function cleanupAbandonedJournalUploads(now = new Date()): Promise<
   let failed = 0;
 
   for (const row of rows) {
+    const claim = await claimAbandonedCleanup(row.userId, row.id, cutoff, now);
+    if (!claim) continue;
+
+    const cleanupError = await removeJournalEntryStorageObjects(
+      bucket,
+      row.userId,
+      row.id,
+      [claim.current.storagePath, claim.current.posterPath].filter((path): path is string => Boolean(path)),
+    );
+    if (cleanupError) {
+      logStorageCleanupError("Abandoned journal upload Storage cleanup failed.", cleanupError);
+      await releaseOperation(row.userId, row.id, "cleanup", claim.token);
+      failed += 1;
+      continue;
+    }
+
     try {
-      const result = await db.transaction(async (tx) => {
-        const current = await getLockedJournalUpload(tx, row.userId, row.id);
-        if (!current || current.status !== "uploading") return false;
-        const cleanupError = await removeJournalEntryStorageObjects(
-          bucket,
-          row.userId,
-          row.id,
-          [current.storagePath, current.posterPath].filter((path): path is string => Boolean(path)),
-        );
-        if (cleanupError) {
-          logStorageCleanupError("Abandoned journal upload Storage cleanup failed.", cleanupError);
-          throw cleanupError;
-        }
-        const [deleted] = await tx
-          .delete(journalEntries)
-          .where(and(eq(journalEntries.id, row.id), eq(journalEntries.userId, row.userId)))
-          .returning({ id: journalEntries.id });
-        if (!deleted) throw new Error("Abandoned journal upload record was not deleted.");
-        return true;
-      });
-      if (result) removed += 1;
-    } catch {
+      const finalized = await finalizeDeletion(row.userId, row.id, "cleanup", claim.token, "uploading");
+      if (finalized) removed += 1;
+    } catch (error) {
+      logStorageCleanupError("Abandoned journal upload database deletion failed.", error);
       failed += 1;
     }
   }
@@ -381,9 +320,290 @@ type JournalTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type JournalStorageBucket = ReturnType<
   ReturnType<typeof createSupabaseAdminClient>["storage"]["from"]
 >;
+type JournalMediaOperation = "poster" | "complete" | "delete" | "cleanup";
+type LockedJournalUpload = NonNullable<Awaited<ReturnType<typeof getLockedJournalUpload>>>;
+type OperationClaim = {
+  current: LockedJournalUpload;
+  token: string;
+};
 
+const JOURNAL_OPERATION_LEASE_MS = 5 * 60 * 1000;
 const JOURNAL_POSTER_OBJECT_NAME =
   /^poster-[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.(?:jpg|webp)$/i;
+
+async function claimPosterSave(userId: string, entryId: string): Promise<OperationClaim> {
+  return db.transaction(async (tx) => {
+    const current = await getLockedJournalUpload(tx, userId, entryId);
+    if (!current) throw new JournalMutationError("Journal entry not found.", 404);
+    if (current.status !== "uploading") {
+      throw new JournalMutationError("Journal poster can only be added while the video is uploading.", 409);
+    }
+    if (current.mediaOperation && current.mediaOperation !== "poster") {
+      throw new JournalMutationError("Journal media is already being finalized or removed.", 409);
+    }
+    return setOperationClaim(tx, current, userId, "poster", new Date());
+  });
+}
+
+async function claimCompletion(
+  userId: string,
+  entryId: string,
+): Promise<{ kind: "ready" } | ({ kind: "claimed" } & OperationClaim)> {
+  return db.transaction(async (tx) => {
+    const current = await getLockedJournalUpload(tx, userId, entryId);
+    if (!current) throw new JournalMutationError("Journal entry not found.", 404);
+    if (current.mediaOperation === "delete" || current.mediaOperation === "cleanup") {
+      throw new JournalMutationError("Journal entry is being removed.", 409);
+    }
+    if (current.status === "ready") return { kind: "ready" } as const;
+    if (current.status !== "uploading") {
+      throw new JournalMutationError("Journal entry could not be completed.", 409);
+    }
+    if (!current.posterPath) {
+      throw new JournalMutationError("Choose a journal cover before completing the upload.", 409);
+    }
+    const claim = await setOperationClaim(tx, current, userId, "complete", new Date());
+    return { kind: "claimed", ...claim } as const;
+  });
+}
+
+async function claimDeletion(userId: string, entryId: string): Promise<OperationClaim> {
+  return db.transaction(async (tx) => {
+    const current = await getLockedJournalUpload(tx, userId, entryId);
+    if (!current) throw new JournalMutationError("Journal entry not found.", 404);
+    return setOperationClaim(tx, current, userId, "delete", new Date());
+  });
+}
+
+async function claimAbandonedCleanup(
+  userId: string,
+  entryId: string,
+  cutoff: Date,
+  now: Date,
+): Promise<OperationClaim | null> {
+  return db.transaction(async (tx) => {
+    const current = await getLockedJournalUpload(tx, userId, entryId);
+    if (!current || current.status !== "uploading" || current.createdAt >= cutoff) return null;
+    if (current.mediaOperation === "delete") return null;
+    if (
+      current.mediaOperation
+      && current.mediaOperation !== "cleanup"
+      && current.mediaOperationStartedAt
+      && current.mediaOperationStartedAt > new Date(now.getTime() - JOURNAL_OPERATION_LEASE_MS)
+    ) {
+      return null;
+    }
+    return setOperationClaim(tx, current, userId, "cleanup", now);
+  });
+}
+
+async function setOperationClaim(
+  tx: JournalTransaction,
+  current: LockedJournalUpload,
+  userId: string,
+  operation: JournalMediaOperation,
+  startedAt: Date,
+): Promise<OperationClaim> {
+  const token = randomUUID();
+  const [claimed] = await tx
+    .update(journalEntries)
+    .set({
+      mediaOperation: operation,
+      mediaOperationToken: token,
+      mediaOperationStartedAt: startedAt,
+      updatedAt: startedAt,
+    })
+    .where(and(eq(journalEntries.id, current.id), eq(journalEntries.userId, userId)))
+    .returning({ id: journalEntries.id });
+  if (!claimed) throw new JournalMutationError("Journal entry not found.", 404);
+  return { current, token };
+}
+
+async function finalizePosterSave(
+  userId: string,
+  entryId: string,
+  token: string,
+  posterPath: string,
+): Promise<{ previousPosterPath: string | null } | null> {
+  return db.transaction(async (tx) => {
+    const current = await getLockedJournalUpload(tx, userId, entryId);
+    if (
+      !current
+      || current.status !== "uploading"
+      || !operationMatches(current, "poster", token)
+    ) {
+      return null;
+    }
+
+    const [updatedMedia] = await tx
+      .update(journalMedia)
+      .set({ posterPath, updatedAt: new Date() })
+      .where(and(eq(journalMedia.id, current.mediaId), eq(journalMedia.journalEntryId, entryId)))
+      .returning({ id: journalMedia.id });
+    if (!updatedMedia) throw new JournalMutationError("Journal entry not found.", 404);
+    await clearOperationClaim(tx, current, userId);
+    return { previousPosterPath: current.posterPath };
+  });
+}
+
+async function finalizeReadyUpload(userId: string, entryId: string, token: string): Promise<boolean> {
+  return db.transaction(async (tx) => {
+    const current = await getLockedJournalUpload(tx, userId, entryId);
+    if (
+      !current
+      || current.status !== "uploading"
+      || !operationMatches(current, "complete", token)
+    ) {
+      return false;
+    }
+    const [updated] = await tx
+      .update(journalEntries)
+      .set({
+        status: "ready",
+        mediaOperation: null,
+        mediaOperationToken: null,
+        mediaOperationStartedAt: null,
+        updatedAt: new Date(),
+      })
+      .where(and(
+        eq(journalEntries.id, entryId),
+        eq(journalEntries.userId, userId),
+        eq(journalEntries.status, "uploading"),
+        eq(journalEntries.mediaOperation, "complete"),
+        eq(journalEntries.mediaOperationToken, token),
+      ))
+      .returning({ id: journalEntries.id });
+    return Boolean(updated);
+  });
+}
+
+async function finalizeDeletion(
+  userId: string,
+  entryId: string,
+  operation: "delete" | "cleanup" | "complete",
+  token: string,
+  requiredStatus?: "uploading",
+): Promise<boolean> {
+  return db.transaction(async (tx) => {
+    const current = await getLockedJournalUpload(tx, userId, entryId);
+    if (
+      !current
+      || (requiredStatus && current.status !== requiredStatus)
+      || !operationMatches(current, operation, token)
+    ) {
+      return false;
+    }
+    const [deleted] = await tx
+      .delete(journalEntries)
+      .where(and(
+        eq(journalEntries.id, entryId),
+        eq(journalEntries.userId, userId),
+        eq(journalEntries.mediaOperation, operation),
+        eq(journalEntries.mediaOperationToken, token),
+        requiredStatus ? eq(journalEntries.status, requiredStatus) : undefined,
+      ))
+      .returning({ id: journalEntries.id });
+    return Boolean(deleted);
+  });
+}
+
+async function clearOperationClaim(
+  tx: JournalTransaction,
+  current: LockedJournalUpload,
+  userId: string,
+): Promise<void> {
+  const [updated] = await tx
+    .update(journalEntries)
+    .set({
+      mediaOperation: null,
+      mediaOperationToken: null,
+      mediaOperationStartedAt: null,
+      updatedAt: new Date(),
+    })
+    .where(and(
+      eq(journalEntries.id, current.id),
+      eq(journalEntries.userId, userId),
+      eq(journalEntries.mediaOperation, current.mediaOperation!),
+      eq(journalEntries.mediaOperationToken, current.mediaOperationToken!),
+    ))
+    .returning({ id: journalEntries.id });
+  if (!updated) throw new JournalMutationError("Journal operation ownership was lost.", 409);
+}
+
+async function releaseOperation(
+  userId: string,
+  entryId: string,
+  operation: JournalMediaOperation,
+  token: string,
+): Promise<void> {
+  try {
+    await db.transaction(async (tx) => {
+      const current = await getLockedJournalUpload(tx, userId, entryId);
+      if (!current || !operationMatches(current, operation, token)) return;
+      await clearOperationClaim(tx, current, userId);
+    });
+  } catch (error) {
+    logStorageCleanupError("Journal operation release failed; retry can take over the claim.", error);
+  }
+}
+
+function operationMatches(
+  current: LockedJournalUpload,
+  operation: JournalMediaOperation,
+  token: string,
+): boolean {
+  return current.mediaOperation === operation && current.mediaOperationToken === token;
+}
+
+async function rejectCompletedUpload(
+  userId: string,
+  entryId: string,
+  claim: OperationClaim,
+  bucket: JournalStorageBucket,
+  reason: "missing" | "mismatch",
+): Promise<never> {
+  const cleanupError = await removeJournalEntryStorageObjects(
+    bucket,
+    userId,
+    entryId,
+    [claim.current.storagePath, claim.current.posterPath].filter((path): path is string => Boolean(path)),
+  );
+  if (cleanupError) {
+    logStorageCleanupError("Rejected journal upload Storage cleanup failed.", cleanupError);
+    await releaseOperation(userId, entryId, "complete", claim.token);
+    throw new JournalMutationError(
+      "The uploaded video was rejected, but its files could not be cleaned up. Try again.",
+      503,
+    );
+  }
+
+  let finalized: boolean;
+  try {
+    finalized = await finalizeDeletion(userId, entryId, "complete", claim.token, "uploading");
+  } catch (error) {
+    logStorageCleanupError("Rejected journal upload database cleanup failed.", error);
+    throw new JournalMutationError(
+      "The rejected files were removed, but the upload record remains. Retry to finish cleanup.",
+      503,
+    );
+  }
+  if (!finalized && await getOwnedJournalRow(userId, entryId)) {
+    throw new JournalMutationError("Journal entry could not be rejected because its operation changed.", 409);
+  }
+
+  throw new JournalMutationError(
+    reason === "missing"
+      ? "The uploaded video is no longer available. Select it again."
+      : "The uploaded video did not match the selected file.",
+    reason === "missing" ? 409 : 400,
+  );
+}
+
+async function loadCompletedEntry(userId: string, entryId: string): Promise<JournalEntryDetail> {
+  const entry = await getJournalEntryById(userId, entryId);
+  if (!entry) throw new JournalMutationError("Completed journal entry could not be loaded.", 404);
+  return entry;
+}
 
 async function getLockedJournalUpload(
   tx: JournalTransaction,
@@ -394,6 +614,10 @@ async function getLockedJournalUpload(
     .select({
       id: journalEntries.id,
       status: journalEntries.status,
+      createdAt: journalEntries.createdAt,
+      mediaOperation: journalEntries.mediaOperation,
+      mediaOperationToken: journalEntries.mediaOperationToken,
+      mediaOperationStartedAt: journalEntries.mediaOperationStartedAt,
       mediaId: journalMedia.id,
       storagePath: journalMedia.storagePath,
       mimeType: journalMedia.mimeType,
@@ -408,27 +632,15 @@ async function getLockedJournalUpload(
   return row ?? null;
 }
 
-async function cleanupFailedPosterAttempt(
+async function cleanupUncommittedPoster(
   bucket: JournalStorageBucket,
   userId: string,
   entryId: string,
-  failedPosterPath: string,
+  posterPath: string,
 ): Promise<unknown | null> {
-  try {
-    return await db.transaction(async (tx) => {
-      const current = await getLockedJournalUpload(tx, userId, entryId);
-      if (!current) return removeStoragePaths(bucket, [failedPosterPath]);
-      return reconcileJournalPosterObjects(
-        bucket,
-        userId,
-        entryId,
-        current.posterPath,
-        [failedPosterPath],
-      );
-    });
-  } catch (error) {
-    return error;
-  }
+  const current = await getOwnedJournalRow(userId, entryId);
+  if (current?.posterPath === posterPath) return null;
+  return removeStoragePaths(bucket, [posterPath]);
 }
 
 async function reconcileJournalPosterObjects(

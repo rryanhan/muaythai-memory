@@ -1,7 +1,11 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 type UploadRow = {
+  createdAt: Date;
   id: string;
+  mediaOperation: string | null;
+  mediaOperationStartedAt: Date | null;
+  mediaOperationToken: string | null;
   mediaId: string;
   mimeType: string;
   posterPath: string | null;
@@ -12,6 +16,7 @@ type UploadRow = {
 };
 
 const mocks = vi.hoisted(() => ({
+  activeTransactions: 0,
   afterAbandonedScan: null as (() => void) | null,
   bucketInfo: vi.fn(),
   bucketList: vi.fn(),
@@ -28,6 +33,7 @@ const mocks = vi.hoisted(() => ({
   removeFailures: 0,
   row: null as UploadRow | null,
   selectAbandonedRows: vi.fn(),
+  storageCallsInsideTransactions: [] as string[],
   transaction: vi.fn(),
   updateFailures: 0,
   uploadJournalPosterObject: vi.fn(),
@@ -68,6 +74,7 @@ const otherEntryPosterPath = "user/other-entry/poster-44444444-4444-4444-8444-44
 const otherUserPosterPath = "other-user/entry/poster-55555555-5555-4555-8555-555555555555.webp";
 
 beforeEach(() => {
+  mocks.activeTransactions = 0;
   mocks.afterAbandonedScan = null;
   mocks.bucketInfo.mockReset();
   mocks.bucketList.mockReset().mockImplementation(async (
@@ -106,15 +113,26 @@ beforeEach(() => {
   mocks.createSupabaseAdminClient.mockReset().mockReturnValue({
     storage: {
       from: () => ({
-        info: mocks.bucketInfo,
-        list: mocks.bucketList,
-        remove: mocks.bucketRemove,
+        info: (...args: unknown[]) => {
+          recordStorageCall("info");
+          return mocks.bucketInfo(...args);
+        },
+        list: (...args: unknown[]) => {
+          recordStorageCall("list");
+          return mocks.bucketList(...args);
+        },
+        remove: (...args: unknown[]) => {
+          recordStorageCall("remove");
+          return mocks.bucketRemove(...args);
+        },
       }),
     },
   });
   mocks.deleteFailures = 0;
   mocks.forUpdate.mockReset();
-  mocks.getJournalEntryById.mockReset().mockResolvedValue({ id: "entry" });
+  mocks.getJournalEntryById.mockReset().mockImplementation(
+    async () => mocks.row?.status === "ready" ? { id: "entry" } : null,
+  );
   mocks.getOwnedJournalRow.mockReset().mockImplementation(
     async () => mocks.row ? { ...mocks.row } : null,
   );
@@ -143,20 +161,26 @@ beforeEach(() => {
     return builder;
   });
   mocks.updateFailures = 0;
+  mocks.storageCallsInsideTransactions = [];
   mocks.uploadJournalPosterObject.mockReset().mockImplementation(async (
     _userId: string,
     _entryId: string,
     _file: File,
     path: string,
   ) => {
+    recordStorageCall("poster upload");
     mocks.objects.push(path);
     return path;
   });
   installSerializedTransactions();
 });
 
-describe("journal upload mutation locking", () => {
-  it("serializes completion before poster upload so a losing object is never created", async () => {
+afterEach(() => {
+  expect(mocks.storageCallsInsideTransactions).toEqual([]);
+});
+
+describe("journal media operation claims", () => {
+  it("keeps delayed completion Storage I/O outside the claim transaction and blocks a new poster", async () => {
     const info = deferred<{
       data: { contentType: string; size: number };
       error: null;
@@ -170,20 +194,149 @@ describe("journal upload mutation locking", () => {
       "entry",
       new File(["poster"], "poster.webp", { type: "image/webp" }),
     );
-    await vi.waitFor(() => expect(mocks.forUpdate).toHaveBeenCalledOnce());
+    const posterFailure = expect(posterSave).rejects.toThrow(/already being finalized or removed/);
+    await vi.waitFor(() => expect(mocks.forUpdate).toHaveBeenCalledTimes(2));
     expect(mocks.uploadJournalPosterObject).not.toHaveBeenCalled();
 
     info.resolve({ data: { contentType: "video/mp4", size: 10 }, error: null });
 
     await expect(completion).resolves.toEqual({ id: "entry" });
-    await expect(posterSave).rejects.toThrow(/only be added while the video is uploading/);
+    await posterFailure;
     expect(mocks.row).toMatchObject({
       posterPath: oldPosterPath,
       status: "ready",
     });
     expect(mocks.bucketRemove).not.toHaveBeenCalled();
     expect(mocks.objects).toContain(oldPosterPath);
-    expect(mocks.forUpdate).toHaveBeenCalledTimes(2);
+    expect(mocks.forUpdate).toHaveBeenCalledTimes(3);
+  });
+
+  it("lets completion supersede a delayed poster and removes only the losing UUID path", async () => {
+    const posterUpload = deferred<void>();
+    mocks.uploadJournalPosterObject.mockImplementation(async (
+      _userId: string,
+      _entryId: string,
+      _file: File,
+      path: string,
+    ) => {
+      recordStorageCall("poster upload");
+      await posterUpload.promise;
+      mocks.objects.push(path);
+      return path;
+    });
+    mocks.bucketInfo.mockResolvedValue({
+      data: { contentType: "video/mp4", size: 10 },
+      error: null,
+    });
+
+    const posterSave = saveJournalPoster(
+      "user",
+      "entry",
+      new File(["poster"], "poster.webp", { type: "image/webp" }),
+    );
+    const posterFailure = expect(posterSave).rejects.toThrow(/only be added while the video is uploading/);
+    await vi.waitFor(() => expect(mocks.uploadJournalPosterObject).toHaveBeenCalledOnce());
+
+    await expect(completeJournalUpload("user", "entry")).resolves.toEqual({ id: "entry" });
+    posterUpload.resolve();
+    await posterFailure;
+
+    expect(mocks.row).toMatchObject({
+      mediaOperation: null,
+      posterPath: oldPosterPath,
+      status: "ready",
+    });
+    expect(mocks.bucketRemove).toHaveBeenCalledWith([firstPosterPath]);
+    expect(mocks.objects).toEqual(["user/entry/video.mp4", oldPosterPath]);
+  });
+
+  it("uses the newest poster claim and never deletes the winning current poster", async () => {
+    const firstUpload = deferred<void>();
+    const secondUpload = deferred<void>();
+    mocks.posterPaths = [firstPosterPath, secondPosterPath];
+    mocks.uploadJournalPosterObject.mockImplementation(async (
+      _userId: string,
+      _entryId: string,
+      _file: File,
+      path: string,
+    ) => {
+      recordStorageCall("poster upload");
+      await (path === firstPosterPath ? firstUpload.promise : secondUpload.promise);
+      mocks.objects.push(path);
+      return path;
+    });
+
+    const firstSave = saveJournalPoster(
+      "user",
+      "entry",
+      new File(["first"], "first.webp", { type: "image/webp" }),
+    );
+    const firstFailure = expect(firstSave).rejects.toThrow(/only be added while the video is uploading/);
+    await vi.waitFor(() => expect(mocks.uploadJournalPosterObject).toHaveBeenCalledOnce());
+    const secondSave = saveJournalPoster(
+      "user",
+      "entry",
+      new File(["second"], "second.webp", { type: "image/webp" }),
+    );
+    await vi.waitFor(() => expect(mocks.uploadJournalPosterObject).toHaveBeenCalledTimes(2));
+
+    secondUpload.resolve();
+    await expect(secondSave).resolves.toBeUndefined();
+    firstUpload.resolve();
+    await firstFailure;
+
+    expect(mocks.row?.posterPath).toBe(secondPosterPath);
+    expect(mocks.objects).toEqual(["user/entry/video.mp4", secondPosterPath]);
+    for (const [paths] of mocks.bucketRemove.mock.calls) {
+      expect(paths).not.toContain(secondPosterPath);
+    }
+  });
+
+  it("lets delete supersede delayed completion without completion reviving the row", async () => {
+    const info = deferred<{
+      data: { contentType: string; size: number };
+      error: null;
+    }>();
+    mocks.bucketInfo.mockReturnValue(info.promise);
+
+    const completion = completeJournalUpload("user", "entry");
+    await vi.waitFor(() => expect(mocks.bucketInfo).toHaveBeenCalledOnce());
+
+    await expect(deleteJournalEntry("user", "entry")).resolves.toBe("entry");
+    info.resolve({ data: { contentType: "video/mp4", size: 10 }, error: null });
+    await expect(completion).rejects.toThrow(/could not be completed/);
+
+    expect(mocks.row).toBeNull();
+    expect(mocks.objects).toEqual([]);
+  });
+
+  it("keeps a delayed delete listing outside its claim transaction and blocks new media work", async () => {
+    const listing = deferred<{
+      data: Array<{ name: string }>;
+      error: null;
+    }>();
+    mocks.bucketList.mockReturnValueOnce(listing.promise);
+
+    const deletion = deleteJournalEntry("user", "entry");
+    await vi.waitFor(() => expect(mocks.bucketList).toHaveBeenCalledOnce());
+
+    await expect(saveJournalPoster(
+      "user",
+      "entry",
+      new File(["poster"], "poster.webp", { type: "image/webp" }),
+    )).rejects.toThrow(/already being finalized or removed/);
+    expect(mocks.uploadJournalPosterObject).not.toHaveBeenCalled();
+
+    listing.resolve({
+      data: [
+        { name: "video.mp4" },
+        { name: oldPosterPath.slice("user/entry/".length) },
+      ],
+      error: null,
+    });
+    await expect(deletion).resolves.toBe("entry");
+    expect(mocks.row).toBeNull();
+    expect(mocks.objects).toEqual([]);
   });
 
   it("recovers on retry when Storage succeeded but database deletion failed", async () => {
@@ -217,20 +370,64 @@ describe("journal upload mutation locking", () => {
 
     await expect(completeJournalUpload("user", "entry"))
       .rejects.toThrow(/could not be confirmed/);
-    expect(mocks.row).toMatchObject({ status: "uploading" });
+    expect(mocks.row).toMatchObject({ mediaOperation: null, status: "uploading" });
     expect(mocks.bucketRemove).not.toHaveBeenCalled();
   });
 
+  it("retries a valid completion after its database finalize fails", async () => {
+    mocks.bucketInfo
+      .mockImplementationOnce(async () => {
+        mocks.updateFailures = 1;
+        return {
+          data: { contentType: "video/mp4", size: 10 },
+          error: null,
+        };
+      })
+      .mockResolvedValueOnce({
+        data: { contentType: "video/mp4", size: 10 },
+        error: null,
+      });
+
+    await expect(completeJournalUpload("user", "entry"))
+      .rejects.toThrow(/could not be completed.*Try again/);
+    expect(mocks.row).toMatchObject({
+      mediaOperation: "complete",
+      status: "uploading",
+    });
+
+    await expect(completeJournalUpload("user", "entry")).resolves.toEqual({ id: "entry" });
+    expect(mocks.row).toMatchObject({
+      mediaOperation: null,
+      status: "ready",
+    });
+    expect(mocks.objects).toEqual(["user/entry/video.mp4", oldPosterPath]);
+  });
+
   it("recovers a losing poster cleanup failure on retry without deleting the current poster", async () => {
+    const posterUpload = deferred<void>();
     mocks.posterPaths = [firstPosterPath, secondPosterPath];
     mocks.removeFailures = 1;
-    mocks.updateFailures = 1;
+    mocks.uploadJournalPosterObject.mockImplementationOnce(async (
+      _userId: string,
+      _entryId: string,
+      _file: File,
+      path: string,
+    ) => {
+      recordStorageCall("poster upload");
+      mocks.objects.push(path);
+      await posterUpload.promise;
+      return path;
+    });
 
-    await expect(saveJournalPoster(
+    const firstSave = saveJournalPoster(
       "user",
       "entry",
       new File(["poster"], "poster.webp", { type: "image/webp" }),
-    )).rejects.toThrow(/unused journal poster could not be cleaned up.*reconcile/);
+    );
+    await vi.waitFor(() => expect(mocks.uploadJournalPosterObject).toHaveBeenCalledOnce());
+    mocks.updateFailures = 1;
+    posterUpload.resolve();
+    await expect(firstSave).rejects.toThrow(/unused journal poster could not be cleaned up.*reconcile/);
     expect(mocks.row?.posterPath).toBe(oldPosterPath);
     expect(mocks.objects).toEqual([
       "user/entry/video.mp4",
@@ -245,9 +442,16 @@ describe("journal upload mutation locking", () => {
       new File(["poster"], "poster.webp", { type: "image/webp" }),
     )).resolves.toBeUndefined();
     expect(mocks.row?.posterPath).toBe(secondPosterPath);
+    expect(mocks.objects).toEqual(["user/entry/video.mp4", firstPosterPath, secondPosterPath]);
+    expect(mocks.bucketRemove).toHaveBeenNthCalledWith(2, [oldPosterPath]);
+
+    mocks.bucketInfo.mockResolvedValue({
+      data: { contentType: "video/mp4", size: 10 },
+      error: null,
+    });
+    await expect(completeJournalUpload("user", "entry")).resolves.toEqual({ id: "entry" });
     expect(mocks.objects).toEqual(["user/entry/video.mp4", secondPosterPath]);
-    expect(mocks.bucketRemove).toHaveBeenNthCalledWith(2, [firstPosterPath]);
-    expect(mocks.bucketRemove).toHaveBeenNthCalledWith(3, [oldPosterPath]);
+    expect(mocks.bucketRemove).toHaveBeenNthCalledWith(3, [firstPosterPath]);
   });
 
   it("recovers a superseded poster cleanup failure during completion and keeps the current poster", async () => {
@@ -347,7 +551,11 @@ describe("cleanupAbandonedJournalUploads", () => {
       await expect(cleanupAbandonedJournalUploads(new Date("2026-07-23T12:00:00Z")))
         .resolves.toEqual({ removed: 0, failed: 1 });
 
-      expect(mocks.row).toMatchObject({ id: "entry", status: "uploading" });
+      expect(mocks.row).toMatchObject({
+        id: "entry",
+        mediaOperation: null,
+        status: "uploading",
+      });
     },
   );
 
@@ -379,6 +587,37 @@ describe("cleanupAbandonedJournalUploads", () => {
     expect(mocks.bucketRemove).not.toHaveBeenCalled();
     expect(mocks.objects).toEqual(["user/entry/video.mp4", oldPosterPath]);
   });
+
+  it("does not preempt a fresh poster claim on an old upload", async () => {
+    mocks.row = {
+      ...uploadRow(),
+      mediaOperation: "poster",
+      mediaOperationToken: "11111111-1111-4111-8111-111111111111",
+      mediaOperationStartedAt: new Date("2026-07-23T11:59:00Z"),
+    };
+
+    await expect(cleanupAbandonedJournalUploads(new Date("2026-07-23T12:00:00Z")))
+      .resolves.toEqual({ removed: 0, failed: 0 });
+
+    expect(mocks.row).toMatchObject({ mediaOperation: "poster", status: "uploading" });
+    expect(mocks.bucketList).not.toHaveBeenCalled();
+    expect(mocks.bucketRemove).not.toHaveBeenCalled();
+  });
+
+  it("takes over a stale media claim and finishes abandoned cleanup", async () => {
+    mocks.row = {
+      ...uploadRow(),
+      mediaOperation: "complete",
+      mediaOperationToken: "11111111-1111-4111-8111-111111111111",
+      mediaOperationStartedAt: new Date("2026-07-23T11:50:00Z"),
+    };
+
+    await expect(cleanupAbandonedJournalUploads(new Date("2026-07-23T12:00:00Z")))
+      .resolves.toEqual({ removed: 1, failed: 0 });
+
+    expect(mocks.row).toBeNull();
+    expect(mocks.objects).toEqual([]);
+  });
 });
 
 function installSerializedTransactions(): void {
@@ -395,10 +634,12 @@ function installSerializedTransactions(): void {
 
     const local = { row: mocks.row ? { ...mocks.row } : null };
     try {
+      mocks.activeTransactions += 1;
       const result = await callback(fakeTransaction(local));
       mocks.row = local.row;
       return result;
     } finally {
+      mocks.activeTransactions -= 1;
       release();
     }
   });
@@ -460,7 +701,11 @@ function chainBuilder(): Record<string, ReturnType<typeof vi.fn>> {
 
 function uploadRow(): UploadRow {
   return {
+    createdAt: new Date("2026-07-22T00:00:00Z"),
     id: "entry",
+    mediaOperation: null,
+    mediaOperationStartedAt: null,
+    mediaOperationToken: null,
     mediaId: "media",
     mimeType: "video/mp4",
     posterPath: oldPosterPath,
@@ -469,6 +714,12 @@ function uploadRow(): UploadRow {
     storagePath: "user/entry/video.mp4",
     userId: "user",
   };
+}
+
+function recordStorageCall(operation: string): void {
+  if (mocks.activeTransactions > 0) {
+    mocks.storageCallsInsideTransactions.push(operation);
+  }
 }
 
 function deferred<T>(): {

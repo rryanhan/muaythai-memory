@@ -1,4 +1,4 @@
-import { Upload } from "tus-js-client";
+import { Upload, type PreviousUpload } from "tus-js-client";
 import {
   JOURNAL_MEDIA_BUCKET,
   JOURNAL_UPLOAD_CHUNK_BYTES,
@@ -76,9 +76,41 @@ export function uploadJournalVideo({
     void upload.findPreviousUploads()
       .then((previousUploads) => {
         if (signal.aborted || settled) return;
-        if (previousUploads.length > 0) upload.resumeFromPreviousUpload(previousUploads[0]);
+        const previousUpload = findMatchingPreviousUpload(previousUploads, intent);
+        if (previousUpload) upload.resumeFromPreviousUpload(previousUpload);
         upload.start();
       })
       .catch((error) => finish(() => reject(error)));
   });
+}
+
+export function findMatchingPreviousUpload(
+  previousUploads: PreviousUpload[],
+  intent: JournalUploadIntentResponse,
+): PreviousUpload | undefined {
+  return previousUploads
+    .filter((previousUpload) => (
+      previousUpload.metadata?.bucketName === JOURNAL_MEDIA_BUCKET
+      && previousUpload.metadata.objectName === intent.upload.path
+      && isSameResumableEndpoint(previousUpload.uploadUrl, intent.upload.endpoint)
+    ))
+    .sort((left, right) => parseCreationTime(right.creationTime) - parseCreationTime(left.creationTime))[0];
+}
+
+function isSameResumableEndpoint(uploadUrl: string | null, endpoint: string): boolean {
+  if (!uploadUrl) return false;
+  try {
+    const previous = new URL(uploadUrl);
+    const current = new URL(endpoint);
+    const resumablePath = current.pathname.replace(/\/sign\/?$/, "");
+    return previous.origin === current.origin
+      && previous.pathname.startsWith(`${resumablePath}/`);
+  } catch {
+    return false;
+  }
+}
+
+function parseCreationTime(value: string): number {
+  const timestamp = Date.parse(value);
+  return Number.isNaN(timestamp) ? 0 : timestamp;
 }
