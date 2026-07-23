@@ -87,6 +87,7 @@ export function JournalUploadProvider({ children }: { children: ReactNode }) {
   const posterFileRef = useRef<File | null>(null);
   const posterPromiseRef = useRef<Promise<File | null> | null>(null);
   const posterGenerationRef = useRef(0);
+  const posterAbortRef = useRef<AbortController | null>(null);
   const busy = phase === "creating" || phase === "uploading" || phase === "completing";
   const hasDraftChanges = Boolean(
     draft.file || draft.caption.trim() || draft.drillId || draft.occurredOn !== localToday(),
@@ -109,6 +110,7 @@ export function JournalUploadProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => () => {
     abortRef.current?.abort();
+    posterAbortRef.current?.abort();
     if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
     if (posterPreviewUrlRef.current) URL.revokeObjectURL(posterPreviewUrlRef.current);
   }, []);
@@ -129,6 +131,8 @@ export function JournalUploadProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const resetDraft = useCallback(() => {
+    posterAbortRef.current?.abort();
+    posterAbortRef.current = null;
     posterGenerationRef.current += 1;
     posterFileRef.current = null;
     posterPromiseRef.current = null;
@@ -240,6 +244,7 @@ export function JournalUploadProvider({ children }: { children: ReactNode }) {
     hasWork,
     setFile(file) {
       validateJournalVideoFile(file);
+      posterAbortRef.current?.abort();
       const generation = posterGenerationRef.current + 1;
       posterGenerationRef.current = generation;
       posterFileRef.current = null;
@@ -248,16 +253,29 @@ export function JournalUploadProvider({ children }: { children: ReactNode }) {
       if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
       const previewUrl = URL.createObjectURL(file);
       previewUrlRef.current = previewUrl;
-      const posterPromise = createVideoPoster(file).then((poster) => {
-        if (poster) {
-          commitPoster(poster, generation);
-          return poster.file;
-        }
-        if (posterGenerationRef.current === generation) {
-          setDraft((current) => ({ ...current, posterStatus: "unavailable" }));
-        }
-        return null;
-      });
+      const posterController = new AbortController();
+      posterAbortRef.current = posterController;
+      const posterPromise = createVideoPoster(file, { signal: posterController.signal })
+        .then((poster) => {
+          if (poster) {
+            commitPoster(poster, generation);
+            return poster.file;
+          }
+          if (posterGenerationRef.current === generation) {
+            setDraft((current) => ({ ...current, posterStatus: "unavailable" }));
+          }
+          return null;
+        })
+        .catch((posterError) => {
+          if (isAbortError(posterError)) return null;
+          if (posterGenerationRef.current === generation) {
+            setDraft((current) => ({ ...current, posterStatus: "unavailable" }));
+          }
+          return null;
+        })
+        .finally(() => {
+          if (posterAbortRef.current === posterController) posterAbortRef.current = null;
+        });
       posterPromiseRef.current = posterPromise;
       setDraft((current) => ({
         ...current,
@@ -288,6 +306,8 @@ export function JournalUploadProvider({ children }: { children: ReactNode }) {
     },
     setPreparedPoster(poster) {
       if (busy) return;
+      posterAbortRef.current?.abort();
+      posterAbortRef.current = null;
       const generation = posterGenerationRef.current + 1;
       posterGenerationRef.current = generation;
       commitPoster(poster, generation);
@@ -300,21 +320,28 @@ export function JournalUploadProvider({ children }: { children: ReactNode }) {
       if (file.size === 0 || file.size > 5 * 1024 * 1024) {
         throw new Error(file.size === 0 ? "Choose a non-empty cover image." : "Cover images must be 5 MB or smaller.");
       }
+      posterAbortRef.current?.abort();
       const generation = posterGenerationRef.current + 1;
       posterGenerationRef.current = generation;
+      const posterController = new AbortController();
+      posterAbortRef.current = posterController;
       const hadPoster = Boolean(posterFileRef.current);
       setDraft((current) => ({ ...current, posterStatus: "generating" }));
-      const posterPromise = createPosterFromImage(file)
+      const posterPromise = createPosterFromImage(file, { signal: posterController.signal })
         .then((poster) => {
           commitPoster({ file: poster, timeSeconds: 0 }, generation);
           setDraft((current) => ({ ...current, posterTimeSeconds: null }));
           return poster;
         })
-        .catch((error) => {
+        .catch((posterError) => {
+          if (isAbortError(posterError)) return null;
           if (posterGenerationRef.current === generation) {
             setDraft((current) => ({ ...current, posterStatus: hadPoster ? "ready" : "unavailable" }));
           }
-          throw error;
+          throw posterError;
+        })
+        .finally(() => {
+          if (posterAbortRef.current === posterController) posterAbortRef.current = null;
         });
       posterPromiseRef.current = posterPromise;
       await posterPromise;
@@ -414,4 +441,8 @@ function localToday(): string {
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
   return `${date.getFullYear()}-${month}-${day}`;
+}
+
+function isAbortError(error: unknown): boolean {
+  return error instanceof DOMException && error.name === "AbortError";
 }

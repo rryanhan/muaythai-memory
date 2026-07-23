@@ -19,6 +19,7 @@ import {
 } from "./contracts";
 import { getJournalEntryById, getOwnedJournalRow } from "./queries";
 import { uploadJournalPosterObject } from "./poster";
+import { cleanupRejectedJournalUpload } from "./rejected-upload";
 
 export class JournalMutationError extends Error {
   readonly status: number;
@@ -103,8 +104,25 @@ export async function completeJournalUpload(userId: string, entryId: string): Pr
     !isJournalVideoMime(contentType) ||
     contentType !== current.mimeType
   ) {
-    await bucket.remove([current.storagePath]).catch(() => undefined);
-    await db.delete(journalEntries).where(and(eq(journalEntries.id, entryId), eq(journalEntries.userId, userId)));
+    const paths = [current.storagePath, current.posterPath].filter((path): path is string => Boolean(path));
+    const cleanup = await cleanupRejectedJournalUpload(paths, {
+      removeObjects: (objectPaths) => bucket.remove(objectPaths),
+      async deleteUploadRecord() {
+        await db.delete(journalEntries).where(
+          and(eq(journalEntries.id, entryId), eq(journalEntries.userId, userId)),
+        );
+      },
+    });
+    if (!cleanup.ok) {
+      console.error(
+        "Rejected journal upload cleanup failed.",
+        cleanup.error instanceof Error ? cleanup.error.message : cleanup.error,
+      );
+      throw new JournalMutationError(
+        "The uploaded video was rejected, but its files could not be cleaned up. Try again.",
+        503,
+      );
+    }
     throw new JournalMutationError("The uploaded video did not match the selected file.", 400);
   }
 

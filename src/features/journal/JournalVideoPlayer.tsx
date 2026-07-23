@@ -32,6 +32,9 @@ export function JournalVideoPlayer({
   preload = "metadata",
 }: JournalVideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const autoplayAttemptedSourceRef = useRef<string | null>(null);
+  const initialMutedRef = useRef(initialMuted);
+  initialMutedRef.current = initialMuted;
   const [playing, setPlaying] = useState(false);
   const [muted, setMuted] = useState(initialMuted);
   const [currentTime, setCurrentTime] = useState(0);
@@ -46,14 +49,16 @@ export function JournalVideoPlayer({
     setDuration(0);
     setUnavailable(false);
     setAutoplayBlocked(false);
-    setMuted(initialMuted);
-    if (video) video.muted = initialMuted;
-  }, [initialMuted, src]);
+    const sourceInitialMuted = initialMutedRef.current;
+    setMuted(sourceInitialMuted);
+    autoplayAttemptedSourceRef.current = null;
+    if (video) video.muted = sourceInitialMuted;
+  }, [src]);
 
   async function attemptAutoplay(video: HTMLVideoElement) {
     if (!autoPlay || unavailable || video.readyState < HTMLMediaElement.HAVE_FUTURE_DATA) return;
-    video.muted = initialMuted;
-    setMuted(video.muted);
+    if (autoplayAttemptedSourceRef.current === src) return;
+    autoplayAttemptedSourceRef.current = src;
     await video.play().catch(() => setAutoplayBlocked(true));
   }
 
@@ -103,7 +108,6 @@ export function JournalVideoPlayer({
           playsInline
           preload={preload}
           poster={poster ?? undefined}
-          autoPlay={autoPlay}
           loop={loop}
           muted={muted}
           src={src}
