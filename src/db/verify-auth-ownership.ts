@@ -51,7 +51,7 @@ async function main() {
   );
   expect(
     getAuthLinkFailureMessage("invalid-link") ===
-      "That confirmation or recovery link is invalid or has expired. Start again below.",
+      "That confirmation link is invalid or has expired. Start again below.",
     "Expired authentication links should use recoverable product copy.",
   );
 

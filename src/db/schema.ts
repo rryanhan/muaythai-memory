@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import {
   boolean,
+  check,
   date,
   index,
   integer,
@@ -38,6 +39,77 @@ export const users = pgTable(
   (table) => ({
     displayNameIdx: index("users_display_name_idx").on(table.displayName),
     usernameUnique: uniqueIndex("users_username_unique").on(table.username),
+  }),
+);
+
+// Recovery grants are short-lived server-only capabilities. The database stores
+// only keyed hashes/fingerprints; the signed browser grant carries the random
+// jti. State and attempt counters bridge the non-atomic boundary between
+// Postgres and Supabase Auth without allowing a retry to choose a new password.
+export const authRecoveryGrants = pgTable(
+  "auth_recovery_grants",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    jtiHash: varchar("jti_hash", { length: 64 }).notNull(),
+    sessionHash: varchar("session_hash", { length: 64 }).notNull(),
+    state: varchar("state", { length: 16 }).notNull().default("issued"),
+    passwordFingerprint: varchar("password_fingerprint", { length: 64 }),
+    activeAttempts: integer("active_attempts").notNull().default(0),
+    outcomeUncertain: boolean("outcome_uncertain").notNull().default(false),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    pendingAt: timestamp("pending_at", { withTimezone: true }),
+    consumedAt: timestamp("consumed_at", { withTimezone: true }),
+    failedAt: timestamp("failed_at", { withTimezone: true }),
+    ...timestamps,
+  },
+  (table) => ({
+    jtiHashUnique: uniqueIndex("auth_recovery_grants_jti_hash_unique").on(table.jtiHash),
+    userIdx: index("auth_recovery_grants_user_id_idx").on(table.userId),
+    expiresIdx: index("auth_recovery_grants_expires_at_idx").on(table.expiresAt),
+    stateCheck: check(
+      "auth_recovery_grants_state_check",
+      sql`${table.state} in ('issued', 'pending', 'consumed', 'failed')`,
+    ),
+    attemptsCheck: check(
+      "auth_recovery_grants_active_attempts_check",
+      sql`${table.activeAttempts} >= 0`,
+    ),
+    lifecycleCheck: check(
+      "auth_recovery_grants_lifecycle_check",
+      sql`(
+        (${table.state} = 'issued'
+          and ${table.passwordFingerprint} is null
+          and ${table.activeAttempts} = 0
+          and ${table.outcomeUncertain} = false
+          and ${table.pendingAt} is null
+          and ${table.consumedAt} is null
+          and ${table.failedAt} is null)
+        or
+        (${table.state} = 'failed'
+          and ${table.passwordFingerprint} is null
+          and ${table.activeAttempts} = 0
+          and ${table.outcomeUncertain} = false
+          and ${table.pendingAt} is null
+          and ${table.consumedAt} is null
+          and ${table.failedAt} is not null)
+        or
+        (${table.state} = 'pending'
+          and ${table.passwordFingerprint} is not null
+          and (${table.activeAttempts} > 0 or ${table.outcomeUncertain} = true)
+          and ${table.pendingAt} is not null
+          and ${table.consumedAt} is null
+          and ${table.failedAt} is null)
+        or
+        (${table.state} = 'consumed'
+          and ${table.passwordFingerprint} is not null
+          and ${table.activeAttempts} = 0
+          and ${table.outcomeUncertain} = false
+          and ${table.pendingAt} is not null
+          and ${table.consumedAt} is not null
+          and ${table.failedAt} is null)
+      )`,
+    ),
   }),
 );
 
@@ -241,6 +313,8 @@ export const journalMedia = pgTable(
 
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
+export type AuthRecoveryGrant = typeof authRecoveryGrants.$inferSelect;
+export type NewAuthRecoveryGrant = typeof authRecoveryGrants.$inferInsert;
 export type Drill = typeof drills.$inferSelect;
 export type NewDrill = typeof drills.$inferInsert;
 export type TrainingMethod = typeof trainingMethods.$inferSelect;

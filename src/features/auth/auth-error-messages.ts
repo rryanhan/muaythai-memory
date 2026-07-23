@@ -22,7 +22,17 @@ export function getAuthErrorMessage(
 
 export function getAuthLinkFailureMessage(reason: string | null | undefined): string | null {
   if (reason !== "invalid-link") return null;
-  return "That confirmation or recovery link is invalid or has expired. Start again below.";
+  return "That confirmation link is invalid or has expired. Start again below.";
+}
+
+export function getAuthSuccessMessage(reason: string | null | undefined): string | null {
+  if (reason !== "password-reset") return null;
+  return "Password updated. Sign in with your new password.";
+}
+
+export function getRecoveryLinkFailureMessage(reason: string | null | undefined): string | null {
+  if (reason !== "invalid-recovery") return null;
+  return "That recovery link is invalid, expired, or already used. Request a new one below.";
 }
 
 function isRateLimitCode(code: AuthError["code"]): boolean {

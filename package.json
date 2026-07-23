@@ -10,6 +10,7 @@
     "dev": "next dev",
     "build": "next build",
     "lint": "next lint",
+    "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "db:describe": "python3 scripts/check_db_connection.py --env DATABASE_POOLER_URL --describe",
     "db:check": "python3 scripts/check_db_connection.py --env DATABASE_POOLER_URL",
@@ -31,6 +32,7 @@
     "api:verify": "tsx src/data/verify-api.ts",
     "auth:verify": "tsx src/db/verify-auth-ownership.ts",
     "auth:verify-api": "tsx src/data/verify-auth-api.ts",
+    "auth:verify-recovery-grants": "tsx src/db/verify-auth-recovery-grants.ts",
     "onboarding:verify": "tsx src/modules/onboarding/verify-onboarding.ts",
     "capture:verify": "tsx src/modules/capture/verify-capture.ts",
     "profile:verify": "tsx src/modules/profile/verify-profile.ts",
@@ -62,6 +64,9 @@
     "zod": "latest"
   },
   "devDependencies": {
+    "@testing-library/jest-dom": "^7.0.0",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
     "@types/d3": "^7.4.3",
     "@types/node": "latest",
     "@types/react": "latest",
@@ -69,7 +74,9 @@
     "drizzle-kit": "latest",
     "eslint": "latest",
     "eslint-config-next": "latest",
+    "jsdom": "^29.1.1",
     "tsx": "latest",
-    "typescript": "latest"
+    "typescript": "latest",
+    "vitest": "^4.1.10"
   }
 }

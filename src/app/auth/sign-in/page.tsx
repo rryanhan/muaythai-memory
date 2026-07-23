@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 import { SignInForm } from "@/features/auth/SignInForm";
-import { getAuthLinkFailureMessage } from "@/features/auth/auth-error-messages";
+import {
+  getAuthLinkFailureMessage,
+  getAuthSuccessMessage,
+} from "@/features/auth/auth-error-messages";
 import styles from "@/features/auth/SignIn.module.css";
 import { safeInternalPath } from "@/lib/safe-internal-path";
 
@@ -24,6 +27,7 @@ export default async function SignInPage({ searchParams }: SignInPageProps) {
       <SignInForm
         nextPath={safeInternalPath(nextValue)}
         initialError={getAuthLinkFailureMessage(reasonValue)}
+        initialSuccess={getAuthSuccessMessage(reasonValue)}
       />
     </main>
   );

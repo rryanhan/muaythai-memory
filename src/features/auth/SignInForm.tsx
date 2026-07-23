@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Eye } from "@phosphor-icons/react/Eye";
 import { EyeSlash } from "@phosphor-icons/react/EyeSlash";
 import { GoogleLogo } from "@phosphor-icons/react/GoogleLogo";
@@ -14,9 +14,14 @@ type AuthMode = "sign-in" | "create";
 type SignInFormProps = {
   nextPath: string;
   initialError?: string | null;
+  initialSuccess?: string | null;
 };
 
-export function SignInForm({ nextPath, initialError = null }: SignInFormProps) {
+export function SignInForm({
+  nextPath,
+  initialError = null,
+  initialSuccess = null,
+}: SignInFormProps) {
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const [mode, setMode] = useState<AuthMode>("sign-in");
   const [email, setEmail] = useState("");
@@ -25,6 +30,18 @@ export function SignInForm({ nextPath, initialError = null }: SignInFormProps) {
   const [pending, setPending] = useState<"email" | "google" | null>(null);
   const [error, setError] = useState<string | null>(initialError);
   const [confirmationSent, setConfirmationSent] = useState(false);
+  const [submittedEmail, setSubmittedEmail] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(initialSuccess);
+  const confirmationHeadingRef = useRef<HTMLHeadingElement>(null);
+  const feedbackRef = useRef<HTMLParagraphElement>(null);
+
+  useEffect(() => {
+    if (confirmationSent) confirmationHeadingRef.current?.focus();
+  }, [confirmationSent]);
+
+  useEffect(() => {
+    if (error || successMessage) feedbackRef.current?.focus();
+  }, [error, successMessage]);
 
   function confirmUrl() {
     const url = new URL("/auth/confirm", window.location.origin);
@@ -64,10 +81,11 @@ export function SignInForm({ nextPath, initialError = null }: SignInFormProps) {
         setError(getAuthErrorMessage(signInError, "sign-in"));
         return;
       }
-      window.location.assign(nextPath);
+      announceAndContinue("Signed in. Opening your training memory.");
       return;
     }
 
+    setSubmittedEmail(normalizedEmail);
     const { data, error: signUpError } = await supabase.auth.signUp({
       email: normalizedEmail,
       password,
@@ -75,13 +93,13 @@ export function SignInForm({ nextPath, initialError = null }: SignInFormProps) {
     });
     setPending(null);
     if (signUpError) {
+      setSubmittedEmail(null);
       setError(getAuthErrorMessage(signUpError, "create"));
       return;
     }
 
-    setEmail(normalizedEmail);
     if (data.session) {
-      window.location.assign(nextPath);
+      announceAndContinue("Account created. Opening your training memory.");
       return;
     }
     setConfirmationSent(true);
@@ -92,12 +110,12 @@ export function SignInForm({ nextPath, initialError = null }: SignInFormProps) {
       <div className={styles.panel}>
         <header className={styles.header}>
           <p className="eyebrow">Muay Thai Memory</p>
-          <h1>Check your email</h1>
-          <p>Confirm {email} once, then use your password whenever you return.</p>
+          <h1 ref={confirmationHeadingRef} tabIndex={-1}>Check your email</h1>
+          <p>Confirm {submittedEmail} once, then use your password whenever you return.</p>
         </header>
         <div className={styles.form}>
-          <p className={styles.message}>The confirmation link expires. If it does, create the account again to request a fresh one.</p>
-          <button className={styles.secondary} type="button" onClick={() => setConfirmationSent(false)}>
+          <p className={styles.message} role="status" aria-live="polite">The confirmation link expires. If it does, create the account again to request a fresh one.</p>
+          <button className={styles.secondary} type="button" onClick={() => { setConfirmationSent(false); setSubmittedEmail(null); }}>
             Change email
           </button>
         </div>
@@ -126,8 +144,8 @@ export function SignInForm({ nextPath, initialError = null }: SignInFormProps) {
       <div className={styles.divider}><span>or continue with email</span></div>
 
       <div className={styles.modeSwitch} aria-label="Email authentication mode">
-        <button type="button" aria-pressed={mode === "sign-in"} onClick={() => changeMode("sign-in")}>Sign In</button>
-        <button type="button" aria-pressed={mode === "create"} onClick={() => changeMode("create")}>Create Account</button>
+        <button type="button" disabled={pending !== null} aria-pressed={mode === "sign-in"} onClick={() => changeMode("sign-in")}>Sign In</button>
+        <button type="button" disabled={pending !== null} aria-pressed={mode === "create"} onClick={() => changeMode("create")}>Create Account</button>
       </div>
 
       <form className={styles.form} onSubmit={(event) => void submitEmail(event)}>
@@ -155,7 +173,7 @@ export function SignInForm({ nextPath, initialError = null }: SignInFormProps) {
               disabled={pending !== null}
               onChange={(event) => { setPassword(event.target.value); setError(null); }}
             />
-            <button type="button" aria-label={passwordVisible ? "Hide password" : "Show password"} onClick={() => setPasswordVisible((value) => !value)}>
+            <button type="button" disabled={pending !== null} aria-label={passwordVisible ? "Hide password" : "Show password"} onClick={() => setPasswordVisible((value) => !value)}>
               {passwordVisible ? <EyeSlash size={20} /> : <Eye size={20} />}
             </button>
           </span>
@@ -165,7 +183,8 @@ export function SignInForm({ nextPath, initialError = null }: SignInFormProps) {
           <Link className={styles.forgotLink} href={`/auth/forgot-password?next=${encodeURIComponent(nextPath)}`}>Forgot password?</Link>
         )}
         {mode === "create" && <p className={styles.passwordHint}>Use at least 8 characters. You will verify your email once.</p>}
-        {error && <p className={styles.error} role="alert" aria-live="polite">{error}</p>}
+        {error && <p ref={feedbackRef} className={styles.error} role="alert" tabIndex={-1}>{error}</p>}
+        {successMessage && <p ref={feedbackRef} className={styles.message} role="status" tabIndex={-1}>{successMessage}</p>}
         <button className={styles.primary} type="submit" disabled={pending !== null}>
           {pending === "email" ? "Working..." : mode === "sign-in" ? "Sign in" : "Create account"}
         </button>
@@ -177,5 +196,11 @@ export function SignInForm({ nextPath, initialError = null }: SignInFormProps) {
     setMode(nextMode);
     setPassword("");
     setError(null);
+  }
+
+  function announceAndContinue(message: string) {
+    setPending("email");
+    setSuccessMessage(message);
+    window.setTimeout(() => window.location.assign(nextPath), 500);
   }
 }

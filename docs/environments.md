@@ -18,8 +18,9 @@ Hosted environment credentials stay in ignored files:
 
 Never copy staging credentials into the production file. Each file must set
 `DEPLOYMENT_ENVIRONMENT` and contain public Supabase values, the server-only
-service key, a port `6543` runtime pooler URL, and a port `5432` direct migration
-URL for the same Supabase project.
+service key, a unique server-only `AUTH_FLOW_SECRET`, a port `6543` runtime
+pooler URL, and a port `5432` direct migration URL for the same Supabase
+project.
 
 Verify the files without printing secrets:
 
