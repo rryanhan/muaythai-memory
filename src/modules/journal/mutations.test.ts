@@ -8,9 +8,11 @@ type UploadRow = {
   sizeBytes: number;
   status: string;
   storagePath: string;
+  userId: string;
 };
 
 const mocks = vi.hoisted(() => ({
+  afterAbandonedScan: null as (() => void) | null,
   bucketInfo: vi.fn(),
   bucketList: vi.fn(),
   bucketRemove: vi.fn(),
@@ -25,6 +27,7 @@ const mocks = vi.hoisted(() => ({
   posterPaths: [] as string[],
   removeFailures: 0,
   row: null as UploadRow | null,
+  selectAbandonedRows: vi.fn(),
   transaction: vi.fn(),
   updateFailures: 0,
   uploadJournalPosterObject: vi.fn(),
@@ -32,6 +35,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("@/db/client", () => ({
   db: {
+    select: mocks.selectAbandonedRows,
     transaction: mocks.transaction,
   },
 }));
@@ -50,14 +54,21 @@ vi.mock("./queries", () => ({
   getOwnedJournalRow: mocks.getOwnedJournalRow,
 }));
 
-import { completeJournalUpload, deleteJournalEntry, saveJournalPoster } from "./mutations";
+import {
+  cleanupAbandonedJournalUploads,
+  completeJournalUpload,
+  deleteJournalEntry,
+  saveJournalPoster,
+} from "./mutations";
 
 const oldPosterPath = "user/entry/poster-11111111-1111-4111-8111-111111111111.webp";
 const firstPosterPath = "user/entry/poster-22222222-2222-4222-8222-222222222222.webp";
 const secondPosterPath = "user/entry/poster-33333333-3333-4333-8333-333333333333.webp";
 const otherEntryPosterPath = "user/other-entry/poster-44444444-4444-4444-8444-444444444444.webp";
+const otherUserPosterPath = "other-user/entry/poster-55555555-5555-4555-8555-555555555555.webp";
 
 beforeEach(() => {
+  mocks.afterAbandonedScan = null;
   mocks.bucketInfo.mockReset();
   mocks.bucketList.mockReset().mockImplementation(async (
     prefix: string,
@@ -112,6 +123,25 @@ beforeEach(() => {
   mocks.posterPaths = [firstPosterPath];
   mocks.removeFailures = 0;
   mocks.row = uploadRow();
+  mocks.selectAbandonedRows.mockReset().mockImplementation(() => {
+    const builder = chainBuilder();
+    builder.where = vi.fn(async () => {
+      const row = mocks.row;
+      const rows = row?.status === "uploading"
+        ? [{
+            id: row.id,
+            userId: row.userId,
+            storagePath: row.storagePath,
+            posterPath: row.posterPath,
+          }]
+        : [];
+      const afterScan = mocks.afterAbandonedScan;
+      mocks.afterAbandonedScan = null;
+      afterScan?.();
+      return rows;
+    });
+    return builder;
+  });
   mocks.updateFailures = 0;
   mocks.uploadJournalPosterObject.mockReset().mockImplementation(async (
     _userId: string,
@@ -281,6 +311,76 @@ describe("journal upload mutation locking", () => {
   });
 });
 
+describe("cleanupAbandonedJournalUploads", () => {
+  it("discovers owned poster orphans without crossing entry or user prefixes", async () => {
+    mocks.objects.push(firstPosterPath, otherEntryPosterPath, otherUserPosterPath);
+
+    await expect(cleanupAbandonedJournalUploads(new Date("2026-07-23T12:00:00Z")))
+      .resolves.toEqual({ removed: 1, failed: 0 });
+
+    expect(mocks.row).toBeNull();
+    expect(mocks.bucketList).toHaveBeenCalledWith(
+      "user/entry",
+      expect.objectContaining({ limit: 100, offset: 0 }),
+    );
+    expect(mocks.bucketRemove).toHaveBeenCalledWith([
+      "user/entry/video.mp4",
+      oldPosterPath,
+      firstPosterPath,
+    ]);
+    expect(mocks.objects).toEqual([otherEntryPosterPath, otherUserPosterPath]);
+  });
+
+  it.each(["listing", "removal"] as const)(
+    "preserves the upload row when Storage %s fails",
+    async (failure) => {
+      mocks.objects.push(firstPosterPath);
+      if (failure === "listing") {
+        mocks.bucketList.mockResolvedValue({
+          data: null,
+          error: { message: "Storage unavailable", status: 503, statusCode: "503" },
+        });
+      } else {
+        mocks.removeFailures = 1;
+      }
+
+      await expect(cleanupAbandonedJournalUploads(new Date("2026-07-23T12:00:00Z")))
+        .resolves.toEqual({ removed: 0, failed: 1 });
+
+      expect(mocks.row).toMatchObject({ id: "entry", status: "uploading" });
+    },
+  );
+
+  it("retries successfully after Storage cleanup succeeds but database deletion fails", async () => {
+    mocks.objects.push(firstPosterPath);
+    mocks.deleteFailures = 1;
+
+    await expect(cleanupAbandonedJournalUploads(new Date("2026-07-23T12:00:00Z")))
+      .resolves.toEqual({ removed: 0, failed: 1 });
+    expect(mocks.row).toMatchObject({ id: "entry", status: "uploading" });
+    expect(mocks.objects).toEqual([]);
+
+    await expect(cleanupAbandonedJournalUploads(new Date("2026-07-23T12:01:00Z")))
+      .resolves.toEqual({ removed: 1, failed: 0 });
+    expect(mocks.row).toBeNull();
+    expect(mocks.bucketRemove).toHaveBeenCalledTimes(2);
+  });
+
+  it("preserves an entry that becomes ready after the initial abandoned scan", async () => {
+    mocks.afterAbandonedScan = () => {
+      if (mocks.row) mocks.row = { ...mocks.row, status: "ready" };
+    };
+
+    await expect(cleanupAbandonedJournalUploads(new Date("2026-07-23T12:00:00Z")))
+      .resolves.toEqual({ removed: 0, failed: 0 });
+
+    expect(mocks.row).toMatchObject({ id: "entry", status: "ready" });
+    expect(mocks.bucketList).not.toHaveBeenCalled();
+    expect(mocks.bucketRemove).not.toHaveBeenCalled();
+    expect(mocks.objects).toEqual(["user/entry/video.mp4", oldPosterPath]);
+  });
+});
+
 function installSerializedTransactions(): void {
   let tail = Promise.resolve();
   mocks.transaction.mockReset().mockImplementation(async (
@@ -367,6 +467,7 @@ function uploadRow(): UploadRow {
     sizeBytes: 10,
     status: "uploading",
     storagePath: "user/entry/video.mp4",
+    userId: "user",
   };
 }
 
