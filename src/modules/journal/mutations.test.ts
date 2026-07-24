@@ -38,6 +38,7 @@ const mocks = vi.hoisted(() => ({
   storageCallsInsideTransactions: [] as string[],
   tombstoneFailures: 0,
   transaction: vi.fn(),
+  transactionFailures: 0,
   updateFailures: 0,
   uploadJournalPosterObject: vi.fn(),
 }));
@@ -181,6 +182,7 @@ beforeEach(() => {
   mocks.updateFailures = 0;
   mocks.storageCallsInsideTransactions = [];
   mocks.tombstoneFailures = 0;
+  mocks.transactionFailures = 0;
   mocks.uploadJournalPosterObject.mockReset().mockImplementation(async (
     _userId: string,
     _entryId: string,
@@ -653,6 +655,26 @@ describe("journal media operation claims", () => {
 });
 
 describe("cleanupAbandonedJournalUploads", () => {
+  it("counts a claim failure and continues cleaning later rows", async () => {
+    mocks.selectAbandonedRows.mockImplementationOnce(() => {
+      const builder = chainBuilder();
+      builder.where = vi.fn(async () => [
+        { id: "failed-entry", userId: "user" },
+        { id: "entry", userId: "user" },
+      ]);
+      return builder;
+    });
+    mocks.transactionFailures = 1;
+
+    await expect(cleanupAbandonedJournalUploads(new Date("2026-07-23T12:00:00Z")))
+      .resolves.toEqual({ removed: 1, failed: 1 });
+
+    expect(mocks.row).toBeNull();
+    expect(mocks.bucketList).toHaveBeenCalledOnce();
+    expect(mocks.bucketRemove).toHaveBeenCalledOnce();
+    expect(mocks.objects).toEqual([]);
+  });
+
   it("discovers owned poster orphans without crossing entry or user prefixes", async () => {
     mocks.objects.push(firstPosterPath, otherEntryPosterPath, otherUserPosterPath);
 
@@ -897,6 +919,10 @@ function installSerializedTransactions(): void {
   mocks.transaction.mockReset().mockImplementation(async (
     callback: (tx: ReturnType<typeof fakeTransaction>) => Promise<unknown>,
   ) => {
+    if (mocks.transactionFailures > 0) {
+      mocks.transactionFailures -= 1;
+      throw new Error("database unavailable");
+    }
     let release: () => void = () => {};
     const previous = tail;
     tail = new Promise<void>((resolve) => {

@@ -336,33 +336,33 @@ export async function cleanupAbandonedJournalUploads(now = new Date()): Promise<
   let failed = 0;
 
   for (const row of rows) {
-    const claim = await claimAbandonedCleanup(
-      row.userId,
-      row.id,
-      cutoff,
-      tombstoneCutoff,
-      now,
-    );
-    if (!claim) continue;
-
-    const cleanupError = await removeJournalEntryStorageObjects(
-      bucket,
-      row.userId,
-      row.id,
-      [claim.current.storagePath, claim.current.posterPath].filter((path): path is string => Boolean(path)),
-    );
-    if (cleanupError) {
-      logStorageCleanupError("Abandoned journal upload Storage cleanup failed.", cleanupError);
-      failed += 1;
-      continue;
-    }
-
-    if (!claim.physicallyDelete) {
-      await releaseOperation(row.userId, row.id, "cleanup", claim.token);
-      continue;
-    }
-
     try {
+      const claim = await claimAbandonedCleanup(
+        row.userId,
+        row.id,
+        cutoff,
+        tombstoneCutoff,
+        now,
+      );
+      if (!claim) continue;
+
+      const cleanupError = await removeJournalEntryStorageObjects(
+        bucket,
+        row.userId,
+        row.id,
+        [claim.current.storagePath, claim.current.posterPath].filter((path): path is string => Boolean(path)),
+      );
+      if (cleanupError) {
+        logStorageCleanupError("Abandoned journal upload Storage cleanup failed.", cleanupError);
+        failed += 1;
+        continue;
+      }
+
+      if (!claim.physicallyDelete) {
+        await releaseOperation(row.userId, row.id, "cleanup", claim.token);
+        continue;
+      }
+
       const finalized = await finalizeDeletion(
         row.userId,
         row.id,
@@ -372,7 +372,7 @@ export async function cleanupAbandonedJournalUploads(now = new Date()): Promise<
       );
       if (finalized) removed += 1;
     } catch (error) {
-      logStorageCleanupError("Abandoned journal upload database deletion failed.", error);
+      logStorageCleanupError("Abandoned journal upload cleanup failed.", error);
       failed += 1;
     }
   }
