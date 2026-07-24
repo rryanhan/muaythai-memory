@@ -44,6 +44,8 @@ export async function updateProfile(currentUser: CurrentAppUser, input: UpdatePr
   }
 
   try {
+    await recoverExpiredAvatarClaim(currentUser.id);
+
     if (input.avatar) {
       const upload = await prepareProfileAvatarUpload(currentUser.id, input.avatar);
       return await updateProfileWithAvatar(currentUser, profile, upload);
@@ -155,11 +157,13 @@ async function updateProfileWithoutAvatar(
 
 type AvatarClaim = {
   claimUrl: string;
+  expiresAt: number;
   previousAvatarUrl: string | null;
   targetAvatarUrl: string;
 };
 
 const AVATAR_CLAIM_MARKER = "#profile-avatar-claim=";
+const AVATAR_CLAIM_TTL_MS = 10 * 60 * 1_000;
 
 async function claimProfileAvatar(
   userId: string,
@@ -172,8 +176,13 @@ async function claimProfileAvatar(
       if (!current) throw new ProfileUpdateError("Profile could not be found.", 404);
 
       const previousAvatarUrl = getStableProfileAvatarUrl(userId, current.avatarUrl);
-      const claimUrl = createAvatarClaimUrl(previousAvatarUrl, targetAvatarUrl);
-      attempt.claim = { claimUrl, previousAvatarUrl, targetAvatarUrl };
+      const expiresAt = Date.now() + AVATAR_CLAIM_TTL_MS;
+      const claimUrl = createAvatarClaimUrl(
+        previousAvatarUrl,
+        targetAvatarUrl,
+        expiresAt,
+      );
+      attempt.claim = { claimUrl, expiresAt, previousAvatarUrl, targetAvatarUrl };
       const [claimed] = await tx
         .update(users)
         .set({ avatarUrl: claimUrl, updatedAt: new Date() })
@@ -225,6 +234,32 @@ async function rollbackAvatarClaim(userId: string, claim: AvatarClaim): Promise<
       .where(eq(users.id, userId))
       .returning({ id: users.id });
   });
+}
+
+async function recoverExpiredAvatarClaim(userId: string): Promise<void> {
+  const observedAvatarUrl = await getCurrentProfileAvatarUrl(userId);
+  const observedClaim = parseAvatarClaim(userId, observedAvatarUrl ?? null);
+  if (!observedClaim || observedClaim.expiresAt > Date.now()) return;
+
+  const abandonedTargetPath = await db.transaction(async (tx) => {
+    const current = await getLockedProfileAvatar(tx, userId);
+    const claim = parseAvatarClaim(userId, current?.avatarUrl ?? null);
+    if (!current || !claim || claim.expiresAt > Date.now()) return null;
+
+    const [restored] = await tx
+      .update(users)
+      .set({ avatarUrl: claim.previousAvatarUrl, updatedAt: new Date() })
+      .where(eq(users.id, userId))
+      .returning({ id: users.id });
+    if (!restored) return null;
+    return getOwnedProfileAvatarPath(userId, claim.targetAvatarUrl);
+  });
+
+  if (abandonedTargetPath) {
+    await removeAvatarPathIfUnprotected(userId, abandonedTargetPath).catch((error) => {
+      logAvatarCleanupError("Abandoned profile avatar cleanup failed.", error);
+    });
+  }
 }
 
 async function getLockedProfileAvatar(tx: ProfileTransaction, userId: string) {
@@ -306,8 +341,10 @@ function getStableProfileAvatarUrl(userId: string, avatarUrl: string | null): st
 function createAvatarClaimUrl(
   previousAvatarUrl: string | null,
   targetAvatarUrl: string,
+  expiresAt: number,
 ): string {
   const payload = encodeURIComponent(JSON.stringify({
+    expiresAt,
     previousAvatarUrl,
     targetAvatarUrl,
   }));
@@ -324,10 +361,13 @@ function parseAvatarClaim(userId: string, avatarUrl: string | null): AvatarClaim
     const payload = JSON.parse(decodeURIComponent(
       avatarUrl.slice(markerIndex + AVATAR_CLAIM_MARKER.length),
     )) as Record<string, unknown>;
+    const expiresAt = payload.expiresAt === undefined ? 0 : payload.expiresAt;
     const previousAvatarUrl = payload.previousAvatarUrl;
     const targetAvatarUrl = payload.targetAvatarUrl;
     if (
-      (previousAvatarUrl !== null && typeof previousAvatarUrl !== "string")
+      typeof expiresAt !== "number"
+      || !Number.isFinite(expiresAt)
+      || (previousAvatarUrl !== null && typeof previousAvatarUrl !== "string")
       || typeof targetAvatarUrl !== "string"
       || !getOwnedProfileAvatarPath(userId, targetAvatarUrl)
     ) {
@@ -335,6 +375,7 @@ function parseAvatarClaim(userId: string, avatarUrl: string | null): AvatarClaim
     }
     return {
       claimUrl: avatarUrl,
+      expiresAt,
       previousAvatarUrl,
       targetAvatarUrl,
     };

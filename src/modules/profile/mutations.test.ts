@@ -222,6 +222,64 @@ describe("updateProfile avatar claims and reconciliation", () => {
     expect(mocks.storageCallsDuringTransaction).toEqual([]);
   });
 
+  it("recovers a seeded expired claim during a non-avatar update", async () => {
+    if (mocks.row) {
+      mocks.row.avatarUrl = seededAvatarClaim(
+        avatarUrl(originalPath),
+        avatarUrl(firstPath),
+        0,
+      );
+    }
+    mocks.storageObjects.add(firstPath);
+
+    await expect(updateProfile(currentUser(), input({
+      username: "details_save",
+    }))).resolves.toMatchObject({
+      username: "details_save",
+      avatarUrl: avatarUrl(originalPath),
+    });
+
+    expect(mocks.row?.avatarUrl).toBe(avatarUrl(originalPath));
+    expect(mocks.storageObjects).toEqual(new Set([originalPath, otherUserPath]));
+    expect(removedPaths()).toEqual([firstPath]);
+    expect(removedPaths()).not.toContain(originalPath);
+    expect(removedPaths()).not.toContain(otherUserPath);
+    expect(mocks.prepareProfileAvatarUpload).not.toHaveBeenCalled();
+    expect(mocks.storageCallsDuringTransaction).toEqual([]);
+  });
+
+  it("retries an expired claim cleanup failure on a later profile update", async () => {
+    if (mocks.row) {
+      mocks.row.avatarUrl = seededAvatarClaim(
+        avatarUrl(originalPath),
+        avatarUrl(firstPath),
+        0,
+      );
+    }
+    mocks.storageObjects.add(firstPath);
+    mocks.removeFailures.set(firstPath, 2);
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    await updateProfile(currentUser(), input({ username: "first_retry" }));
+    expect(mocks.row?.avatarUrl).toBe(avatarUrl(originalPath));
+    expect(mocks.storageObjects).toContain(firstPath);
+    expect(removedPaths().filter((path) => path === firstPath)).toHaveLength(2);
+
+    await updateProfile(currentUser(), input({ username: "second_retry" }));
+    expect(mocks.row?.avatarUrl).toBe(avatarUrl(originalPath));
+    expect(mocks.storageObjects).toEqual(new Set([originalPath, otherUserPath]));
+    expect(removedPaths().filter((path) => path === firstPath)).toHaveLength(3);
+    expect(consoleError).toHaveBeenCalledWith(
+      "Abandoned profile avatar cleanup failed.",
+      "storage unavailable",
+    );
+    expect(consoleError).toHaveBeenCalledWith(
+      "Profile avatar reconciliation failed.",
+      "storage unavailable",
+    );
+    consoleError.mockRestore();
+  });
+
   it("rediscovers a superseded avatar after repeated cleanup failure and retries later", async () => {
     mocks.removeFailures.set(originalPath, 2);
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
@@ -427,6 +485,20 @@ function preparedAvatar(path: string): PreparedAvatarUpload {
 
 function avatarUrl(path: string): string {
   return `https://project.supabase.co/storage/v1/object/public/profile-avatars/${path}`;
+}
+
+function seededAvatarClaim(
+  previousAvatarUrl: string | null,
+  targetAvatarUrl: string,
+  expiresAt: number,
+): string {
+  const payload = encodeURIComponent(JSON.stringify({
+    expiresAt,
+    previousAvatarUrl,
+    targetAvatarUrl,
+  }));
+  const baseUrl = previousAvatarUrl ?? targetAvatarUrl;
+  return `${baseUrl}#profile-avatar-claim=${payload}`;
 }
 
 function removedPaths(): string[] {
