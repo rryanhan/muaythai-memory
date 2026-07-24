@@ -36,22 +36,41 @@ export type UploadedAvatar = {
   publicUrl: string;
 };
 
-export async function uploadProfileAvatar(userId: string, file: File): Promise<UploadedAvatar> {
+export type PreparedAvatarUpload = UploadedAvatar & {
+  bytes: Uint8Array;
+  mime: AvatarImageMime;
+};
+
+export async function prepareProfileAvatarUpload(
+  userId: string,
+  file: File,
+): Promise<PreparedAvatarUpload> {
   const validated = await validateAvatarFile(file);
   const path = `${userId}/${randomUUID()}.${extensionByMime[validated.mime]}`;
   const supabase = createSupabaseAdminClient();
-  const { error } = await supabase.storage.from(PROFILE_AVATAR_BUCKET).upload(path, validated.bytes, {
+  const { data } = supabase.storage.from(PROFILE_AVATAR_BUCKET).getPublicUrl(path);
+  return {
+    path,
+    publicUrl: data.publicUrl,
+    bytes: validated.bytes,
+    mime: validated.mime,
+  };
+}
+
+export async function uploadPreparedProfileAvatar(
+  upload: PreparedAvatarUpload,
+): Promise<void> {
+  const supabase = createSupabaseAdminClient();
+  const { path, bytes, mime } = upload;
+  const { error } = await supabase.storage.from(PROFILE_AVATAR_BUCKET).upload(path, bytes, {
     cacheControl: "31536000",
-    contentType: validated.mime,
+    contentType: mime,
     upsert: false,
   });
 
   if (error) {
     throw new Error(`Avatar upload failed: ${error.message}`);
   }
-
-  const { data } = supabase.storage.from(PROFILE_AVATAR_BUCKET).getPublicUrl(path);
-  return { path, publicUrl: data.publicUrl };
 }
 
 export async function removeUploadedAvatar(path: string): Promise<void> {
@@ -60,24 +79,49 @@ export async function removeUploadedAvatar(path: string): Promise<void> {
   if (error) throw new Error(`Avatar cleanup failed: ${error.message}`);
 }
 
-export async function removeOtherUserAvatars(userId: string, keepPath: string | null): Promise<void> {
+export function getOwnedProfileAvatarPath(userId: string, publicUrl: string | null): string | null {
+  if (!publicUrl) return null;
+
+  try {
+    const marker = `/storage/v1/object/public/${PROFILE_AVATAR_BUCKET}/`;
+    const pathname = new URL(publicUrl).pathname;
+    const markerIndex = pathname.indexOf(marker);
+    if (markerIndex === -1) return null;
+
+    const path = decodeURIComponent(pathname.slice(markerIndex + marker.length));
+    const objectName = path.slice(userId.length + 1);
+    if (!path.startsWith(`${userId}/`) || !objectName || objectName.includes("/")) return null;
+    return path;
+  } catch {
+    return null;
+  }
+}
+
+export async function listProfileAvatarPaths(userId: string): Promise<string[]> {
   const supabase = createSupabaseAdminClient();
   const bucket = supabase.storage.from(PROFILE_AVATAR_BUCKET);
-  const pathsToRemove: string[] = [];
+  const paths: string[] = [];
   let offset = 0;
 
   while (true) {
-    const { data, error } = await bucket.list(userId, { limit: 100, offset, sortBy: { column: "name", order: "asc" } });
+    const { data, error } = await bucket.list(userId, {
+      limit: 100,
+      offset,
+      sortBy: { column: "name", order: "asc" },
+    });
     if (error) throw new Error(`Avatar listing failed: ${error.message}`);
 
-    for (const object of data) {
-      const path = `${userId}/${object.name}`;
-      if (path !== keepPath) pathsToRemove.push(path);
-    }
-
-    if (data.length < 100) break;
+    for (const object of data) paths.push(`${userId}/${object.name}`);
+    if (data.length < 100) return paths;
     offset += data.length;
   }
+}
+
+export async function removeOtherUserAvatars(userId: string, keepPath: string | null): Promise<void> {
+  const supabase = createSupabaseAdminClient();
+  const bucket = supabase.storage.from(PROFILE_AVATAR_BUCKET);
+  const pathsToRemove = (await listProfileAvatarPaths(userId))
+    .filter((path) => path !== keepPath);
 
   for (let index = 0; index < pathsToRemove.length; index += 100) {
     const { error } = await bucket.remove(pathsToRemove.slice(index, index + 100));

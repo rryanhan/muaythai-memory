@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { imageFile, pngBytes } from "@/modules/media/test-image-fixtures";
 import type { SupportedImageMime } from "@/modules/media/image-metadata";
-import { validateAvatarFile } from "./avatar";
+import { getOwnedProfileAvatarPath, validateAvatarFile } from "./avatar";
 
 const avatarMimes: SupportedImageMime[] = ["image/jpeg", "image/png", "image/webp"];
 
@@ -40,3 +40,19 @@ describe("validateAvatarFile image boundaries", () => {
       .resolves.toMatchObject({ mime });
   });
 });
+
+describe("getOwnedProfileAvatarPath", () => {
+  it("returns only a direct avatar object owned by the requested user", () => {
+    const userId = "11111111-1111-4111-8111-111111111111";
+    const path = `${userId}/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.jpg`;
+    const otherUserPath = "22222222-2222-4222-8222-222222222222/avatar.jpg";
+
+    expect(getOwnedProfileAvatarPath(userId, avatarUrl(path))).toBe(path);
+    expect(getOwnedProfileAvatarPath(userId, avatarUrl(otherUserPath))).toBeNull();
+    expect(getOwnedProfileAvatarPath(userId, avatarUrl(`${userId}/nested/avatar.jpg`))).toBeNull();
+  });
+});
+
+function avatarUrl(path: string): string {
+  return `https://project.supabase.co/storage/v1/object/public/profile-avatars/${path}`;
+}

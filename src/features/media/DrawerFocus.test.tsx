@@ -24,6 +24,7 @@ vi.mock("vaul", async () => {
 import { JournalCoverEditor } from "@/features/journal/JournalCoverEditor";
 import { JournalDiscardSheet } from "@/features/journal/JournalDiscardSheet";
 import { ProfileDiscardSheet } from "@/features/profile/ProfileDiscardSheet";
+import { CaptureDiscardSheet } from "@/features/capture/CaptureDiscardSheet";
 
 describe("media drawer focus", () => {
   it("focuses and restores the journal cover drawer", async () => {
@@ -45,7 +46,9 @@ describe("media drawer focus", () => {
       />,
     );
 
-    await waitFor(() => expect(screen.getByRole("button", { name: "Cancel" })).toHaveFocus());
+    const cancel = screen.getByRole("button", { name: "Cancel" });
+    expect(cancel).toBeVisible();
+    await waitFor(() => expect(cancel).toHaveFocus());
     unmount();
     expect(opener).toHaveFocus();
     opener.remove();
@@ -57,7 +60,9 @@ describe("media drawer focus", () => {
       <ProfileDiscardSheet open={false} onStay={vi.fn()} onDiscard={vi.fn()} />,
     );
     profile.rerender(<ProfileDiscardSheet open onStay={vi.fn()} onDiscard={vi.fn()} />);
-    await waitFor(() => expect(screen.getByRole("button", { name: "Keep editing" })).toHaveFocus());
+    const profileStay = screen.getByRole("button", { name: "Keep editing" });
+    expect(profileStay).toBeVisible();
+    await waitFor(() => expect(profileStay).toHaveFocus());
     profile.rerender(<ProfileDiscardSheet open={false} onStay={vi.fn()} onDiscard={vi.fn()} />);
     expect(profileOpener).toHaveFocus();
     profile.unmount();
@@ -75,7 +80,9 @@ describe("media drawer focus", () => {
     journal.rerender(
       <JournalDiscardSheet open pending={false} onStay={vi.fn()} onDiscard={vi.fn()} />,
     );
-    await waitFor(() => expect(screen.getByRole("button", { name: "Keep editing" })).toHaveFocus());
+    const journalStay = screen.getByRole("button", { name: "Keep editing" });
+    expect(journalStay).toBeVisible();
+    await waitFor(() => expect(journalStay).toHaveFocus());
     journal.rerender(
       <JournalDiscardSheet
         open={false}
@@ -87,6 +94,25 @@ describe("media drawer focus", () => {
     expect(journalOpener).toHaveFocus();
     journal.unmount();
     journalOpener.remove();
+  });
+
+  it("focuses and restores the capture discard drawer as it opens and closes", async () => {
+    const opener = focusedOpener();
+    const capture = render(
+      <CaptureDiscardSheet open={false} onStay={vi.fn()} onDiscard={vi.fn()} />,
+    );
+
+    capture.rerender(<CaptureDiscardSheet open onStay={vi.fn()} onDiscard={vi.fn()} />);
+    const stay = screen.getByRole("button", { name: "Keep editing" });
+    expect(stay).toBeVisible();
+    await waitFor(() => expect(stay).toHaveFocus());
+
+    capture.rerender(
+      <CaptureDiscardSheet open={false} onStay={vi.fn()} onDiscard={vi.fn()} />,
+    );
+    expect(opener).toHaveFocus();
+    capture.unmount();
+    opener.remove();
   });
 });
 
