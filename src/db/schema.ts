@@ -304,6 +304,7 @@ export const journalEntries = pgTable(
     mediaOperation: varchar("media_operation", { length: 32 }),
     mediaOperationToken: uuid("media_operation_token"),
     mediaOperationStartedAt: timestamp("media_operation_started_at", { withTimezone: true }),
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
     ...timestamps,
   },
   (table) => ({
@@ -321,6 +322,16 @@ export const journalEntries = pgTable(
         and ${table.mediaOperation} in ('token', 'poster', 'complete', 'delete', 'cleanup')
         and ${table.mediaOperationToken} is not null
         and ${table.mediaOperationStartedAt} is not null
+      )) is true`,
+    ),
+    deletionStateCheck: check(
+      "journal_entries_deletion_state_check",
+      sql`((
+        ${table.status} = 'deleted'
+        and ${table.deletedAt} is not null
+      ) or (
+        ${table.status} <> 'deleted'
+        and ${table.deletedAt} is null
       )) is true`,
     ),
   }),

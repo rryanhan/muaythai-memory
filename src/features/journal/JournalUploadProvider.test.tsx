@@ -241,6 +241,51 @@ describe("JournalUploadProvider intent recovery", () => {
     expect(dataMocks.refreshJournalUpload).not.toHaveBeenCalled();
   });
 
+  it("recreates a missing intent once when a poster retry receives 404", async () => {
+    const oldIntent = uploadIntent(
+      "11111111-1111-4111-8111-111111111111",
+      "user/old-entry/video.mp4",
+      "old-token",
+    );
+    const replacementIntent = uploadIntent(
+      "22222222-2222-4222-8222-222222222222",
+      "user/new-entry/video.mp4",
+      "new-token",
+    );
+    dataMocks.createJournalUpload
+      .mockResolvedValueOnce(oldIntent)
+      .mockResolvedValueOnce(replacementIntent);
+    dataMocks.uploadJournalEntryPoster
+      .mockRejectedValueOnce(new Error("Poster upload interrupted."))
+      .mockRejectedValueOnce(new JournalApiError("Journal entry not found.", 404))
+      .mockResolvedValueOnce(undefined);
+    dataMocks.completeJournalEntryUpload.mockResolvedValueOnce({ id: replacementIntent.entryId });
+
+    renderProvider(<UploadHarness />);
+    await chooseReadyFile();
+
+    fireEvent.click(screen.getByRole("button", { name: "Start upload" }));
+    await screen.findByText("Poster upload interrupted.");
+    expect(screen.getByTestId("file-name")).toHaveTextContent("round.mp4");
+
+    fireEvent.click(screen.getByRole("button", { name: "Start upload" }));
+    await screen.findByText("ready");
+
+    expect(dataMocks.createJournalUpload).toHaveBeenCalledTimes(2);
+    expect(uploadMocks.uploadJournalVideo).toHaveBeenCalledTimes(2);
+    expect(uploadMocks.uploadJournalVideo.mock.calls[1][0].intent).toEqual(replacementIntent);
+    expect(dataMocks.uploadJournalEntryPoster.mock.calls.map(([id]) => id)).toEqual([
+      oldIntent.entryId,
+      oldIntent.entryId,
+      replacementIntent.entryId,
+    ]);
+    expect(dataMocks.completeJournalEntryUpload).toHaveBeenCalledWith(
+      replacementIntent.entryId,
+      expect.any(Object),
+    );
+    expect(dataMocks.refreshJournalUpload).not.toHaveBeenCalled();
+  });
+
   it("keeps the staged intent and draft when cancellation DELETE fails", async () => {
     const currentIntent = uploadIntent(
       "11111111-1111-4111-8111-111111111111",

@@ -186,7 +186,7 @@ export function JournalUploadProvider({ children }: { children: ReactNode }) {
     let currentStage: Exclude<FailedStage, null> = "intent";
     let retryStage = failedStage;
     let nextIntent = intent;
-    let recreatedMissingCompletion = false;
+    let recreatedMissingIntent = false;
 
     try {
       while (true) {
@@ -266,13 +266,15 @@ export function JournalUploadProvider({ children }: { children: ReactNode }) {
           return;
         } catch (uploadError) {
           if (
-            !recreatedMissingCompletion
-            && retryStage === "complete"
-            && currentStage === "complete"
+            !recreatedMissingIntent
+            && (
+              (retryStage === "complete" && currentStage === "complete")
+              || (retryStage === "poster" && currentStage === "poster")
+            )
             && uploadError instanceof JournalApiError
             && uploadError.status === 404
           ) {
-            recreatedMissingCompletion = true;
+            recreatedMissingIntent = true;
             retryStage = null;
             nextIntent = null;
             intentRef.current = null;

@@ -5,6 +5,7 @@ import { drills, journalEntries, journalMedia } from "@/db/schema";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import {
   JOURNAL_ABANDONED_UPLOAD_HOURS,
+  JOURNAL_DELETE_TOMBSTONE_HOURS,
   JOURNAL_MEDIA_BUCKET,
   isJournalVideoMime,
   journalVideoExtension,
@@ -255,6 +256,7 @@ export async function updateJournalEntry(
   const input = updateJournalEntryInputSchema.parse(rawInput);
   const current = await getOwnedJournalRow(userId, entryId);
   if (!current) throw new JournalMutationError("Journal entry not found.", 404);
+  if (current.status === "deleted") throw new JournalMutationError("Journal entry not found.", 404);
   if (current.status !== "ready") {
     throw new JournalMutationError("Finish the video upload before editing this entry.", 409);
   }
@@ -294,7 +296,7 @@ export async function deleteJournalEntry(userId: string, entryId: string): Promi
 
   let finalized: boolean;
   try {
-    finalized = await finalizeDeletion(userId, entryId, "delete", claim.token);
+    finalized = await finalizeDeletionTombstone(userId, entryId, "delete", claim.token);
   } catch (error) {
     logStorageCleanupError("Journal entry database deletion failed.", error);
     throw new JournalMutationError("Journal video was removed, but its entry cleanup must be retried.", 503);
@@ -305,6 +307,9 @@ export async function deleteJournalEntry(userId: string, entryId: string): Promi
 
 export async function cleanupAbandonedJournalUploads(now = new Date()): Promise<{ removed: number; failed: number }> {
   const cutoff = new Date(now.getTime() - JOURNAL_ABANDONED_UPLOAD_HOURS * 60 * 60 * 1000);
+  const tombstoneCutoff = new Date(
+    now.getTime() - JOURNAL_DELETE_TOMBSTONE_HOURS * 60 * 60 * 1000,
+  );
   const leaseCutoff = new Date(now.getTime() - JOURNAL_OPERATION_LEASE_MS);
   const rows = await db
     .select({
@@ -319,6 +324,10 @@ export async function cleanupAbandonedJournalUploads(now = new Date()): Promise<
         eq(journalEntries.mediaOperation, "delete"),
         lte(journalEntries.mediaOperationStartedAt, leaseCutoff),
       ),
+      and(
+        eq(journalEntries.status, "deleted"),
+        lte(journalEntries.deletedAt, tombstoneCutoff),
+      ),
     ));
   if (rows.length === 0) return { removed: 0, failed: 0 };
 
@@ -327,7 +336,13 @@ export async function cleanupAbandonedJournalUploads(now = new Date()): Promise<
   let failed = 0;
 
   for (const row of rows) {
-    const claim = await claimAbandonedCleanup(row.userId, row.id, cutoff, now);
+    const claim = await claimAbandonedCleanup(
+      row.userId,
+      row.id,
+      cutoff,
+      tombstoneCutoff,
+      now,
+    );
     if (!claim) continue;
 
     const cleanupError = await removeJournalEntryStorageObjects(
@@ -339,6 +354,11 @@ export async function cleanupAbandonedJournalUploads(now = new Date()): Promise<
     if (cleanupError) {
       logStorageCleanupError("Abandoned journal upload Storage cleanup failed.", cleanupError);
       failed += 1;
+      continue;
+    }
+
+    if (!claim.physicallyDelete) {
+      await releaseOperation(row.userId, row.id, "cleanup", claim.token);
       continue;
     }
 
@@ -392,6 +412,7 @@ export async function claimPosterSave(
   return database.transaction(async (tx) => {
     const current = await getLockedJournalUpload(tx, userId, entryId);
     if (!current) throw new JournalMutationError("Journal entry not found.", 404);
+    if (current.status === "deleted") throw new JournalMutationError("Journal entry not found.", 404);
     if (current.status !== "uploading") {
       throw new JournalMutationError("Journal poster can only be added while the video is uploading.", 409);
     }
@@ -410,6 +431,7 @@ export async function claimCompletion(
   return database.transaction(async (tx) => {
     const current = await getLockedJournalUpload(tx, userId, entryId);
     if (!current) throw new JournalMutationError("Journal entry not found.", 404);
+    if (current.status === "deleted") throw new JournalMutationError("Journal entry not found.", 404);
     if (current.mediaOperation === "delete" || current.mediaOperation === "cleanup") {
       throw new JournalMutationError("Journal entry is being removed.", 409);
     }
@@ -433,6 +455,7 @@ export async function claimDeletion(
   return database.transaction(async (tx) => {
     const current = await getLockedJournalUpload(tx, userId, entryId);
     if (!current) throw new JournalMutationError("Journal entry not found.", 404);
+    if (current.status === "deleted") throw new JournalMutationError("Journal entry not found.", 404);
     return setOperationClaim(tx, current, userId, "delete", new Date());
   });
 }
@@ -441,8 +464,12 @@ async function claimAbandonedCleanup(
   userId: string,
   entryId: string,
   cutoff: Date,
+  tombstoneCutoff: Date,
   now: Date,
-): Promise<(OperationClaim & { requiredStatus?: "uploading" }) | null> {
+): Promise<(OperationClaim & {
+  physicallyDelete: boolean;
+  requiredStatus: "uploading" | "deleted";
+}) | null> {
   return db.transaction(async (tx) => {
     const current = await getLockedJournalUpload(tx, userId, entryId);
     if (!current) return null;
@@ -451,14 +478,32 @@ async function claimAbandonedCleanup(
       && Boolean(current.mediaOperationStartedAt && current.mediaOperationStartedAt <= leaseCutoff);
     const destructiveCleanup = current.mediaOperation === "cleanup";
     const abandonedUpload = current.status === "uploading" && current.createdAt < cutoff;
-    if (!staleDelete && !destructiveCleanup && !abandonedUpload) return null;
+    const expiredTombstone = current.status === "deleted"
+      && Boolean(current.deletedAt && current.deletedAt <= tombstoneCutoff);
+    if (!staleDelete && !destructiveCleanup && !abandonedUpload && !expiredTombstone) return null;
     if (current.mediaOperation && current.mediaOperation !== "cleanup") {
       if (!current.mediaOperationStartedAt || current.mediaOperationStartedAt > leaseCutoff) return null;
     }
-    const claim = await setOperationClaim(tx, current, userId, "cleanup", now);
+
+    const shouldCreateTombstone = staleDelete
+      || (destructiveCleanup && !abandonedUpload && current.status !== "deleted");
+    const claim = await setOperationClaim(
+      tx,
+      current,
+      userId,
+      "cleanup",
+      now,
+      shouldCreateTombstone ? now : undefined,
+    );
+    const claimedStatus = shouldCreateTombstone ? "deleted" : current.status;
+    const claimedDeletedAt = shouldCreateTombstone ? now : current.deletedAt;
     return {
       ...claim,
-      requiredStatus: staleDelete || destructiveCleanup ? undefined : "uploading",
+      physicallyDelete: claimedStatus === "uploading"
+        ? abandonedUpload
+        : claimedStatus === "deleted"
+          && Boolean(claimedDeletedAt && claimedDeletedAt <= tombstoneCutoff),
+      requiredStatus: claimedStatus === "deleted" ? "deleted" : "uploading",
     };
   });
 }
@@ -471,6 +516,7 @@ async function claimUploadToken(
   return database.transaction(async (tx) => {
     const current = await getLockedJournalUpload(tx, userId, entryId);
     if (!current) throw new JournalMutationError("Journal entry not found.", 404);
+    if (current.status === "deleted") throw new JournalMutationError("Journal entry not found.", 404);
     if (current.status !== "uploading") {
       throw new JournalMutationError("Journal upload access can only be refreshed while uploading.", 409);
     }
@@ -487,6 +533,7 @@ async function setOperationClaim(
   userId: string,
   operation: JournalMediaOperation,
   startedAt: Date,
+  tombstoneAt?: Date,
 ): Promise<OperationClaim> {
   const token = randomUUID();
   const [claimed] = await tx
@@ -495,12 +542,19 @@ async function setOperationClaim(
       mediaOperation: operation,
       mediaOperationToken: token,
       mediaOperationStartedAt: startedAt,
+      status: tombstoneAt ? "deleted" : current.status,
+      deletedAt: tombstoneAt ?? current.deletedAt,
       updatedAt: startedAt,
     })
     .where(and(eq(journalEntries.id, current.id), eq(journalEntries.userId, userId)))
     .returning({ id: journalEntries.id });
   if (!claimed) throw new JournalMutationError("Journal entry not found.", 404);
-  return { current, token };
+  return {
+    current: tombstoneAt
+      ? { ...current, status: "deleted", deletedAt: tombstoneAt }
+      : current,
+    token,
+  };
 }
 
 export async function finalizePosterSave(
@@ -572,7 +626,7 @@ export async function finalizeDeletion(
   entryId: string,
   operation: "delete" | "cleanup" | "complete",
   token: string,
-  requiredStatus?: "uploading",
+  requiredStatus?: "uploading" | "deleted",
   database: JournalDatabase = db,
 ): Promise<boolean> {
   return database.transaction(async (tx) => {
@@ -595,6 +649,39 @@ export async function finalizeDeletion(
       ))
       .returning({ id: journalEntries.id });
     return Boolean(deleted);
+  });
+}
+
+async function finalizeDeletionTombstone(
+  userId: string,
+  entryId: string,
+  operation: "delete" | "complete",
+  token: string,
+  database: JournalDatabase = db,
+): Promise<boolean> {
+  return database.transaction(async (tx) => {
+    const current = await getLockedJournalUpload(tx, userId, entryId);
+    if (!current || !operationMatches(current, operation, token)) return false;
+
+    const deletedAt = new Date();
+    const [updated] = await tx
+      .update(journalEntries)
+      .set({
+        status: "deleted",
+        deletedAt,
+        mediaOperation: null,
+        mediaOperationToken: null,
+        mediaOperationStartedAt: null,
+        updatedAt: deletedAt,
+      })
+      .where(and(
+        eq(journalEntries.id, entryId),
+        eq(journalEntries.userId, userId),
+        eq(journalEntries.mediaOperation, operation),
+        eq(journalEntries.mediaOperationToken, token),
+      ))
+      .returning({ id: journalEntries.id });
+    return Boolean(updated);
   });
 }
 
@@ -690,7 +777,7 @@ async function rejectCompletedUpload(
 
   let finalized: boolean;
   try {
-    finalized = await finalizeDeletion(userId, entryId, "complete", claim.token, "uploading");
+    finalized = await finalizeDeletionTombstone(userId, entryId, "complete", claim.token);
   } catch (error) {
     logStorageCleanupError("Rejected journal upload database cleanup failed.", error);
     throw new JournalMutationError(
@@ -726,6 +813,7 @@ async function getLockedJournalUpload(
       id: journalEntries.id,
       status: journalEntries.status,
       createdAt: journalEntries.createdAt,
+      deletedAt: journalEntries.deletedAt,
       mediaOperation: journalEntries.mediaOperation,
       mediaOperationToken: journalEntries.mediaOperationToken,
       mediaOperationStartedAt: journalEntries.mediaOperationStartedAt,

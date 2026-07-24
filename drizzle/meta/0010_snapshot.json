@@ -817,6 +817,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -926,6 +932,10 @@
         "journal_entries_media_operation_check": {
           "name": "journal_entries_media_operation_check",
           "value": "((\n        \"journal_entries\".\"media_operation\" is null\n        and \"journal_entries\".\"media_operation_token\" is null\n        and \"journal_entries\".\"media_operation_started_at\" is null\n      ) or (\n        \"journal_entries\".\"media_operation\" is not null\n        and \"journal_entries\".\"media_operation\" in ('token', 'poster', 'complete', 'delete', 'cleanup')\n        and \"journal_entries\".\"media_operation_token\" is not null\n        and \"journal_entries\".\"media_operation_started_at\" is not null\n      )) is true"
+        },
+        "journal_entries_deletion_state_check": {
+          "name": "journal_entries_deletion_state_check",
+          "value": "((\n        \"journal_entries\".\"status\" = 'deleted'\n        and \"journal_entries\".\"deleted_at\" is not null\n      ) or (\n        \"journal_entries\".\"status\" <> 'deleted'\n        and \"journal_entries\".\"deleted_at\" is null\n      )) is true"
         }
       },
       "isRLSEnabled": false
