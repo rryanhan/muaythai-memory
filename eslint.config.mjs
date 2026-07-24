@@ -17,7 +17,6 @@ export default defineConfig([
     files: ["**/*.test.{ts,tsx}"],
     rules: {
       "react/display-name": "off",
-      "react-hooks/rules-of-hooks": "off",
     },
   },
   globalIgnores([

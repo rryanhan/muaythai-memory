@@ -32,12 +32,13 @@ vi.mock("vaul", async () => {
 vi.mock("react-easy-crop", async () => {
   const React = await import("react");
   return {
-    default: (props: Record<string, unknown>) => {
+    default: function MockCropper(props: Record<string, unknown>) {
       cropperMock.props = props;
+      const initialProps = React.useRef(props);
       React.useEffect(() => {
-        const onCropComplete = props.onCropComplete as (area: unknown, pixels: unknown) => void;
+        const onCropComplete = initialProps.current.onCropComplete as (area: unknown, pixels: unknown) => void;
         onCropComplete({}, { height: 400, width: 400, x: 10, y: 20 });
-        (props.onMediaLoaded as () => void)();
+        (initialProps.current.onMediaLoaded as () => void)();
       }, []);
       return (
         <button
