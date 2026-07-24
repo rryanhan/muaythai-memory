@@ -68,21 +68,22 @@ jobs:
     timeout-minutes: 15
     env:
       AUTH_FLOW_SECRET: ci-only-auth-flow-secret-with-at-least-32-bytes
-      DATABASE_DIRECT_URL: postgresql://postgres:postgres@127.0.0.1:5432/muaythai_ci
-      DATABASE_POOLER_URL: postgresql://postgres:postgres@127.0.0.1:5432/muaythai_ci
+      DATABASE_DIRECT_URL: postgresql://postgres:postgres@127.0.0.1:5432/muaythai_pr6_test_ci
+      DATABASE_POOLER_URL: postgresql://postgres:postgres@127.0.0.1:5432/muaythai_pr6_test_ci
       DATABASE_POOL_MAX: "3"
+      JOURNAL_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/muaythai_pr6_test_ci
 
     services:
       postgres:
         image: postgres:16-alpine
         env:
-          POSTGRES_DB: muaythai_ci
+          POSTGRES_DB: muaythai_pr6_test_ci
           POSTGRES_PASSWORD: postgres
           POSTGRES_USER: postgres
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U postgres -d muaythai_ci"
+          --health-cmd "pg_isready -U postgres -d muaythai_pr6_test_ci"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
@@ -102,6 +103,9 @@ jobs:
 
       - name: Migrate ephemeral database
         run: npm run db:migrate
+
+      - name: Verify journal operation claims in PostgreSQL
+        run: npm test -- --run src/modules/journal/operation-claims.postgres.test.ts
 
       - name: Verify recovery grant concurrency and retention
         run: npm run auth:verify-recovery-grants
