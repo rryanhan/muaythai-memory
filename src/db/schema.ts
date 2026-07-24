@@ -312,15 +312,16 @@ export const journalEntries = pgTable(
     drillIdx: index("journal_entries_drill_id_idx").on(table.drillId),
     mediaOperationCheck: check(
       "journal_entries_media_operation_check",
-      sql`(
+      sql`((
         ${table.mediaOperation} is null
         and ${table.mediaOperationToken} is null
         and ${table.mediaOperationStartedAt} is null
       ) or (
-        ${table.mediaOperation} in ('poster', 'complete', 'delete', 'cleanup')
+        ${table.mediaOperation} is not null
+        and ${table.mediaOperation} in ('token', 'poster', 'complete', 'delete', 'cleanup')
         and ${table.mediaOperationToken} is not null
         and ${table.mediaOperationStartedAt} is not null
-      )`,
+      )) is true`,
     ),
   }),
 );

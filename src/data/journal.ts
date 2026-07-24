@@ -59,6 +59,25 @@ export async function createJournalUpload(
   );
 }
 
+export async function refreshJournalUpload(
+  id: string,
+  options: ApiClientOptions = {},
+): Promise<JournalUploadIntentResponse | null> {
+  try {
+    return await requestWithReadableError(
+      () => fetchJson(
+        `/api/journal/${encodeURIComponent(id)}/upload-token`,
+        journalUploadIntentResponseSchema,
+        options,
+        { method: "POST" },
+      ),
+    );
+  } catch (error) {
+    if (error instanceof JournalApiError && error.status === 404) return null;
+    throw error;
+  }
+}
+
 export async function completeJournalEntryUpload(
   id: string,
   options: ApiClientOptions = {},
@@ -118,9 +137,19 @@ async function requestWithReadableError<T>(request: () => Promise<T>): Promise<T
     return await request();
   } catch (error) {
     if (error instanceof ApiError && hasErrorMessage(error.responseBody)) {
-      throw new Error(error.responseBody.error);
+      throw new JournalApiError(error.responseBody.error, error.status);
     }
     throw error;
+  }
+}
+
+export class JournalApiError extends Error {
+  readonly status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "JournalApiError";
+    this.status = status;
   }
 }
 

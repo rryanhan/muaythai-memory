@@ -925,7 +925,7 @@
       "checkConstraints": {
         "journal_entries_media_operation_check": {
           "name": "journal_entries_media_operation_check",
-          "value": "(\n        \"journal_entries\".\"media_operation\" is null\n        and \"journal_entries\".\"media_operation_token\" is null\n        and \"journal_entries\".\"media_operation_started_at\" is null\n      ) or (\n        \"journal_entries\".\"media_operation\" in ('poster', 'complete', 'delete', 'cleanup')\n        and \"journal_entries\".\"media_operation_token\" is not null\n        and \"journal_entries\".\"media_operation_started_at\" is not null\n      )"
+          "value": "((\n        \"journal_entries\".\"media_operation\" is null\n        and \"journal_entries\".\"media_operation_token\" is null\n        and \"journal_entries\".\"media_operation_started_at\" is null\n      ) or (\n        \"journal_entries\".\"media_operation\" is not null\n        and \"journal_entries\".\"media_operation\" in ('token', 'poster', 'complete', 'delete', 'cleanup')\n        and \"journal_entries\".\"media_operation_token\" is not null\n        and \"journal_entries\".\"media_operation_started_at\" is not null\n      )) is true"
         }
       },
       "isRLSEnabled": false

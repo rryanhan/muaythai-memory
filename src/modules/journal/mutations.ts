@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { and, eq, lt } from "drizzle-orm";
+import { and, eq, lt, lte, or } from "drizzle-orm";
 import { db } from "@/db/client";
 import { drills, journalEntries, journalMedia } from "@/db/schema";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
@@ -78,6 +78,45 @@ export async function createJournalUploadIntent(
     await db.delete(journalEntries).where(and(eq(journalEntries.id, entryId), eq(journalEntries.userId, userId)));
     throw error;
   }
+}
+
+export async function refreshJournalUploadIntent(
+  userId: string,
+  entryId: string,
+): Promise<JournalUploadIntentResponse> {
+  const claim = await claimUploadToken(userId, entryId);
+
+  let token: string;
+  try {
+    const { data, error } = await createSupabaseAdminClient().storage
+      .from(JOURNAL_MEDIA_BUCKET)
+      .createSignedUploadUrl(claim.current.storagePath, { upsert: false });
+    if (error || !data?.token) throw new Error(error?.message ?? "No upload token returned.");
+    token = data.token;
+  } catch (error) {
+    await releaseOperation(userId, entryId, "token", claim.token);
+    throw error;
+  }
+
+  let finalized: boolean;
+  try {
+    finalized = await finalizeUploadToken(userId, entryId, claim.token);
+  } catch (error) {
+    logStorageCleanupError("Journal upload token database finalize failed.", error);
+    throw new JournalMutationError("Journal upload access could not be refreshed. Try again.", 503);
+  }
+  if (!finalized) {
+    throw new JournalMutationError("Journal upload changed while access was being refreshed.", 409);
+  }
+
+  return {
+    entryId,
+    upload: {
+      endpoint: getResumableStorageEndpoint(),
+      token,
+      path: claim.current.storagePath,
+    },
+  };
 }
 
 export async function completeJournalUpload(userId: string, entryId: string): Promise<JournalEntryDetail> {
@@ -266,13 +305,21 @@ export async function deleteJournalEntry(userId: string, entryId: string): Promi
 
 export async function cleanupAbandonedJournalUploads(now = new Date()): Promise<{ removed: number; failed: number }> {
   const cutoff = new Date(now.getTime() - JOURNAL_ABANDONED_UPLOAD_HOURS * 60 * 60 * 1000);
+  const leaseCutoff = new Date(now.getTime() - JOURNAL_OPERATION_LEASE_MS);
   const rows = await db
     .select({
       id: journalEntries.id,
       userId: journalEntries.userId,
     })
     .from(journalEntries)
-    .where(and(eq(journalEntries.status, "uploading"), lt(journalEntries.createdAt, cutoff)));
+    .where(or(
+      and(eq(journalEntries.status, "uploading"), lt(journalEntries.createdAt, cutoff)),
+      eq(journalEntries.mediaOperation, "cleanup"),
+      and(
+        eq(journalEntries.mediaOperation, "delete"),
+        lte(journalEntries.mediaOperationStartedAt, leaseCutoff),
+      ),
+    ));
   if (rows.length === 0) return { removed: 0, failed: 0 };
 
   const bucket = createSupabaseAdminClient().storage.from(JOURNAL_MEDIA_BUCKET);
@@ -291,13 +338,18 @@ export async function cleanupAbandonedJournalUploads(now = new Date()): Promise<
     );
     if (cleanupError) {
       logStorageCleanupError("Abandoned journal upload Storage cleanup failed.", cleanupError);
-      await releaseOperation(row.userId, row.id, "cleanup", claim.token);
       failed += 1;
       continue;
     }
 
     try {
-      const finalized = await finalizeDeletion(row.userId, row.id, "cleanup", claim.token, "uploading");
+      const finalized = await finalizeDeletion(
+        row.userId,
+        row.id,
+        "cleanup",
+        claim.token,
+        claim.requiredStatus,
+      );
       if (finalized) removed += 1;
     } catch (error) {
       logStorageCleanupError("Abandoned journal upload database deletion failed.", error);
@@ -320,7 +372,8 @@ type JournalTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type JournalStorageBucket = ReturnType<
   ReturnType<typeof createSupabaseAdminClient>["storage"]["from"]
 >;
-type JournalMediaOperation = "poster" | "complete" | "delete" | "cleanup";
+type JournalDatabase = Pick<typeof db, "transaction">;
+type JournalMediaOperation = "token" | "poster" | "complete" | "delete" | "cleanup";
 type LockedJournalUpload = NonNullable<Awaited<ReturnType<typeof getLockedJournalUpload>>>;
 type OperationClaim = {
   current: LockedJournalUpload;
@@ -331,8 +384,12 @@ const JOURNAL_OPERATION_LEASE_MS = 5 * 60 * 1000;
 const JOURNAL_POSTER_OBJECT_NAME =
   /^poster-[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.(?:jpg|webp)$/i;
 
-async function claimPosterSave(userId: string, entryId: string): Promise<OperationClaim> {
-  return db.transaction(async (tx) => {
+export async function claimPosterSave(
+  userId: string,
+  entryId: string,
+  database: JournalDatabase = db,
+): Promise<OperationClaim> {
+  return database.transaction(async (tx) => {
     const current = await getLockedJournalUpload(tx, userId, entryId);
     if (!current) throw new JournalMutationError("Journal entry not found.", 404);
     if (current.status !== "uploading") {
@@ -345,11 +402,12 @@ async function claimPosterSave(userId: string, entryId: string): Promise<Operati
   });
 }
 
-async function claimCompletion(
+export async function claimCompletion(
   userId: string,
   entryId: string,
+  database: JournalDatabase = db,
 ): Promise<{ kind: "ready" } | ({ kind: "claimed" } & OperationClaim)> {
-  return db.transaction(async (tx) => {
+  return database.transaction(async (tx) => {
     const current = await getLockedJournalUpload(tx, userId, entryId);
     if (!current) throw new JournalMutationError("Journal entry not found.", 404);
     if (current.mediaOperation === "delete" || current.mediaOperation === "cleanup") {
@@ -367,8 +425,12 @@ async function claimCompletion(
   });
 }
 
-async function claimDeletion(userId: string, entryId: string): Promise<OperationClaim> {
-  return db.transaction(async (tx) => {
+export async function claimDeletion(
+  userId: string,
+  entryId: string,
+  database: JournalDatabase = db,
+): Promise<OperationClaim> {
+  return database.transaction(async (tx) => {
     const current = await getLockedJournalUpload(tx, userId, entryId);
     if (!current) throw new JournalMutationError("Journal entry not found.", 404);
     return setOperationClaim(tx, current, userId, "delete", new Date());
@@ -380,20 +442,42 @@ async function claimAbandonedCleanup(
   entryId: string,
   cutoff: Date,
   now: Date,
-): Promise<OperationClaim | null> {
+): Promise<(OperationClaim & { requiredStatus?: "uploading" }) | null> {
   return db.transaction(async (tx) => {
     const current = await getLockedJournalUpload(tx, userId, entryId);
-    if (!current || current.status !== "uploading" || current.createdAt >= cutoff) return null;
-    if (current.mediaOperation === "delete") return null;
-    if (
-      current.mediaOperation
-      && current.mediaOperation !== "cleanup"
-      && current.mediaOperationStartedAt
-      && current.mediaOperationStartedAt > new Date(now.getTime() - JOURNAL_OPERATION_LEASE_MS)
-    ) {
-      return null;
+    if (!current) return null;
+    const leaseCutoff = new Date(now.getTime() - JOURNAL_OPERATION_LEASE_MS);
+    const staleDelete = current.mediaOperation === "delete"
+      && Boolean(current.mediaOperationStartedAt && current.mediaOperationStartedAt <= leaseCutoff);
+    const destructiveCleanup = current.mediaOperation === "cleanup";
+    const abandonedUpload = current.status === "uploading" && current.createdAt < cutoff;
+    if (!staleDelete && !destructiveCleanup && !abandonedUpload) return null;
+    if (current.mediaOperation && current.mediaOperation !== "cleanup") {
+      if (!current.mediaOperationStartedAt || current.mediaOperationStartedAt > leaseCutoff) return null;
     }
-    return setOperationClaim(tx, current, userId, "cleanup", now);
+    const claim = await setOperationClaim(tx, current, userId, "cleanup", now);
+    return {
+      ...claim,
+      requiredStatus: staleDelete || destructiveCleanup ? undefined : "uploading",
+    };
+  });
+}
+
+async function claimUploadToken(
+  userId: string,
+  entryId: string,
+  database: JournalDatabase = db,
+): Promise<OperationClaim> {
+  return database.transaction(async (tx) => {
+    const current = await getLockedJournalUpload(tx, userId, entryId);
+    if (!current) throw new JournalMutationError("Journal entry not found.", 404);
+    if (current.status !== "uploading") {
+      throw new JournalMutationError("Journal upload access can only be refreshed while uploading.", 409);
+    }
+    if (current.mediaOperation && current.mediaOperation !== "token") {
+      throw new JournalMutationError("Journal media is already being finalized or removed.", 409);
+    }
+    return setOperationClaim(tx, current, userId, "token", new Date());
   });
 }
 
@@ -419,13 +503,14 @@ async function setOperationClaim(
   return { current, token };
 }
 
-async function finalizePosterSave(
+export async function finalizePosterSave(
   userId: string,
   entryId: string,
   token: string,
   posterPath: string,
+  database: JournalDatabase = db,
 ): Promise<{ previousPosterPath: string | null } | null> {
-  return db.transaction(async (tx) => {
+  return database.transaction(async (tx) => {
     const current = await getLockedJournalUpload(tx, userId, entryId);
     if (
       !current
@@ -446,8 +531,13 @@ async function finalizePosterSave(
   });
 }
 
-async function finalizeReadyUpload(userId: string, entryId: string, token: string): Promise<boolean> {
-  return db.transaction(async (tx) => {
+export async function finalizeReadyUpload(
+  userId: string,
+  entryId: string,
+  token: string,
+  database: JournalDatabase = db,
+): Promise<boolean> {
+  return database.transaction(async (tx) => {
     const current = await getLockedJournalUpload(tx, userId, entryId);
     if (
       !current
@@ -477,14 +567,15 @@ async function finalizeReadyUpload(userId: string, entryId: string, token: strin
   });
 }
 
-async function finalizeDeletion(
+export async function finalizeDeletion(
   userId: string,
   entryId: string,
   operation: "delete" | "cleanup" | "complete",
   token: string,
   requiredStatus?: "uploading",
+  database: JournalDatabase = db,
 ): Promise<boolean> {
-  return db.transaction(async (tx) => {
+  return database.transaction(async (tx) => {
     const current = await getLockedJournalUpload(tx, userId, entryId);
     if (
       !current
@@ -504,6 +595,26 @@ async function finalizeDeletion(
       ))
       .returning({ id: journalEntries.id });
     return Boolean(deleted);
+  });
+}
+
+async function finalizeUploadToken(
+  userId: string,
+  entryId: string,
+  token: string,
+  database: JournalDatabase = db,
+): Promise<boolean> {
+  return database.transaction(async (tx) => {
+    const current = await getLockedJournalUpload(tx, userId, entryId);
+    if (
+      !current
+      || current.status !== "uploading"
+      || !operationMatches(current, "token", token)
+    ) {
+      return false;
+    }
+    await clearOperationClaim(tx, current, userId);
+    return true;
   });
 }
 
