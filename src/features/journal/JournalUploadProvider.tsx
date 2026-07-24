@@ -17,6 +17,8 @@ import {
   completeJournalEntryUpload,
   createJournalUpload,
   deleteJournalEntry,
+  JournalApiError,
+  refreshJournalUpload,
   uploadJournalEntryPoster,
   type JournalUploadIntentResponse,
 } from "@/data";
@@ -146,7 +148,19 @@ export function JournalUploadProvider({ children }: { children: ReactNode }) {
   const discardWork = useCallback(async () => {
     abortRef.current?.abort();
     const stagedEntryId = intentRef.current?.entryId;
-    if (stagedEntryId) await deleteJournalEntry(stagedEntryId).catch(() => undefined);
+    if (stagedEntryId) {
+      try {
+        await deleteJournalEntry(stagedEntryId);
+      } catch (deleteError) {
+        if (!(deleteError instanceof JournalApiError && deleteError.status === 404)) {
+          setPhase("error");
+          setError(deleteError instanceof Error
+            ? deleteError.message
+            : "Journal upload could not be discarded. Try again.");
+          return;
+        }
+      }
+    }
     intentRef.current = null;
     setIntent(null);
     setPhase("idle");
@@ -170,60 +184,108 @@ export function JournalUploadProvider({ children }: { children: ReactNode }) {
     const controller = new AbortController();
     abortRef.current = controller;
     let currentStage: Exclude<FailedStage, null> = "intent";
+    let retryStage = failedStage;
+    let nextIntent = intent;
+    let recreatedMissingIntent = false;
 
     try {
-      let nextIntent = intent;
-      if (!nextIntent || failedStage === "intent") {
-        setPhase("creating");
-        nextIntent = await createJournalUpload({
-          fileName: file.name,
-          mimeType: file.type as "video/mp4" | "video/webm" | "video/quicktime",
-          sizeBytes: file.size,
-          durationMs: draft.durationMs,
-          occurredOn: draft.occurredOn,
-          caption: draft.caption,
-          drillId: draft.drillId || null,
-        }, { requestInit: { signal: controller.signal } });
-        intentRef.current = nextIntent;
-        setIntent(nextIntent);
-      }
+      while (true) {
+        try {
+          if (nextIntent && retryStage === "upload") {
+            currentStage = "upload";
+            setPhase("creating");
+            const refreshedIntent = await refreshJournalUpload(nextIntent.entryId, {
+              requestInit: { signal: controller.signal },
+            });
+            if (refreshedIntent) {
+              nextIntent = refreshedIntent;
+              intentRef.current = refreshedIntent;
+              setIntent(refreshedIntent);
+            } else {
+              nextIntent = null;
+              retryStage = null;
+              intentRef.current = null;
+              setIntent(null);
+              setFailedStage(null);
+              setProgress(0);
+            }
+          }
 
-      if (failedStage !== "complete" && failedStage !== "poster") {
-        currentStage = "upload";
-        setPhase("uploading");
-        await uploadJournalVideo({
-          file,
-          intent: nextIntent,
-          signal: controller.signal,
-          onProgress: setProgress,
-        });
-      }
+          if (!nextIntent || retryStage === "intent") {
+            currentStage = "intent";
+            setPhase("creating");
+            nextIntent = await createJournalUpload({
+              fileName: file.name,
+              mimeType: file.type as "video/mp4" | "video/webm" | "video/quicktime",
+              sizeBytes: file.size,
+              durationMs: draft.durationMs,
+              occurredOn: draft.occurredOn,
+              caption: draft.caption,
+              drillId: draft.drillId || null,
+            }, { requestInit: { signal: controller.signal } });
+            intentRef.current = nextIntent;
+            setIntent(nextIntent);
+          }
 
-      if (failedStage !== "complete") {
-        currentStage = "poster";
-        await uploadJournalEntryPoster(nextIntent.entryId, poster, {
-          requestInit: { signal: controller.signal },
-        });
-      }
+          if (retryStage !== "complete" && retryStage !== "poster") {
+            currentStage = "upload";
+            setPhase("uploading");
+            await uploadJournalVideo({
+              file,
+              intent: nextIntent,
+              signal: controller.signal,
+              onProgress: setProgress,
+            });
+          }
 
-      setProgress(100);
-      currentStage = "complete";
-      setPhase("completing");
-      const entry = await completeJournalEntryUpload(nextIntent.entryId, {
-        requestInit: { signal: controller.signal },
-      });
-      intentRef.current = null;
-      setIntent(null);
-      setFailedStage(null);
-      setCompletedEntryId(entry.id);
-      setPhase("ready");
-      resetDraft();
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["journal"] }),
-        queryClient.invalidateQueries({ queryKey: ["drills"] }),
-        queryClient.invalidateQueries({ queryKey: ["drill-journal"] }),
-      ]);
-      if (pathnameRef.current === "/journal/new") router.replace(`/journal/${entry.id}`);
+          if (retryStage !== "complete") {
+            currentStage = "poster";
+            await uploadJournalEntryPoster(nextIntent.entryId, poster, {
+              requestInit: { signal: controller.signal },
+            });
+          }
+
+          setProgress(100);
+          currentStage = "complete";
+          setPhase("completing");
+          const entry = await completeJournalEntryUpload(nextIntent.entryId, {
+            requestInit: { signal: controller.signal },
+          });
+          intentRef.current = null;
+          setIntent(null);
+          setFailedStage(null);
+          setCompletedEntryId(entry.id);
+          setPhase("ready");
+          resetDraft();
+          await Promise.all([
+            queryClient.invalidateQueries({ queryKey: ["journal"] }),
+            queryClient.invalidateQueries({ queryKey: ["drills"] }),
+            queryClient.invalidateQueries({ queryKey: ["drill-journal"] }),
+          ]);
+          if (pathnameRef.current === "/journal/new") router.replace(`/journal/${entry.id}`);
+          return;
+        } catch (uploadError) {
+          if (
+            !recreatedMissingIntent
+            && (
+              (retryStage === "complete" && currentStage === "complete")
+              || (retryStage === "poster" && currentStage === "poster")
+            )
+            && uploadError instanceof JournalApiError
+            && uploadError.status === 404
+          ) {
+            recreatedMissingIntent = true;
+            retryStage = null;
+            nextIntent = null;
+            intentRef.current = null;
+            setIntent(null);
+            setFailedStage(null);
+            setProgress(0);
+            continue;
+          }
+          throw uploadError;
+        }
+      }
     } catch (uploadError) {
       if (uploadError instanceof DOMException && uploadError.name === "AbortError") return;
       setFailedStage(currentStage);

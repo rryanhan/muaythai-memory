@@ -71,6 +71,13 @@
       "when": 1784842676746,
       "tag": "0009_stabilize_first_drill_onboarding",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1784845893754,
+      "tag": "0010_journal_media_operation_claims",
+      "breakpoints": true
     }
   ]
 }
