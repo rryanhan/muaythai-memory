@@ -9,7 +9,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "lint": "next lint",
+    "lint": "eslint .",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "db:describe": "python3 scripts/check_db_connection.py --env DATABASE_POOLER_URL --describe",

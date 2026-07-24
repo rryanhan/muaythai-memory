@@ -3,7 +3,7 @@ import { safeInternalPath } from "@/lib/safe-internal-path";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { setRecoveryIntentCookie } from "@/modules/auth/recovery-cookies";
 import {
-  getPublicRequestOrigin,
+  getCanonicalAppOrigin,
   isSameOriginRequest,
 } from "@/modules/auth/request-origin";
 import {
@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
   }
 
   const { state, token } = createRecoveryIntent(email, { secret: getAuthFlowSecret() });
-  const confirmationUrl = new URL("/auth/confirm", getPublicRequestOrigin(request));
+  const confirmationUrl = new URL("/auth/confirm", getCanonicalAppOrigin(request));
   confirmationUrl.searchParams.set("flow", "recovery");
   confirmationUrl.searchParams.set("state", state);
   confirmationUrl.searchParams.set("next", nextPath);

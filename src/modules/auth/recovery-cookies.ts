@@ -1,4 +1,5 @@
 import type { NextRequest, NextResponse } from "next/server";
+import { getCanonicalAppOrigin } from "./request-origin";
 
 export const RECOVERY_INTENT_COOKIE = "mtm-recovery-intent";
 export const RECOVERY_GRANT_COOKIE = "mtm-recovery-grant";
@@ -77,6 +78,5 @@ function isSupabaseAuthCookie(name: string): boolean {
 }
 
 function isSecureRequest(request: NextRequest): boolean {
-  const forwardedProtocol = request.headers.get("x-forwarded-proto")?.split(",")[0]?.trim();
-  return forwardedProtocol === "https" || request.nextUrl.protocol === "https:";
+  return new URL(getCanonicalAppOrigin(request)).protocol === "https:";
 }

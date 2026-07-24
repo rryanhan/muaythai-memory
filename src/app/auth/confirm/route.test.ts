@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { RECOVERY_GRANT_COOKIE } from "@/modules/auth/recovery-cookies";
 
 const mocks = vi.hoisted(() => ({
@@ -41,6 +41,9 @@ const USER_ID = "00000000-0000-4000-8000-000000000001";
 describe("GET /auth/confirm", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.stubEnv("NEXT_PUBLIC_APP_URL", "https://staging.example.com");
+    vi.stubEnv("VERCEL_ENV", "production");
+    vi.stubEnv("VERCEL_TARGET_ENV", "production");
     mocks.createSupabaseServerClient.mockResolvedValue({
       auth: {
         exchangeCodeForSession: mocks.exchangeCodeForSession,
@@ -70,6 +73,10 @@ describe("GET /auth/confirm", () => {
     mocks.signOut.mockResolvedValue({ error: null });
   });
 
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   it("mints a grant only after an actual recovery exchange and durable insert", async () => {
     const response = await GET(recoveryRequest());
 
@@ -84,6 +91,27 @@ describe("GET /auth/confirm", () => {
       userId: USER_ID,
     });
     expect(response.cookies.get(RECOVERY_GRANT_COOKIE)?.value).toBe("signed-grant");
+  });
+
+  it("returns a preview callback to the same trusted host with a host-only grant", async () => {
+    vi.stubEnv("VERCEL_BRANCH_URL", "muaythai-git-feature.vercel.app");
+    vi.stubEnv("VERCEL_ENV", "preview");
+    vi.stubEnv("VERCEL_TARGET_ENV", "preview");
+    vi.stubEnv("VERCEL_URL", "muaythai-a1b2c3.vercel.app");
+
+    const response = await GET(
+      recoveryRequest("https://muaythai-git-feature.vercel.app"),
+    );
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get("location")).toBe(
+      "https://muaythai-git-feature.vercel.app"
+        + "/auth/reset-password?next=%2Fdrills",
+    );
+    const setCookie = response.headers.get("set-cookie") ?? "";
+    expect(setCookie).toContain(`${RECOVERY_GRANT_COOKIE}=signed-grant`);
+    expect(setCookie).toContain("Secure");
+    expect(setCookie).not.toMatch(/domain=/i);
   });
 
   it("rejects a successful PKCE exchange whose redirect type is not recovery", async () => {
@@ -155,13 +183,15 @@ describe("GET /auth/confirm", () => {
   });
 });
 
-function recoveryRequest(): NextRequest {
+function recoveryRequest(origin = "http://internal:3000"): NextRequest {
   return new NextRequest(
-    "https://staging.example.com/auth/confirm"
+    `${origin}/auth/confirm`
       + "?flow=recovery&state=browser-state&code=pkce-code&next=%2Fdrills",
     {
       headers: {
         cookie: "mtm-recovery-intent=signed-intent",
+        "x-forwarded-host": "attacker.example",
+        "x-forwarded-proto": "http",
       },
     },
   );
