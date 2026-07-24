@@ -13,12 +13,13 @@ type UploadRow = {
   sizeBytes: number;
   status: string;
   storagePath: string;
+  updatedAt: Date;
   userId: string;
 };
 
 const mocks = vi.hoisted(() => ({
   activeTransactions: 0,
-  afterAbandonedScan: null as (() => void) | null,
+  afterAbandonedScan: null as (() => void | Promise<void>) | null,
   bucketCreateSignedUploadUrl: vi.fn(),
   bucketInfo: vi.fn(),
   bucketList: vi.fn(),
@@ -174,7 +175,7 @@ beforeEach(() => {
         : [];
       const afterScan = mocks.afterAbandonedScan;
       mocks.afterAbandonedScan = null;
-      afterScan?.();
+      await afterScan?.();
       return rows;
     });
     return builder;
@@ -435,23 +436,69 @@ describe("journal media operation claims", () => {
     expect(mocks.objects).toEqual([]);
   });
 
-  it("releases a failed delete claim so cancellation can retry the same entry", async () => {
+  it("keeps a failed delete hidden until cleanup can recover it", async () => {
     mocks.removeFailures = 1;
 
     await expect(deleteJournalEntry("user", "entry"))
       .rejects.toThrow(/could not be removed.*Try again/);
     expect(mocks.row).toMatchObject({
-      mediaOperation: null,
-      status: "uploading",
+      mediaOperation: "delete",
+      status: "deleted",
     });
     expect(mocks.objects).toEqual(["user/entry/video.mp4", oldPosterPath]);
 
     await expect(deleteJournalEntry("user", "entry")).resolves.toBe("entry");
     expect(mocks.row).toMatchObject({
-      mediaOperation: null,
+      mediaOperation: "delete",
       status: "deleted",
     });
-    expect(mocks.objects).toEqual([]);
+    expect(mocks.objects).toEqual(["user/entry/video.mp4", oldPosterPath]);
+  });
+
+  it("retains a hidden recoverable tombstone when known paths are removed despite a listing failure", async () => {
+    const now = new Date("2026-07-23T12:00:00Z");
+    vi.useFakeTimers();
+    vi.setSystemTime(now);
+    mocks.bucketList.mockResolvedValueOnce({
+      data: null,
+      error: { message: "Storage unavailable", status: 503, statusCode: "503" },
+    });
+
+    try {
+      await expect(deleteJournalEntry("user", "entry"))
+        .rejects.toThrow(/could not be removed.*Try again/);
+      expect(mocks.bucketRemove).toHaveBeenCalledWith([
+        "user/entry/video.mp4",
+        oldPosterPath,
+      ]);
+      expect(mocks.objects).toEqual([]);
+      expect(mocks.row).toMatchObject({
+        deletedAt: now,
+        mediaOperation: "delete",
+        status: "deleted",
+      });
+
+      await expect(deleteJournalEntry("user", "entry")).resolves.toBe("entry");
+      await expect(cleanupAbandonedJournalUploads(new Date("2026-07-23T12:04:59.999Z")))
+        .resolves.toEqual({ removed: 0, failed: 0 });
+      expect(mocks.row).toMatchObject({
+        mediaOperation: "delete",
+        status: "deleted",
+      });
+
+      await expect(cleanupAbandonedJournalUploads(new Date("2026-07-23T12:05:00Z")))
+        .resolves.toEqual({ removed: 0, failed: 0 });
+      expect(mocks.row).toMatchObject({
+        mediaOperation: null,
+        status: "deleted",
+      });
+
+      await expect(cleanupAbandonedJournalUploads(new Date("2026-07-23T15:05:00Z")))
+        .resolves.toEqual({ removed: 1, failed: 0 });
+      expect(mocks.row).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("keeps a delete claim after database failure and accepts an immediate cancellation retry", async () => {
@@ -655,6 +702,32 @@ describe("journal media operation claims", () => {
 });
 
 describe("cleanupAbandonedJournalUploads", () => {
+  it("does not claim an aged upload refreshed after the abandoned scan", async () => {
+    const now = new Date("2026-07-23T12:00:00Z");
+    vi.useFakeTimers();
+    vi.setSystemTime(now);
+    mocks.afterAbandonedScan = async () => {
+      await refreshJournalUploadIntent("user", "entry");
+    };
+
+    try {
+      await expect(cleanupAbandonedJournalUploads(now))
+        .resolves.toEqual({ removed: 0, failed: 0 });
+
+      expect(mocks.bucketCreateSignedUploadUrl).toHaveBeenCalledOnce();
+      expect(mocks.row).toMatchObject({
+        mediaOperation: null,
+        status: "uploading",
+        updatedAt: now,
+      });
+      expect(mocks.bucketList).not.toHaveBeenCalled();
+      expect(mocks.bucketRemove).not.toHaveBeenCalled();
+      expect(mocks.objects).toEqual(["user/entry/video.mp4", oldPosterPath]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("counts a claim failure and continues cleaning later rows", async () => {
     mocks.selectAbandonedRows.mockImplementationOnce(() => {
       const builder = chainBuilder();
@@ -1015,6 +1088,7 @@ function uploadRow(): UploadRow {
     sizeBytes: 10,
     status: "uploading",
     storagePath: "user/entry/video.mp4",
+    updatedAt: new Date("2026-07-22T00:00:00Z"),
     userId: "user",
   };
 }
