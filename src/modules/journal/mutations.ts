@@ -280,7 +280,19 @@ export async function updateJournalEntry(
 }
 
 export async function deleteJournalEntry(userId: string, entryId: string): Promise<string> {
-  const claim = await claimDeletion(userId, entryId);
+  let claim: OperationClaim;
+  try {
+    claim = await claimDeletion(userId, entryId);
+  } catch (error) {
+    if (
+      error instanceof JournalMutationError
+      && error.status === 404
+      && (await getOwnedJournalRow(userId, entryId))?.status === "deleted"
+    ) {
+      return entryId;
+    }
+    throw error;
+  }
   const bucket = createSupabaseAdminClient().storage.from(JOURNAL_MEDIA_BUCKET);
   const cleanupError = await removeJournalEntryStorageObjects(
     bucket,
@@ -290,7 +302,11 @@ export async function deleteJournalEntry(userId: string, entryId: string): Promi
   );
   if (cleanupError) {
     logStorageCleanupError("Journal entry Storage cleanup failed.", cleanupError);
-    await releaseOperation(userId, entryId, "delete", claim.token);
+    try {
+      await retainDeletionTombstone(userId, entryId, claim.token);
+    } catch (error) {
+      logStorageCleanupError("Journal deletion tombstone could not be retained.", error);
+    }
     throw new JournalMutationError("Journal video could not be removed. Try again.", 503);
   }
 
@@ -318,7 +334,7 @@ export async function cleanupAbandonedJournalUploads(now = new Date()): Promise<
     })
     .from(journalEntries)
     .where(or(
-      and(eq(journalEntries.status, "uploading"), lt(journalEntries.createdAt, cutoff)),
+      and(eq(journalEntries.status, "uploading"), lt(journalEntries.updatedAt, cutoff)),
       eq(journalEntries.mediaOperation, "cleanup"),
       and(
         eq(journalEntries.mediaOperation, "delete"),
@@ -477,7 +493,7 @@ async function claimAbandonedCleanup(
     const staleDelete = current.mediaOperation === "delete"
       && Boolean(current.mediaOperationStartedAt && current.mediaOperationStartedAt <= leaseCutoff);
     const destructiveCleanup = current.mediaOperation === "cleanup";
-    const abandonedUpload = current.status === "uploading" && current.createdAt < cutoff;
+    const abandonedUpload = current.status === "uploading" && current.updatedAt < cutoff;
     const expiredTombstone = current.status === "deleted"
       && Boolean(current.deletedAt && current.deletedAt <= tombstoneCutoff);
     if (!staleDelete && !destructiveCleanup && !abandonedUpload && !expiredTombstone) return null;
@@ -544,7 +560,7 @@ async function setOperationClaim(
       mediaOperationStartedAt: startedAt,
       status: tombstoneAt ? "deleted" : current.status,
       deletedAt: tombstoneAt ?? current.deletedAt,
-      updatedAt: startedAt,
+      updatedAt: operation === "cleanup" && !tombstoneAt ? current.updatedAt : startedAt,
     })
     .where(and(eq(journalEntries.id, current.id), eq(journalEntries.userId, userId)))
     .returning({ id: journalEntries.id });
@@ -685,6 +701,37 @@ async function finalizeDeletionTombstone(
   });
 }
 
+async function retainDeletionTombstone(
+  userId: string,
+  entryId: string,
+  token: string,
+  database: JournalDatabase = db,
+): Promise<void> {
+  await database.transaction(async (tx) => {
+    const current = await getLockedJournalUpload(tx, userId, entryId);
+    if (!current || !operationMatches(current, "delete", token)) return;
+
+    const deletedAt = new Date();
+    const [updated] = await tx
+      .update(journalEntries)
+      .set({
+        status: "deleted",
+        deletedAt,
+        updatedAt: deletedAt,
+      })
+      .where(and(
+        eq(journalEntries.id, entryId),
+        eq(journalEntries.userId, userId),
+        eq(journalEntries.mediaOperation, "delete"),
+        eq(journalEntries.mediaOperationToken, token),
+      ))
+      .returning({ id: journalEntries.id });
+    if (!updated) {
+      throw new JournalMutationError("Journal deletion ownership was lost.", 409);
+    }
+  });
+}
+
 async function finalizeUploadToken(
   userId: string,
   entryId: string,
@@ -812,7 +859,7 @@ async function getLockedJournalUpload(
     .select({
       id: journalEntries.id,
       status: journalEntries.status,
-      createdAt: journalEntries.createdAt,
+      updatedAt: journalEntries.updatedAt,
       deletedAt: journalEntries.deletedAt,
       mediaOperation: journalEntries.mediaOperation,
       mediaOperationToken: journalEntries.mediaOperationToken,
