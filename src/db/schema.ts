@@ -46,6 +46,125 @@ export const users = pgTable(
   }),
 );
 
+// Friendships use one canonical row per unordered user pair. requestedById
+// preserves request direction while userOneId/userTwoId prevent duplicate
+// reverse requests under concurrent writes.
+export const friendships = pgTable(
+  "friendships",
+  {
+    userOneId: uuid("user_one_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    userTwoId: uuid("user_two_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    requestedById: uuid("requested_by_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    status: varchar("status", { length: 16 }).notNull().default("pending"),
+    respondedAt: timestamp("responded_at", { withTimezone: true }),
+    ...timestamps,
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.userOneId, table.userTwoId] }),
+    userTwoIdx: index("friendships_user_two_id_idx").on(table.userTwoId),
+    requestedByIdx: index("friendships_requested_by_id_idx").on(table.requestedById),
+    statusIdx: index("friendships_status_idx").on(table.status),
+    orderedPairCheck: check(
+      "friendships_ordered_pair_check",
+      sql`${table.userOneId} < ${table.userTwoId}`,
+    ),
+    requesterMemberCheck: check(
+      "friendships_requester_member_check",
+      sql`${table.requestedById} = ${table.userOneId} or ${table.requestedById} = ${table.userTwoId}`,
+    ),
+    statusCheck: check(
+      "friendships_status_check",
+      sql`${table.status} in ('pending', 'accepted')`,
+    ),
+    responseStateCheck: check(
+      "friendships_response_state_check",
+      sql`(
+        (${table.status} = 'pending' and ${table.respondedAt} is null)
+        or (${table.status} = 'accepted' and ${table.respondedAt} is not null)
+      )`,
+    ),
+  }),
+);
+
+// Blocking is directional and deliberately separate from friendship state.
+// A block mutation removes any friendship row for the pair in the same
+// transaction, while this table records who controls a later unblock.
+export const userBlocks = pgTable(
+  "user_blocks",
+  {
+    blockerId: uuid("blocker_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    blockedId: uuid("blocked_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.blockerId, table.blockedId] }),
+    blockedIdx: index("user_blocks_blocked_id_idx").on(table.blockedId),
+    differentUsersCheck: check(
+      "user_blocks_different_users_check",
+      sql`${table.blockerId} <> ${table.blockedId}`,
+    ),
+  }),
+);
+
+// Reports are server-only moderation records. They remain available after a
+// relationship or block changes so safety review never depends on live social
+// state.
+export const friendReports = pgTable(
+  "friend_reports",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    reporterId: uuid("reporter_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    reportedId: uuid("reported_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    reason: varchar("reason", { length: 32 }).notNull(),
+    details: text("details"),
+    ...timestamps,
+  },
+  (table) => ({
+    reporterCreatedIdx: index("friend_reports_reporter_created_idx").on(
+      table.reporterId,
+      table.createdAt,
+    ),
+    reportedCreatedIdx: index("friend_reports_reported_created_idx").on(
+      table.reportedId,
+      table.createdAt,
+    ),
+    differentUsersCheck: check(
+      "friend_reports_different_users_check",
+      sql`${table.reporterId} <> ${table.reportedId}`,
+    ),
+    reasonCheck: check(
+      "friend_reports_reason_check",
+      sql`${table.reason} in ('spam', 'harassment', 'impersonation', 'unsafe-content', 'other')`,
+    ),
+  }),
+);
+
+// Fixed-window counters live in Postgres so limits remain effective across
+// serverless instances. Old buckets contain no user content and can be pruned
+// later without changing product state.
+export const friendRateLimits = pgTable(
+  "friend_rate_limits",
+  {
+    userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    action: varchar("action", { length: 32 }).notNull(),
+    windowStart: timestamp("window_start", { withTimezone: true }).notNull(),
+    requestCount: integer("request_count").notNull().default(1),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.userId, table.action, table.windowStart] }),
+    windowIdx: index("friend_rate_limits_window_idx").on(table.windowStart),
+    actionCheck: check(
+      "friend_rate_limits_action_check",
+      sql`${table.action} in ('search', 'request', 'report')`,
+    ),
+    countCheck: check(
+      "friend_rate_limits_count_check",
+      sql`${table.requestCount} > 0`,
+    ),
+  }),
+);
+
 // Recovery grants are short-lived server-only capabilities. The database stores
 // only keyed hashes/fingerprints; the signed browser grant carries the random
 // jti. State and attempt counters bridge the non-atomic boundary between
@@ -290,6 +409,24 @@ export const drillStatusTags = pgTable(
   }),
 );
 
+// A share grants one accepted friend read-only access to one drill. It does
+// not expose the owner's Library, Saved Lists, journal media, or edit routes.
+export const drillShares = pgTable(
+  "drill_shares",
+  {
+    drillId: uuid("drill_id").notNull().references(() => drills.id, { onDelete: "cascade" }),
+    recipientUserId: uuid("recipient_user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.drillId, table.recipientUserId] }),
+    recipientCreatedIdx: index("drill_shares_recipient_created_idx").on(
+      table.recipientUserId,
+      table.createdAt,
+    ),
+  }),
+);
+
 // Journal entries are private training records. Uploads begin in a staging
 // state and become visible only after their Storage object is confirmed.
 export const journalEntries = pgTable(
@@ -361,6 +498,14 @@ export const journalMedia = pgTable(
 
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
+export type Friendship = typeof friendships.$inferSelect;
+export type NewFriendship = typeof friendships.$inferInsert;
+export type UserBlock = typeof userBlocks.$inferSelect;
+export type NewUserBlock = typeof userBlocks.$inferInsert;
+export type FriendReport = typeof friendReports.$inferSelect;
+export type NewFriendReport = typeof friendReports.$inferInsert;
+export type FriendRateLimit = typeof friendRateLimits.$inferSelect;
+export type NewFriendRateLimit = typeof friendRateLimits.$inferInsert;
 export type AuthRecoveryGrant = typeof authRecoveryGrants.$inferSelect;
 export type NewAuthRecoveryGrant = typeof authRecoveryGrants.$inferInsert;
 export type Drill = typeof drills.$inferSelect;
@@ -368,6 +513,8 @@ export type NewDrill = typeof drills.$inferInsert;
 export type TrainingMethod = typeof trainingMethods.$inferSelect;
 export type Tag = typeof tags.$inferSelect;
 export type StatusTag = typeof statusTags.$inferSelect;
+export type DrillShare = typeof drillShares.$inferSelect;
+export type NewDrillShare = typeof drillShares.$inferInsert;
 export type JournalEntry = typeof journalEntries.$inferSelect;
 export type NewJournalEntry = typeof journalEntries.$inferInsert;
 export type JournalMedia = typeof journalMedia.$inferSelect;

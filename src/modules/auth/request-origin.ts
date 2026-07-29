@@ -18,15 +18,15 @@ export function getCanonicalAppOrigin(
     return selectPreviewOrigin(request, previewOrigins);
   }
 
-  const configuredUrl = environment.NEXT_PUBLIC_APP_URL?.trim();
-  if (configuredUrl) return parseConfiguredAppOrigin(configuredUrl);
-
   if (
     environment.NODE_ENV === "development"
     && isLoopbackUrl(request.nextUrl)
   ) {
     return request.nextUrl.origin;
   }
+
+  const configuredUrl = environment.NEXT_PUBLIC_APP_URL?.trim();
+  if (configuredUrl) return parseConfiguredAppOrigin(configuredUrl);
 
   throw new Error(
     "NEXT_PUBLIC_APP_URL is required outside local loopback development.",

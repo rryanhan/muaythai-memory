@@ -230,6 +230,26 @@ with `ffmpeg` installed.
 Supabase Storage is the object store for both avatars and journal media; an AWS
 S3 bucket is not required.
 
+### friends
+
+Owns:
+
+- Exact-username discovery plus copied profile links and QR invites.
+- Pending and accepted friendship state, including sender cancellation.
+- Cursor-paginated friend, request, and block lists.
+- Friend removal, directional blocking, and a basic report path.
+- Database-backed search, request, and report limits plus an outgoing-request cap.
+- Compact profiles with accepted-friend training totals.
+- Explicit, read-only sharing of individual Drills with accepted friends.
+
+Discovery and limited profiles return only username and avatar. Email, private
+names, location, journal metadata, and graph data remain inaccessible. Accepted
+friends additionally receive aggregate Drill and Training Method counts.
+Individual Drills stay private unless their owner creates a `drill_shares`
+grant; those responses omit Saved Lists and Journal media and are revoked on
+unfriend or block. A future friends-only Journal option must separately
+authorize every metadata and signed-media request.
+
 ## Database Approach
 
 Use Postgres as the source of truth.
@@ -249,6 +269,11 @@ status_tags
 drill_status_tags
 journal_entries
 journal_media
+friendships
+user_blocks
+friend_reports
+friend_rate_limits
+drill_shares
 ```
 
 Later tables, only if durable capture history or background processing is introduced:
@@ -670,7 +695,17 @@ If a save fails, revert and show a clear message.
 - Add optional linked drill.
 - Add private, signed, resumable video uploads.
 
-### Phase 5: Workouts
+### Phase 5: Friends
+
+- Add exact-username discovery, profile links, and QR invites.
+- Add requests, sender cancellation, acceptance, removal, blocking, reports,
+  and unblock management.
+- Add cursor pagination, rate limits, and an outgoing-request cap.
+- Expose compact training totals only to accepted friends.
+- Add explicit, read-only sharing for individual Drills.
+- Keep Journal entries and graph data private; do not add a generic feed.
+
+### Phase 6: Workouts
 
 - Add workout schema.
 - Add exercise graph.

@@ -10,17 +10,22 @@ const REQUIRED_DATABASE_ROLES = [...API_ROLES, "postgres"] as const;
 const EXPECTED_PUBLIC_TABLES = [
   "auth_recovery_grants",
   "drill_creation_keys",
+  "drill_shares",
   "drill_status_tags",
   "drill_steps",
   "drill_tags",
   "drill_training_methods",
   "drills",
+  "friend_rate_limits",
+  "friend_reports",
+  "friendships",
   "journal_entries",
   "journal_media",
   "status_tags",
   "tag_categories",
   "tags",
   "training_methods",
+  "user_blocks",
   "users",
 ] as const;
 

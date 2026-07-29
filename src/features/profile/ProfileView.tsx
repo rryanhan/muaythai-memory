@@ -7,11 +7,14 @@ import { Play } from "@phosphor-icons/react/Play";
 import { Plus } from "@phosphor-icons/react/Plus";
 import { Star } from "@phosphor-icons/react/Star";
 import { Target } from "@phosphor-icons/react/Target";
+import { UsersThree } from "@phosphor-icons/react/UsersThree";
 import { VideoCamera } from "@phosphor-icons/react/VideoCamera";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { badgeByIconKey } from "@/components/shared/context-badges";
+import { DecodedImage } from "@/components/shared/DecodedImage";
 import {
   getDrills,
+  getFriendsSummary,
   getJournalEntries,
   type DrillFilterInput,
   type JournalEntrySummary,
@@ -51,6 +54,11 @@ export function ProfileView({ currentUser }: ProfileViewProps) {
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
     staleTime: 60 * 1000,
   });
+  const friendsQuery = useQuery({
+    queryKey: ["friends", "summary"],
+    queryFn: ({ signal }) => getFriendsSummary({ requestInit: { signal } }),
+    staleTime: 30 * 1000,
+  });
   const drills = drillsQuery.data?.drills ?? [];
   const favourites = filterDrillsByStatus(drills, "starred");
   const drillBackIn = filterDrillsByStatus(drills, "drill-back-in");
@@ -76,6 +84,29 @@ export function ProfileView({ currentUser }: ProfileViewProps) {
           Couldn’t load profile entries. Retry
         </button>
       )}
+
+      <Link
+        className={styles.friendsLink}
+        href="/friends"
+        prefetch
+        aria-label={friendsQuery.isError
+          ? "Friends unavailable. Open to retry."
+          : undefined}
+      >
+        <UsersThree size={20} weight="regular" aria-hidden="true" />
+        <span>Friends</span>
+        <strong>{friendsQuery.data?.counts.friends ?? "–"}</strong>
+        {friendsQuery.isError ? (
+          <small>Unavailable</small>
+        ) : (friendsQuery.data?.counts.incoming ?? 0) > 0 && (
+          <small
+            className={styles.friendRequestBadge}
+            aria-label={`${friendsQuery.data?.counts.incoming} pending friend requests`}
+          >
+            {friendsQuery.data?.counts.incoming}
+          </small>
+        )}
+      </Link>
 
       <nav className={styles.savedRail} aria-label="Saved drill lists">
         <SavedListLink
@@ -209,16 +240,17 @@ function JournalEntryRow({
       onTouchStart={prefetch}
     >
       <span className={styles.videoTile} aria-hidden="true">
-        {entry.posterUrl ? (
-          <img
+        <span className={styles.videoFallback}>
+          <VideoCamera size={20} weight="regular" />
+        </span>
+        {entry.posterUrl && (
+          <DecodedImage
             src={entry.posterUrl}
             alt=""
             loading={eager ? "eager" : "lazy"}
             fetchPriority={priority ? "high" : "auto"}
             decoding="async"
           />
-        ) : (
-          <span className={styles.videoFallback}><VideoCamera size={20} weight="regular" /></span>
         )}
         <Play className={styles.videoPlay} size={16} weight="fill" />
         {entry.durationMs !== null && <small>{formatDuration(entry.durationMs)}</small>}

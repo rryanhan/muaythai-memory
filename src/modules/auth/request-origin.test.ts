@@ -148,6 +148,10 @@ describe("auth request origin", () => {
     expect(getCanonicalAppOrigin(localRequest, {
       NODE_ENV: "development",
     })).toBe("http://localhost:3000");
+    expect(getCanonicalAppOrigin(localRequest, {
+      NEXT_PUBLIC_APP_URL: "https://staging.example.com",
+      NODE_ENV: "development",
+    })).toBe("http://localhost:3000");
     expect(isSameOriginRequest(localRequest, {
       NODE_ENV: "development",
     })).toBe(true);

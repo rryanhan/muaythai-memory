@@ -1,0 +1,927 @@
+.page {
+  position: relative;
+  min-height: 100dvh;
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 22px 20px 118px;
+  overflow-x: hidden;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.page > *:not(:global(.notebook-grid)):not(:global(.bottom-nav)) {
+  position: relative;
+  z-index: 1;
+}
+
+.routeHeader {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 24px;
+}
+
+.back {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border: 0;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.42);
+  color: var(--text);
+  font-size: 28px;
+  line-height: 1;
+  text-decoration: none;
+}
+
+.back:focus-visible,
+.friendIdentityLink:focus-visible,
+.searchResultAction a:focus-visible,
+.blockedSection summary:focus-visible {
+  outline: 1px solid rgba(209, 74, 50, 0.5);
+  outline-offset: 3px;
+}
+
+.heading {
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--border);
+}
+
+.heading h1,
+.heading p,
+.fighterHero h1,
+.fighterHero p {
+  margin: 0;
+}
+
+.heading h1 {
+  font-size: 36px;
+  line-height: 0.98;
+}
+
+.heading p {
+  margin-top: 7px;
+  color: var(--muted);
+  font-size: 16px;
+}
+
+.shareProfile {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0 12px;
+  background: rgba(255, 255, 255, 0.5);
+  color: var(--accent);
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.shareProfile:focus-visible,
+.sectionRetry:focus-visible,
+.loadMore:focus-visible,
+.moreTrigger:focus-visible,
+.moreActions button:focus-visible,
+.reportSheet button:focus-visible,
+.reportSheet textarea:focus-visible,
+.reportReasons input:focus-visible + span {
+  outline: 2px solid rgba(209, 74, 50, 0.52);
+  outline-offset: 2px;
+}
+
+.shareStatus,
+.profileStatus {
+  margin: 9px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.searchSection,
+.section,
+.sharedSection,
+.friendStats,
+.privateNotice {
+  padding: 20px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.sharedRows {
+  margin-top: 10px;
+  border-top: 1px dashed var(--border);
+}
+
+.sharedRows > a {
+  display: grid;
+  min-height: 62px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 11px;
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+  text-decoration: none;
+}
+
+.sharedRows > a:focus-visible {
+  outline: 2px solid rgba(209, 74, 50, 0.52);
+  outline-offset: 2px;
+}
+
+.sharedRows > a > span {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.sharedRows strong,
+.sharedRows small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sharedRows strong {
+  font-size: 15px;
+}
+
+.sharedRows small {
+  color: var(--accent);
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.sharedRows svg {
+  color: var(--muted);
+}
+
+.sharedAvatar {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  overflow: hidden;
+  place-items: center;
+  border: 1px solid var(--accent);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.sectionHeading {
+  display: flex;
+  min-height: 20px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.sectionHeading p {
+  margin: 0;
+}
+
+.sectionHeading > span,
+.blockedSection summary span {
+  min-width: 22px;
+  color: var(--accent);
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: right;
+}
+
+.searchForm {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 48px;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.searchForm input {
+  min-width: 0;
+  min-height: 48px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0 14px;
+  background: rgba(255, 255, 255, 0.62);
+  color: var(--text);
+  font: inherit;
+}
+
+.searchForm button,
+.iconAction {
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--accent);
+}
+
+.searchForm button:disabled,
+.iconAction:disabled,
+.textAction:disabled,
+.profileActions button:disabled,
+.searchResultAction button:disabled {
+  cursor: progress;
+  opacity: 0.48;
+}
+
+.searchForm input:focus-visible,
+.searchForm button:focus-visible,
+.iconAction:focus-visible,
+.textAction:focus-visible,
+.profileActions button:focus-visible,
+.searchResultAction button:focus-visible,
+.drawerActions button:focus-visible {
+  outline: 2px solid rgba(209, 74, 50, 0.52);
+  outline-offset: 2px;
+}
+
+.status,
+.empty,
+.error,
+.actionError,
+.retry {
+  margin: 12px 0 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.sectionRetry,
+.loadMore {
+  width: 100%;
+  min-height: 44px;
+  margin-top: 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.42);
+  color: var(--muted);
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.sectionRetry {
+  color: var(--accent);
+}
+
+.error,
+.actionError {
+  color: var(--accent);
+}
+
+.actionError {
+  position: fixed;
+  right: 12px;
+  bottom: calc(var(--nav-height) + 12px);
+  left: 12px;
+  z-index: 9;
+  max-width: 456px;
+  margin: 0 auto;
+  border: 1px solid rgba(209, 74, 50, 0.42);
+  border-radius: 6px;
+  padding: 10px 12px;
+  background: var(--surface);
+  box-shadow: 0 8px 24px rgba(36, 39, 41, 0.12);
+}
+
+.retry {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+  background: var(--surface);
+}
+
+.searchResult {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 14px;
+  border-top: 1px dashed var(--border);
+  padding-top: 14px;
+}
+
+.searchResultAction,
+.rowActions,
+.profileActions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.moreTrigger {
+  width: 44px;
+  padding: 0 !important;
+  background: transparent !important;
+  color: var(--muted) !important;
+}
+
+.profileStatus {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+  text-align: center;
+}
+
+.searchResultAction button,
+.searchResultAction a,
+.profileActions button {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 11px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.searchResultAction button:first-child,
+.profileActions button:first-child {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--bg);
+}
+
+.rows {
+  margin-top: 10px;
+  border-top: 1px dashed var(--border);
+}
+
+.friendRow {
+  display: flex;
+  min-width: 0;
+  min-height: 62px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border-bottom: 1px solid var(--border);
+  padding: 8px 0;
+}
+
+.friendIdentityLink {
+  display: flex;
+  min-width: 0;
+  min-height: 44px;
+  align-items: center;
+  color: inherit;
+  text-decoration: none;
+}
+
+.friendIdentity {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 11px;
+}
+
+.friendIdentity strong {
+  overflow: hidden;
+  font-size: 15px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.avatar {
+  display: grid;
+  flex: 0 0 42px;
+  width: 42px;
+  height: 42px;
+  overflow: hidden;
+  place-items: center;
+  border: 1px solid var(--accent);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--accent);
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.avatarImage {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.iconAction {
+  width: 44px;
+  height: 44px;
+}
+
+.textAction {
+  min-height: 44px;
+  border: 0;
+  padding: 0 4px;
+  background: transparent;
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.pendingLabel {
+  color: var(--muted);
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.blockedSection {
+  border-bottom: 1px solid var(--border);
+  padding: 16px 0;
+}
+
+.blockedSection summary {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  color: var(--muted);
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 12px;
+  font-weight: 700;
+  list-style: none;
+  text-transform: uppercase;
+}
+
+.blockedSection summary::-webkit-details-marker {
+  display: none;
+}
+
+.loadingRows {
+  display: grid;
+  margin-top: 10px;
+}
+
+.loadingRows > span {
+  display: flex;
+  min-height: 62px;
+  align-items: center;
+  gap: 11px;
+  border-bottom: 1px solid var(--border);
+}
+
+.loadingRows i,
+.loadingRows b {
+  display: block;
+  border-radius: 6px;
+  background: rgba(216, 214, 204, 0.55);
+}
+
+.loadingRows i {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+}
+
+.loadingRows b {
+  width: 44%;
+  height: 16px;
+}
+
+.fighterHero {
+  display: grid;
+  justify-items: center;
+  padding: 10px 0 22px;
+  border-bottom: 1px solid var(--border);
+  text-align: center;
+}
+
+.heroAvatar {
+  display: grid;
+  width: 96px;
+  height: 96px;
+  margin-bottom: 15px;
+  overflow: hidden;
+  place-items: center;
+  border: 2px solid var(--accent);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--accent);
+  font-size: 27px;
+  font-weight: 800;
+}
+
+.fighterHero h1 {
+  max-width: 100%;
+  font-size: 30px;
+  line-height: 1.08;
+  overflow-wrap: anywhere;
+}
+
+.fighterHero p {
+  margin-top: 7px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.profileActions {
+  justify-content: center;
+  flex-wrap: wrap;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.statTotal {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.statTotal strong {
+  color: var(--accent);
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 30px;
+}
+
+.statTotal span {
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.methodStrip {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 4px;
+  margin-top: 12px;
+}
+
+.methodStat {
+  display: grid;
+  min-width: 0;
+  justify-items: center;
+  gap: 3px;
+}
+
+.methodStat img,
+.methodFallback {
+  display: block;
+  width: 34px;
+  height: 34px;
+}
+
+.methodFallback {
+  border: 1px solid var(--border);
+  border-radius: 50%;
+}
+
+.methodStat strong {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 12px;
+}
+
+.privateNotice p {
+  margin: 0;
+}
+
+.privateNotice p:last-child {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.drawerBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: rgba(23, 23, 23, 0.38);
+}
+
+.confirmationSheet {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 51;
+  max-width: 480px;
+  margin: 0 auto;
+  border: 1px solid var(--border);
+  border-bottom: 0;
+  border-radius: 8px 8px 0 0;
+  padding: 10px 20px calc(18px + env(safe-area-inset-bottom, 0px));
+  background: var(--bg);
+  color: var(--text);
+}
+
+.moreSheet,
+.reportSheet,
+.inviteSheet {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 51;
+  max-width: 480px;
+  margin: 0 auto;
+  border: 1px solid var(--border);
+  border-bottom: 0;
+  border-radius: 8px 8px 0 0;
+  padding: 10px 20px calc(18px + env(safe-area-inset-bottom, 0px));
+  background: var(--bg);
+  color: var(--text);
+}
+
+.moreSheet h2,
+.reportSheet h2,
+.reportSheet p,
+.inviteSheet h2,
+.inviteSheet p {
+  margin: 0;
+}
+
+.moreSheet h2,
+.reportSheet h2,
+.inviteSheet h2 {
+  margin-top: 15px;
+  font-size: 24px;
+}
+
+.inviteSheet > p {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.qrStage {
+  display: grid;
+  width: min(70vw, 250px);
+  aspect-ratio: 1;
+  place-items: center;
+  margin: 18px auto 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px;
+  background: var(--bg);
+}
+
+.qrStage img {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.qrStage span {
+  color: var(--muted);
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+.inviteUsername {
+  display: block;
+  text-align: center;
+}
+
+.inviteStatus {
+  margin-top: 8px !important;
+  color: var(--accent) !important;
+  text-align: center;
+}
+
+.inviteActions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 17px;
+}
+
+.inviteActions button {
+  display: inline-flex;
+  min-height: 46px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font-weight: 700;
+}
+
+.inviteActions button:last-child {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--bg);
+}
+
+.inviteActions button:focus-visible {
+  outline: 2px solid rgba(209, 74, 50, 0.52);
+  outline-offset: 2px;
+}
+
+.reportSheet > p {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.moreActions {
+  display: grid;
+  margin-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.moreActions button {
+  display: flex;
+  min-height: 52px;
+  align-items: center;
+  gap: 11px;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  padding: 0 4px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-weight: 700;
+  text-align: left;
+}
+
+.moreActions button svg {
+  color: var(--accent);
+}
+
+.moreActions button[data-danger] {
+  color: var(--accent);
+}
+
+.reportSheet form {
+  margin-top: 16px;
+}
+
+.reportSheet fieldset {
+  margin: 0;
+  border: 0;
+  padding: 0;
+}
+
+.reportSheet legend,
+.reportDetails {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.reportReasons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0;
+  margin-top: 8px;
+}
+
+.reportReasons label {
+  display: flex;
+  align-items: center;
+}
+
+.reportReasons label + label::before {
+  margin: 0 7px;
+  color: var(--border);
+  content: "|";
+}
+
+.reportReasons input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  opacity: 0;
+}
+
+.reportReasons span {
+  display: inline-flex;
+  min-height: 36px;
+  align-items: center;
+  border-radius: 5px;
+  padding: 0 7px;
+  color: var(--text);
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.reportReasons input:checked + span {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.reportDetails {
+  display: grid;
+  gap: 7px;
+  margin-top: 16px;
+}
+
+.reportDetails small {
+  font-weight: 500;
+}
+
+.reportDetails textarea {
+  width: 100%;
+  resize: vertical;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.62);
+  color: var(--text);
+  font: inherit;
+  line-height: 1.45;
+}
+
+.confirmationSheet h2,
+.confirmationSheet p {
+  margin: 0;
+}
+
+.confirmationSheet h2 {
+  margin-top: 15px;
+  font-size: 24px;
+}
+
+.confirmationSheet > p {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.drawerActions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.drawerActions button {
+  min-height: 46px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font-weight: 700;
+}
+
+.drawerActions button:last-child {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--bg);
+}
+
+.drawerActions button:disabled {
+  opacity: 0.5;
+}
+
+.drawerError {
+  color: var(--accent) !important;
+}
+
+@media (max-width: 359px) {
+  .page {
+    padding-right: 16px;
+    padding-left: 16px;
+  }
+
+  .heading h1 {
+    font-size: 32px;
+  }
+
+  .fighterHero h1 {
+    font-size: 27px;
+  }
+
+  .searchResult {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .searchResultAction {
+    width: 100%;
+    justify-content: flex-start;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .loadingRows i,
+  .loadingRows b {
+    animation: none;
+  }
+}

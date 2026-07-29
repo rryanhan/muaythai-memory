@@ -85,6 +85,20 @@
       "when": 1785346986193,
       "tag": "0011_enable_domain_rls",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1785350031060,
+      "tag": "0012_add-friend-network",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1785355370494,
+      "tag": "0013_wonderful_wendell_rand",
+      "breakpoints": true
     }
   ]
 }

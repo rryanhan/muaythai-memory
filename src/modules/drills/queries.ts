@@ -75,6 +75,18 @@ export async function getFirstDrillDetail(
   return getDrillById(userId, firstDrill.id);
 }
 
+export async function getDrillSummariesByIds(
+  userId: string,
+  drillIds: string[],
+): Promise<DrillSummary[]> {
+  if (drillIds.length === 0) return [];
+  const summaries = await loadDrillSummaries(userId, drillIds);
+  const summaryById = new Map(summaries.map((drill) => [drill.id, drill]));
+  return drillIds
+    .map((id) => summaryById.get(id))
+    .filter((drill): drill is DrillSummary => Boolean(drill));
+}
+
 export function normalizeDrillFilters(filters: Partial<DrillFilters> = {}): DrillFilters {
   return {
     keywords: normalizeStringList(filters.keywords ?? []),
@@ -113,11 +125,17 @@ export function drillMatchesFilters(drill: DrillSummary, filters: DrillFilters):
 // Step 3 favors one simple read model over clever SQL composition. Once the
 // product has real scale, these filters can move into SQL without changing API
 // response contracts.
-async function loadDrillSummaries(userId: string): Promise<DrillSummary[]> {
+async function loadDrillSummaries(
+  userId: string,
+  selectedDrillIds?: string[],
+): Promise<DrillSummary[]> {
   const drillRows = await db
     .select()
     .from(drills)
-    .where(eq(drills.userId, userId))
+    .where(and(
+      eq(drills.userId, userId),
+      selectedDrillIds ? inArray(drills.id, selectedDrillIds) : undefined,
+    ))
     .orderBy(desc(drills.createdAt), asc(drills.title));
   const drillIds = drillRows.map((drill) => drill.id);
   const [methodsByDrillId, tagsByDrillId, statusTagsByDrillId] = await Promise.all([

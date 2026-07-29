@@ -45,9 +45,9 @@ export function getMigrationDatabaseUrl(
     connectionString,
     "DATABASE_DIRECT_URL or DATABASE_URL",
   );
-  if (isSupabaseSharedPooler(url)) {
+  if (isSupabaseSharedPooler(url) && effectivePort(url) !== "5432") {
     throw new Error(
-      "DATABASE_DIRECT_URL or DATABASE_URL must use a direct database host, not the Supabase pooler.",
+      "DATABASE_DIRECT_URL or DATABASE_URL must use a direct database host or Supabase session mode on port 5432.",
     );
   }
 

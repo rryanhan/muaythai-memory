@@ -17,6 +17,19 @@ import type {
   UpdateSavedListResponse,
   SavedListSlug,
 } from "@/modules/drills/contracts";
+import type {
+  FighterConnection,
+  FighterProfile,
+  FighterSummary,
+  FriendCounts,
+  FriendMutationResponse,
+  FriendReportReason,
+  FriendSection,
+  FriendSectionItem,
+  FriendSectionPageResponse,
+  FriendsSummaryResponse,
+  FriendshipState,
+} from "@/modules/friends/contracts";
 import type { GraphEdge, GraphNode, GraphOptions, GraphResponse } from "@/modules/graph/contracts";
 import type {
   CompleteJournalUploadResponse,
@@ -46,6 +59,17 @@ export type {
   DrillListResponse,
   DrillSummary,
   FilterMode,
+  FighterConnection,
+  FighterProfile,
+  FighterSummary,
+  FriendCounts,
+  FriendMutationResponse,
+  FriendReportReason,
+  FriendSection,
+  FriendSectionItem,
+  FriendSectionPageResponse,
+  FriendsSummaryResponse,
+  FriendshipState,
   GraphEdge,
   GraphNode,
   GraphOptions,

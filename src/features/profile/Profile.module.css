@@ -71,6 +71,7 @@
 }
 
 .editLink:focus-visible,
+.friendsLink:focus-visible,
 .savedLink:focus-visible,
 .addEntry:focus-visible,
 .journalRow:focus-visible,
@@ -80,6 +81,62 @@
 .signOut:focus-visible {
   outline: 1px solid rgba(209, 74, 50, 0.5);
   outline-offset: 3px;
+}
+
+.friendsLink {
+  display: grid;
+  min-height: 50px;
+  grid-template-columns: 22px minmax(0, 1fr) auto auto;
+  gap: 9px;
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+  text-decoration: none;
+}
+
+.friendsLink svg {
+  color: var(--accent);
+}
+
+.friendsLink span {
+  overflow: hidden;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 12px;
+  font-weight: 750;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.friendsLink strong {
+  min-width: 18px;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 13px;
+  text-align: right;
+}
+
+.friendsLink small {
+  border-left: 1px solid var(--border);
+  padding-left: 9px;
+  color: var(--accent);
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.friendsLink .friendRequestBadge {
+  display: grid;
+  min-width: 24px;
+  height: 24px;
+  place-items: center;
+  border: 0;
+  border-radius: 6px;
+  padding: 0 6px;
+  background: var(--accent);
+  color: var(--bg);
+  font-size: 11px;
 }
 
 .loadError,
@@ -276,6 +333,12 @@
 
 .videoTile img {
   object-fit: cover;
+  opacity: 0;
+  transition: opacity 160ms ease;
+}
+
+.videoTile img[data-image-state="ready"] {
+  opacity: 1;
 }
 
 .videoFallback {
@@ -442,6 +505,10 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .videoTile img {
+    transition: none;
+  }
+
   .journalLoading span {
     background: rgba(216, 214, 204, 0.42);
   }

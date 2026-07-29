@@ -147,6 +147,37 @@ Full Drill pages may lazily request the newest ready Journal entry linked to tha
 Drill. Signed playback URLs stay in Journal-specific responses and never become
 part of the normal Drill or graph payloads.
 
+## Friends
+
+Friends are private, mutual connections between onboarded users. Discovery uses
+an exact username, copied fighter-profile link, or QR invite; it does not expose
+email, first name, last name, location, drills, or journal entries.
+
+Relationship metadata lives in Postgres:
+
+- `friendships`: one canonical unordered user pair, request direction, pending
+  or accepted state, response time, and timestamps
+- `user_blocks`: directional blocker and blocked-user relationship
+- `friend_reports`: a private moderation record with reporter, reported fighter,
+  reason, optional details, and timestamps
+- `friend_rate_limits`: fixed-window counters for search, request, and report
+  abuse controls
+- `drill_shares`: an explicit owner-to-friend grant for one Drill
+
+A unique canonical pair prevents duplicate reverse requests. Blocking removes
+the friendship or pending request and revokes shared Drills in the same
+transaction. Friend, request, and block lists use opaque cursor pagination.
+Outgoing requests are capped, and search, request creation, and reports are
+rate-limited with database-backed counters that work across server instances.
+
+Before acceptance, a fighter profile exposes only username and avatar. Accepted
+friends may also see compact Drill and Training Method totals. Drills remain
+private unless their owner grants an accepted friend access to a specific Drill.
+Shared Drill pages are read-only, omit Saved Lists and Journal media, and become
+inaccessible immediately after unsharing, unfriending, or blocking. Journal
+entries and the knowledge graph remain private; there is intentionally no
+generic social feed.
+
 ## Network View Data
 
 The default Network View should show:

@@ -8,6 +8,7 @@ import { DrillDetailBackButton } from "@/features/drills/DrillDetailBackButton";
 import { DrillDetailContent } from "@/features/drills/DrillDetailContent";
 import { SavedListActions } from "@/features/shared/SavedListActions";
 import { DrillJournalPreview } from "@/features/journal/DrillJournalPreview";
+import { DrillShareButton } from "@/features/friends/DrillShareButton";
 import { RoutedBottomNav } from "@/components/navigation/RoutedBottomNav";
 import { getDrillById } from "@/modules/drills/queries";
 import routeStyles from "@/features/drills/DrillRouteShell.module.css";
@@ -66,6 +67,7 @@ export default async function DrillDetailPage({ params }: DrillDetailPageProps) 
         <p className="eyebrow">Drill Record</p>
         <div className="drill-detail-page-actions">
           <SavedListActions drillId={drill.id} statusTags={drill.statusTags} />
+          <DrillShareButton drillId={drill.id} />
           <Link className="drill-detail-page-edit" href={`/drills/${drill.id}/edit`} prefetch>
             Edit
           </Link>

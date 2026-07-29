@@ -1,6 +1,6 @@
 export {};
 
-const baseUrl = process.env.AUTH_VERIFY_BASE_URL ?? "http://127.0.0.1:3005";
+const baseUrl = process.env.AUTH_VERIFY_BASE_URL ?? "http://localhost:3005";
 const creationKey = "00000000-0000-4000-8000-000000000009";
 
 type ApiState = "unauthenticated" | "profile-incomplete" | "guide-incomplete" | "fully-onboarded";
@@ -66,6 +66,13 @@ async function main() {
       state: "guide-incomplete",
     },
     {
+      cookie: guideIncompleteCookie,
+      expectedStatus: 403,
+      label: "friends API rejects guide-incomplete user",
+      path: "/api/friends",
+      state: "guide-incomplete",
+    },
+    {
       body: invalidDrillRequest,
       cookie: guideIncompleteCookie,
       expectedStatus: 400,
@@ -80,6 +87,13 @@ async function main() {
       expectedStatus: 200,
       label: "normal API authorizes fully onboarded user",
       path: "/api/drills?keyword=__onboarding_state_verifier_no_match__",
+      state: "fully-onboarded",
+    },
+    {
+      cookie: fullyOnboardedCookie,
+      expectedStatus: 200,
+      label: "friends API authorizes fully onboarded user",
+      path: "/api/friends",
       state: "fully-onboarded",
     },
     {

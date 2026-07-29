@@ -1,4 +1,4 @@
-const baseUrl = process.env.AUTH_VERIFY_BASE_URL ?? "http://127.0.0.1:3005";
+const baseUrl = process.env.AUTH_VERIFY_BASE_URL ?? "http://localhost:3005";
 const baseOrigin = new URL(baseUrl).origin;
 
 const checks: Array<{
@@ -31,6 +31,63 @@ const checks: Array<{
     headers: { "content-type": "application/json" },
   },
   { path: "/api/graph" },
+  { path: "/api/friends" },
+  { path: "/api/friends?section=friends" },
+  { path: "/api/friends/search?username=verify_user" },
+  {
+    path: "/api/friends/requests",
+    method: "POST",
+    body: JSON.stringify({ username: "verify_user" }),
+    headers: { "content-type": "application/json" },
+  },
+  {
+    path: "/api/friends/requests/00000000-0000-4000-8000-000000000000",
+    method: "PATCH",
+    body: JSON.stringify({ action: "accept" }),
+    headers: { "content-type": "application/json" },
+  },
+  {
+    path: "/api/friends/requests/00000000-0000-4000-8000-000000000000",
+    method: "DELETE",
+  },
+  {
+    path: "/api/friends/00000000-0000-4000-8000-000000000000",
+    method: "DELETE",
+  },
+  {
+    path: "/api/friends/blocks",
+    method: "POST",
+    body: JSON.stringify({ userId: "00000000-0000-4000-8000-000000000000" }),
+    headers: { "content-type": "application/json" },
+  },
+  {
+    path: "/api/friends/blocks/00000000-0000-4000-8000-000000000000",
+    method: "DELETE",
+  },
+  {
+    path: "/api/friends/reports",
+    method: "POST",
+    body: JSON.stringify({
+      userId: "00000000-0000-4000-8000-000000000000",
+      reason: "spam",
+    }),
+    headers: { "content-type": "application/json" },
+  },
+  { path: "/api/fighters/verify_user" },
+  {
+    path: "/api/drills/00000000-0000-4000-8000-000000000000/shares",
+  },
+  {
+    path: "/api/drills/00000000-0000-4000-8000-000000000000/shares",
+    method: "PATCH",
+    body: JSON.stringify({
+      recipientUserId: "00000000-0000-4000-8000-000000000001",
+      shared: true,
+    }),
+    headers: { "content-type": "application/json" },
+  },
+  { path: "/api/shared-drills" },
+  { path: "/api/shared-drills/00000000-0000-4000-8000-000000000000" },
   {
     path: "/api/capture/draft",
     method: "POST",

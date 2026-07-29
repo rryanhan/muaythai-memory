@@ -1,4 +1,6 @@
 import type { CurrentAppUser } from "@/modules/auth";
+import { DecodedImage } from "@/components/shared/DecodedImage";
+import styles from "./ProfileAvatar.module.css";
 
 type ProfileAvatarProps = {
   profile: Pick<CurrentAppUser, "displayName" | "avatarUrl">;
@@ -7,12 +9,23 @@ type ProfileAvatarProps = {
 };
 
 export function ProfileAvatar({ profile, className, imageClassName }: ProfileAvatarProps) {
+  const rootClassName = [styles.root, className].filter(Boolean).join(" ");
+  const avatarImageClassName = [styles.image, imageClassName].filter(Boolean).join(" ");
+
   return (
-    <span className={className} aria-label={`${profile.displayName} profile photo`}>
-      {profile.avatarUrl ? (
-        <img className={imageClassName} src={profile.avatarUrl} alt="" />
-      ) : (
-        <span aria-hidden="true">{getInitials(profile.displayName)}</span>
+    <span className={rootClassName} aria-label={`${profile.displayName} profile photo`}>
+      <span className={styles.fallback} aria-hidden="true">
+        {getInitials(profile.displayName)}
+      </span>
+      {profile.avatarUrl && (
+        <DecodedImage
+          className={avatarImageClassName}
+          src={profile.avatarUrl}
+          alt=""
+          loading="eager"
+          fetchPriority="high"
+          decoding="async"
+        />
       )}
     </span>
   );

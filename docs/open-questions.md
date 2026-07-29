@@ -42,5 +42,13 @@ Resolved for now:
 ## Later Systems
 
 - Workout and strength training should become a parallel system later, not part of the MVP.
-- Future social features could let users view or share parts of each other's knowledge graph.
-- Need to decide whether sharing is public, friend-based, coach-student, or gym/team-based.
+- Friends are mutual, username-based connections. Profiles expose only avatars,
+  usernames, and accepted-friend training totals.
+- Individual Drills may be shared explicitly and read-only with accepted
+  friends. Saved Lists, Journal media, and graph data do not travel with a
+  shared Drill.
+- Do not build a generic Friends feed. Sharing should solve a concrete training
+  exchange before adding passive social content.
+- Decide whether a later shared Journal feed should be friends-only or also
+  support explicit coach-student and gym/team circles.
+- Knowledge graphs remain private.

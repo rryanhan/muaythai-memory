@@ -89,6 +89,25 @@ Accounts created under the previous magic-link flow can select **Forgot
 password** to establish a password. Their Supabase identity and owned data do
 not change.
 
+## Staging test accounts
+
+Create or reset an already-confirmed staging account without sending email:
+
+```bash
+TEST_USER_PASSWORD='<test-only-password>' npm run auth:create-test-user -- \
+  --email 'ryanjhan10+fighter2@gmail.com' \
+  --username 'fighter2'
+```
+
+The command is locked to `.env.staging.local`, verifies that every configured
+service belongs to the staging environment, and refuses production
+configuration. It creates both the Supabase Auth identity and app profile,
+marks profile onboarding complete, and skips the first-drill guide. Re-running
+the command resets that staging account's password and profile username. The
+password is accepted but never printed. It must be supplied through
+`TEST_USER_PASSWORD`; command-line password arguments are deliberately rejected
+so the credential does not remain in shell history or process listings.
+
 ## Verification
 
 ```bash
