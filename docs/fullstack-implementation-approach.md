@@ -111,10 +111,13 @@ Current authorization is enforced in those server modules by passing the
 verified user id into every read and write. Domain tables remain server-only:
 the `anon` and `authenticated` database roles have no privileges on public
 tables, sequences, functions, or procedures, including through recursive role
-membership and the `postgres` role's default privileges. Run
+membership and the `postgres` role's default privileges. Row Level Security is
+also enabled on every public domain table with no browser-facing policies.
+Server-side Drizzle queries continue through the database owner; any future
+public table migration must explicitly enable RLS. Run
 `npm run db:verify-access-control -- --expect=staging` after staging migrations
-to verify that boundary. Row Level Security must still be designed before any
-domain table is queried directly from a browser or third-party client.
+to verify both boundaries. Explicit ownership policies must be designed before
+any domain table is queried directly from a browser or third-party client.
 
 Supabase dashboard setup for authentication:
 
