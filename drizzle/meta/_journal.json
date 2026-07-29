@@ -78,6 +78,13 @@
       "when": 1784845893754,
       "tag": "0010_journal_media_operation_claims",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1785346986193,
+      "tag": "0011_enable_domain_rls",
+      "breakpoints": true
     }
   ]
 }

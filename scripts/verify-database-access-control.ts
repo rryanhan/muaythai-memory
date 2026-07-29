@@ -25,6 +25,10 @@ const EXPECTED_PUBLIC_TABLES = [
 ] as const;
 
 type NameRow = { name: string };
+type PublicTableRow = {
+  name: string;
+  rlsEnabled: boolean;
+};
 type CurrentRoleRow = { currentRole: string };
 type ObjectCountRow = {
   tableCount: number;
@@ -63,8 +67,10 @@ async function verifyAccessControl(
     `Missing expected Supabase roles: ${missingRoles.join(", ")}`,
   );
 
-  const publicTables = await sql<NameRow[]>`
-    select c.relname as name
+  const publicTables = await sql<PublicTableRow[]>`
+    select
+      c.relname as name,
+      c.relrowsecurity as "rlsEnabled"
     from pg_class c
     join pg_namespace n on n.oid = c.relnamespace
     where n.nspname = 'public'
@@ -78,6 +84,13 @@ async function verifyAccessControl(
   expect(
     missingTables.length === 0,
     `Missing expected public domain tables: ${missingTables.join(", ")}`,
+  );
+  const tablesWithoutRls = publicTables
+    .filter((row) => !row.rlsEnabled)
+    .map((row) => row.name);
+  expect(
+    tablesWithoutRls.length === 0,
+    `Public tables without Row Level Security: ${tablesWithoutRls.join(", ")}`,
   );
 
   // Run catalog checks serially because the runtime pooler intentionally keeps
@@ -114,7 +127,7 @@ async function verifyAccessControl(
 
   const counts = objectCounts[0];
   console.log(
-    `Access-control verification passed for ${EXPECTED_PUBLIC_TABLES.length} expected domain tables.`,
+    `Access-control verification passed for ${EXPECTED_PUBLIC_TABLES.length} expected domain tables with Row Level Security enabled.`,
   );
   console.log(
     `Checked ${counts.tableCount} public tables/views, ${counts.sequenceCount} sequences, and ${counts.routineCount} routines for anon/authenticated access.`,

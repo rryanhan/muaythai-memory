@@ -57,15 +57,16 @@ npm run db:verify-access-control -- --expect=production
 ```
 
 The verifier connects through `DATABASE_POOLER_URL`, confirms that every
-expected public domain table exists, rejects effective table, column, sequence,
-function, or procedure access for Supabase's `anon` and `authenticated` roles,
-checks inherited role privileges and the `postgres` migration role's
-future-object defaults, and performs harmless reads through the application
-database connection. `--expect` selects the matching ignored environment file
-and validates its deployment marker, Supabase project, and database hosts
-before connecting. File values override conflicting ambient variables inside
-an isolated configuration object, and missing file credentials never fall back
-to ambient secrets; credentials are neither exported nor printed. Use
+expected public domain table exists, requires RLS on every public table,
+rejects effective table, column, sequence, function, or procedure access for
+Supabase's `anon` and `authenticated` roles, checks inherited role privileges
+and the `postgres` migration role's future-object defaults, and performs
+harmless reads through the application database connection. `--expect` selects
+the matching ignored environment file and validates its deployment marker,
+Supabase project, and database hosts before connecting. File values override
+conflicting ambient variables inside an isolated configuration object, and
+missing file credentials never fall back to ambient secrets; credentials are
+neither exported nor printed. Use
 `--env-file=<path>` only when intentionally verifying a non-default file.
 
 Run `npm run db:seed` once when provisioning a blank hosted project to create
