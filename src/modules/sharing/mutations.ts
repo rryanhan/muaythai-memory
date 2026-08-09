@@ -1,14 +1,14 @@
-import { and, eq } from "drizzle-orm";
+import { and, asc, eq, inArray, or } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   drillShares,
   drills,
-  friendships,
+  follows,
+  userBlocks,
   users,
 } from "@/db/schema";
 import type { UpdateDrillShareResponse } from "./contracts";
 import { DrillShareError } from "./errors";
-import { canonicalFriendPair } from "@/modules/friends/pair";
 
 export async function updateDrillShare(
   ownerUserId: string,
@@ -39,21 +39,47 @@ export async function updateDrillShare(
       return { drillId, recipientUserId, shared: false };
     }
 
-    const pair = canonicalFriendPair(ownerUserId, recipientUserId);
-    const [friendship] = await tx
-      .select({ status: friendships.status })
-      .from(friendships)
-      .innerJoin(users, eq(users.id, recipientUserId))
+    const pairUsers = await tx
+      .select({ id: users.id })
+      .from(users)
+      .where(inArray(users.id, [ownerUserId, recipientUserId]))
+      .orderBy(asc(users.id))
+      .for("share");
+    const [block] = await tx
+      .select({ blockerId: userBlocks.blockerId })
+      .from(userBlocks)
+      .where(or(
+        and(
+          eq(userBlocks.blockerId, ownerUserId),
+          eq(userBlocks.blockedId, recipientUserId),
+        ),
+        and(
+          eq(userBlocks.blockerId, recipientUserId),
+          eq(userBlocks.blockedId, ownerUserId),
+        ),
+      ))
+      .limit(1);
+    const reciprocalRows = await tx
+      .select({ followerId: follows.followerId })
+      .from(follows)
       .where(and(
-        eq(friendships.userOneId, pair.userOneId),
-        eq(friendships.userTwoId, pair.userTwoId),
-        eq(friendships.status, "accepted"),
+        eq(follows.status, "accepted"),
+        or(
+          and(
+            eq(follows.followerId, ownerUserId),
+            eq(follows.followingId, recipientUserId),
+          ),
+          and(
+            eq(follows.followerId, recipientUserId),
+            eq(follows.followingId, ownerUserId),
+          ),
+        ),
       ))
       .for("share")
-      .limit(1);
-    if (!friendship) {
+      .limit(2);
+    if (pairUsers.length !== 2 || block || reciprocalRows.length !== 2) {
       throw new DrillShareError(
-        "Drills can only be shared with current friends.",
+        "Drills can only be shared when you follow each other.",
         409,
       );
     }

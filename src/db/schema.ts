@@ -86,8 +86,49 @@ export const friendships = pgTable(
   }),
 );
 
-// Blocking is directional and deliberately separate from friendship state.
-// A block mutation removes any friendship row for the pair in the same
+// Follows are directional and require approval. Reciprocal accepted rows are
+// the private-sharing trust boundary, while one accepted row is a normal
+// follower relationship. The legacy friendships table remains temporarily
+// during the staged data migration only.
+export const follows = pgTable(
+  "follows",
+  {
+    followerId: uuid("follower_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    followingId: uuid("following_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    status: varchar("status", { length: 16 }).notNull().default("pending"),
+    respondedAt: timestamp("responded_at", { withTimezone: true }),
+    ...timestamps,
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.followerId, table.followingId] }),
+    followerStatusIdx: index("follows_follower_status_idx").on(
+      table.followerId,
+      table.status,
+    ),
+    followingStatusIdx: index("follows_following_status_idx").on(
+      table.followingId,
+      table.status,
+    ),
+    noSelfFollowCheck: check(
+      "follows_no_self_follow_check",
+      sql`${table.followerId} <> ${table.followingId}`,
+    ),
+    statusCheck: check(
+      "follows_status_check",
+      sql`${table.status} in ('pending', 'accepted')`,
+    ),
+    responseStateCheck: check(
+      "follows_response_state_check",
+      sql`(
+        (${table.status} = 'pending' and ${table.respondedAt} is null)
+        or (${table.status} = 'accepted' and ${table.respondedAt} is not null)
+      )`,
+    ),
+  }),
+);
+
+// Blocking is directional and deliberately separate from follow state.
+// A block mutation removes both follow directions for the pair in the same
 // transaction, while this table records who controls a later unblock.
 export const userBlocks = pgTable(
   "user_blocks",
@@ -156,7 +197,9 @@ export const friendRateLimits = pgTable(
     windowIdx: index("friend_rate_limits_window_idx").on(table.windowStart),
     actionCheck: check(
       "friend_rate_limits_action_check",
-      sql`${table.action} in ('search', 'request', 'report')`,
+      // `request` remains valid only through the expand rollout so an older
+      // deployment can keep serving traffic before the follows code is live.
+      sql`${table.action} in ('search', 'request', 'follow', 'report')`,
     ),
     countCheck: check(
       "friend_rate_limits_count_check",
@@ -409,7 +452,7 @@ export const drillStatusTags = pgTable(
   }),
 );
 
-// A share grants one accepted friend read-only access to one drill. It does
+// A share grants one reciprocal accepted follow read-only access to one drill. It does
 // not expose the owner's Library, Saved Lists, journal media, or edit routes.
 export const drillShares = pgTable(
   "drill_shares",
@@ -500,6 +543,8 @@ export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 export type Friendship = typeof friendships.$inferSelect;
 export type NewFriendship = typeof friendships.$inferInsert;
+export type Follow = typeof follows.$inferSelect;
+export type NewFollow = typeof follows.$inferInsert;
 export type UserBlock = typeof userBlocks.$inferSelect;
 export type NewUserBlock = typeof userBlocks.$inferInsert;
 export type FriendReport = typeof friendReports.$inferSelect;

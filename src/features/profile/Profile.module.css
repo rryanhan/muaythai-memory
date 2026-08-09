@@ -16,6 +16,51 @@
   border-bottom: 1px solid var(--border);
 }
 
+.profileStats {
+  display: flex;
+  min-width: 0;
+  grid-column: 1 / -1;
+  align-items: center;
+  gap: 16px;
+  padding-top: 1px;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.profileStats > span,
+.profileStats > a {
+  display: inline-flex;
+  min-height: 30px;
+  align-items: center;
+  gap: 4px;
+  color: var(--muted);
+  text-decoration: none;
+}
+
+.profileStats strong {
+  color: var(--text);
+  font-size: 12px;
+}
+
+.profileStats small {
+  display: grid;
+  min-width: 18px;
+  height: 18px;
+  place-items: center;
+  border-radius: 5px;
+  padding: 0 4px;
+  background: var(--accent);
+  color: var(--bg);
+  font-size: 9px;
+}
+
+.profileStats > a:focus-visible {
+  outline: 1px solid rgba(209, 74, 50, 0.5);
+  outline-offset: 3px;
+}
+
 .avatar {
   display: grid;
   width: 64px;
@@ -71,7 +116,6 @@
 }
 
 .editLink:focus-visible,
-.friendsLink:focus-visible,
 .savedLink:focus-visible,
 .addEntry:focus-visible,
 .journalRow:focus-visible,
@@ -81,62 +125,6 @@
 .signOut:focus-visible {
   outline: 1px solid rgba(209, 74, 50, 0.5);
   outline-offset: 3px;
-}
-
-.friendsLink {
-  display: grid;
-  min-height: 50px;
-  grid-template-columns: 22px minmax(0, 1fr) auto auto;
-  gap: 9px;
-  align-items: center;
-  border-bottom: 1px solid var(--border);
-  color: var(--text);
-  text-decoration: none;
-}
-
-.friendsLink svg {
-  color: var(--accent);
-}
-
-.friendsLink span {
-  overflow: hidden;
-  font-family: "IBM Plex Mono", ui-monospace, monospace;
-  font-size: 12px;
-  font-weight: 750;
-  text-overflow: ellipsis;
-  text-transform: uppercase;
-  white-space: nowrap;
-}
-
-.friendsLink strong {
-  min-width: 18px;
-  font-family: "IBM Plex Mono", ui-monospace, monospace;
-  font-size: 13px;
-  text-align: right;
-}
-
-.friendsLink small {
-  border-left: 1px solid var(--border);
-  padding-left: 9px;
-  color: var(--accent);
-  font-family: "IBM Plex Mono", ui-monospace, monospace;
-  font-size: 10px;
-  font-weight: 700;
-  text-transform: uppercase;
-  white-space: nowrap;
-}
-
-.friendsLink .friendRequestBadge {
-  display: grid;
-  min-width: 24px;
-  height: 24px;
-  place-items: center;
-  border: 0;
-  border-radius: 6px;
-  padding: 0 6px;
-  background: var(--accent);
-  color: var(--bg);
-  font-size: 11px;
 }
 
 .loadError,

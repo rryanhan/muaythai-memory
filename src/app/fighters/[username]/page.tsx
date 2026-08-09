@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { FighterProfileScreen } from "@/features/friends/FighterProfileScreen";
 import { requireCurrentPageUserId } from "@/modules/auth";
-import { getFighterProfileByUsername } from "@/modules/friends";
+import { getFighterProfileByUsername } from "@/modules/connections";
 import { profileUsernameSchema } from "@/modules/profile/contracts";
 
 export const dynamic = "force-dynamic";
@@ -33,7 +33,7 @@ export default async function FighterPage({ params }: FighterPageProps) {
   );
   const fighter = await getFighterProfileByUsername(currentUserId, parsed.data);
   if (!fighter) notFound();
-  if (fighter.relationship === "self") redirect("/?view=profile");
+  if (fighter.isSelf) redirect("/?view=profile");
 
   return <FighterProfileScreen initialFighter={fighter} />;
 }

@@ -5,11 +5,11 @@ import { Drawer } from "vaul";
 import { useDrawerFocus } from "@/features/media/use-drawer-focus";
 import type {
   FighterSummary,
-  FriendReportReason,
-} from "@/data/friends";
+  ReportReason,
+} from "@/data/connections";
 import styles from "./Friends.module.css";
 
-const reasons: Array<{ value: FriendReportReason; label: string }> = [
+const reasons: Array<{ value: ReportReason; label: string }> = [
   { value: "spam", label: "Spam" },
   { value: "harassment", label: "Harassment" },
   { value: "impersonation", label: "Impersonation" },
@@ -30,10 +30,10 @@ export function FriendReportSheet({
   pending: boolean;
   error: string | null;
   onClose: () => void;
-  onSubmit: (reason: FriendReportReason, details: string) => void;
+  onSubmit: (reason: ReportReason, details: string) => void;
 }) {
   const contentRef = useDrawerFocus(open);
-  const [reason, setReason] = useState<FriendReportReason>("spam");
+  const [reason, setReason] = useState<ReportReason>("spam");
   const [details, setDetails] = useState("");
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {

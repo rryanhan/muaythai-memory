@@ -2,10 +2,10 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireOnboardedUserId } from "@/modules/auth";
 import {
+  connectionErrorResponse,
   fighterProfileResponseSchema,
-  friendErrorResponse,
   getFighterProfileByUsername,
-} from "@/modules/friends";
+} from "@/modules/connections";
 import { profileUsernameSchema } from "@/modules/profile/contracts";
 
 export const dynamic = "force-dynamic";
@@ -26,6 +26,6 @@ export async function GET(
     }
     return NextResponse.json(fighterProfileResponseSchema.parse({ fighter }));
   } catch (error) {
-    return friendErrorResponse(error, "Fighter profile could not be loaded.");
+    return connectionErrorResponse(error, "Fighter profile could not be loaded.");
   }
 }

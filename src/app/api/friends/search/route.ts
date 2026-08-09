@@ -1,11 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireOnboardedUserId } from "@/modules/auth";
-import {
-  consumeFriendRateLimit,
-  fighterSearchResponseSchema,
-  findFighterByUsername,
-  friendErrorResponse,
-} from "@/modules/friends";
+import { fighterSearchResponseSchema, friendErrorResponse } from "@/modules/friends";
+import { findLegacyFighterByUsername } from "@/modules/friends/compatibility";
+import { consumeConnectionRateLimit } from "@/modules/connections";
 import { profileUsernameSchema } from "@/modules/profile/contracts";
 
 export const dynamic = "force-dynamic";
@@ -17,10 +14,10 @@ export async function GET(request: NextRequest) {
     const username = profileUsernameSchema.parse(
       request.nextUrl.searchParams.get("username") ?? "",
     );
-    await consumeFriendRateLimit(userId, "search");
+    await consumeConnectionRateLimit(userId, "search");
     return NextResponse.json(
       fighterSearchResponseSchema.parse({
-        fighter: await findFighterByUsername(userId, username),
+        fighter: await findLegacyFighterByUsername(userId, username),
       }),
     );
   } catch (error) {

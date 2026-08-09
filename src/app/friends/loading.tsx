@@ -3,14 +3,14 @@ import styles from "@/features/friends/Friends.module.css";
 
 export default function FriendsLoading() {
   return (
-    <main className={styles.page} aria-label="Loading Friends">
+    <main className={styles.page} aria-label="Loading Connections">
       <div className="notebook-grid" aria-hidden="true" />
       <header className={styles.routeHeader}>
         <span className={styles.back} aria-hidden="true">←</span>
         <p className="eyebrow">Profile</p>
       </header>
       <section className={styles.heading}>
-        <h1>Friends</h1>
+        <h1>Connections</h1>
         <p>Loading connections</p>
       </section>
       <section className={styles.section}>

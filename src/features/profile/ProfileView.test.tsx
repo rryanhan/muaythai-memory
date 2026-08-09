@@ -6,7 +6,7 @@ import { ProfileView } from "./ProfileView";
 
 const mocks = vi.hoisted(() => ({
   getDrills: vi.fn(),
-  getFriendsSummary: vi.fn(),
+  getConnectionsSummary: vi.fn(),
   getJournalEntries: vi.fn(),
   prefetch: vi.fn(),
 }));
@@ -14,8 +14,11 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/data", async (importOriginal) => ({
   ...await importOriginal<typeof import("@/data")>(),
   getDrills: mocks.getDrills,
-  getFriendsSummary: mocks.getFriendsSummary,
   getJournalEntries: mocks.getJournalEntries,
+}));
+vi.mock("@/data/connections", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/data/connections")>(),
+  getConnectionsSummary: mocks.getConnectionsSummary,
 }));
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ prefetch: mocks.prefetch }),
@@ -37,9 +40,10 @@ describe("ProfileView", () => {
       entries: [],
       nextCursor: null,
     });
-    mocks.getFriendsSummary.mockResolvedValue({
+    mocks.getConnectionsSummary.mockResolvedValue({
       counts: {
-        friends: 4,
+        followers: 4,
+        following: 2,
         incoming: 3,
         outgoing: 1,
         blocked: 0,
@@ -47,13 +51,17 @@ describe("ProfileView", () => {
     });
   });
 
-  it("shows the incoming-request count as a dedicated Friends badge", async () => {
+  it("shows drill, follower, and following counts beneath the username", async () => {
     renderProfile();
 
-    expect(await screen.findByLabelText("3 pending friend requests")).toHaveTextContent("3");
-    expect(screen.getByText("Friends").closest("a")).toHaveAttribute(
+    expect(await screen.findByLabelText("3 pending follow requests")).toHaveTextContent("3");
+    expect(screen.getByText("Followers").closest("a")).toHaveAttribute(
       "href",
-      "/friends",
+      "/connections?tab=followers",
+    );
+    expect(screen.getByText("Following").closest("a")).toHaveAttribute(
+      "href",
+      "/connections?tab=following",
     );
   });
 });

@@ -3,9 +3,9 @@ import { z } from "zod";
 import { requireOnboardedUserId } from "@/modules/auth";
 import {
   friendErrorResponse,
-  removeFriend,
   removeFriendResponseSchema,
 } from "@/modules/friends";
+import { removeLegacyFriendship } from "@/modules/friends/compatibility";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -21,7 +21,7 @@ export async function DELETE(
     const { userId } = paramsSchema.parse(await context.params);
     return NextResponse.json(
       removeFriendResponseSchema.parse(
-        await removeFriend(currentUserId, userId),
+        await removeLegacyFriendship(currentUserId, userId),
       ),
     );
   } catch (error) {

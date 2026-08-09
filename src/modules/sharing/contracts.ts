@@ -3,7 +3,7 @@ import {
   drillDetailSchema,
   drillSummarySchema,
 } from "@/modules/drills/contracts";
-import { fighterSummarySchema } from "@/modules/friends/contracts";
+import { fighterSummarySchema } from "@/modules/connections/contracts";
 
 export const drillShareFriendItemSchema = z.object({
   profile: fighterSummarySchema,

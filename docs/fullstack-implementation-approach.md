@@ -230,24 +230,24 @@ with `ffmpeg` installed.
 Supabase Storage is the object store for both avatars and journal media; an AWS
 S3 bucket is not required.
 
-### friends
+### connections
 
 Owns:
 
 - Exact-username discovery plus copied profile links and QR invites.
-- Pending and accepted friendship state, including sender cancellation.
-- Cursor-paginated friend, request, and block lists.
-- Friend removal, directional blocking, and a basic report path.
-- Database-backed search, request, and report limits plus an outgoing-request cap.
-- Compact profiles with accepted-friend training totals.
-- Explicit, read-only sharing of individual Drills with accepted friends.
+- Directed follow requests with independent approval and sender cancellation.
+- Cursor-paginated follower, following, request, and block lists.
+- Unfollow, directional blocking, and a basic report path.
+- Database-backed search, follow, and report limits plus an outgoing-request cap.
+- Public follower/following counts and reciprocal-follow training totals.
+- Explicit, read-only sharing of individual Drills with reciprocal accepted follows.
 
 Discovery and limited profiles return only username and avatar. Email, private
 names, location, journal metadata, and graph data remain inaccessible. Accepted
-friends additionally receive aggregate Drill and Training Method counts.
+reciprocal accepted follows additionally receive aggregate Drill and Training Method counts.
 Individual Drills stay private unless their owner creates a `drill_shares`
 grant; those responses omit Saved Lists and Journal media and are revoked on
-unfriend or block. A future friends-only Journal option must separately
+unfollow or block. A future connections-only Journal option must separately
 authorize every metadata and signed-media request.
 
 ## Database Approach
@@ -269,7 +269,8 @@ status_tags
 drill_status_tags
 journal_entries
 journal_media
-friendships
+follows
+friendships (temporary rollout compatibility)
 user_blocks
 friend_reports
 friend_rate_limits
@@ -695,13 +696,13 @@ If a save fails, revert and show a clear message.
 - Add optional linked drill.
 - Add private, signed, resumable video uploads.
 
-### Phase 5: Friends
+### Phase 5: Connections
 
 - Add exact-username discovery, profile links, and QR invites.
-- Add requests, sender cancellation, acceptance, removal, blocking, reports,
+- Add directed follow requests, sender cancellation, acceptance, unfollowing, blocking, reports,
   and unblock management.
 - Add cursor pagination, rate limits, and an outgoing-request cap.
-- Expose compact training totals only to accepted friends.
+- Expose compact training totals only to reciprocal accepted follows.
 - Add explicit, read-only sharing for individual Drills.
 - Keep Journal entries and graph data private; do not add a generic feed.
 

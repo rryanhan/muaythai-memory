@@ -16,6 +16,7 @@ const EXPECTED_PUBLIC_TABLES = [
   "drill_tags",
   "drill_training_methods",
   "drills",
+  "follows",
   "friend_rate_limits",
   "friend_reports",
   "friendships",

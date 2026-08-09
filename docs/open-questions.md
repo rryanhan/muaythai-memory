@@ -42,13 +42,14 @@ Resolved for now:
 ## Later Systems
 
 - Workout and strength training should become a parallel system later, not part of the MVP.
-- Friends are mutual, username-based connections. Profiles expose only avatars,
-  usernames, and accepted-friend training totals.
-- Individual Drills may be shared explicitly and read-only with accepted
-  friends. Saved Lists, Journal media, and graph data do not travel with a
+- Follows are directed, username-based, and require approval. Follower and
+  following counts are visible to signed-in users; private training totals
+  require accepted follows in both directions.
+- Individual Drills may be shared explicitly and read-only with reciprocal
+  accepted follows. Saved Lists, Journal media, and graph data do not travel with a
   shared Drill.
-- Do not build a generic Friends feed. Sharing should solve a concrete training
+- Do not build a generic social feed. Sharing should solve a concrete training
   exchange before adding passive social content.
-- Decide whether a later shared Journal feed should be friends-only or also
+- Decide whether a later shared Journal feed should be connections-only or also
   support explicit coach-student and gym/team circles.
 - Knowledge graphs remain private.

@@ -7,18 +7,17 @@ import { Play } from "@phosphor-icons/react/Play";
 import { Plus } from "@phosphor-icons/react/Plus";
 import { Star } from "@phosphor-icons/react/Star";
 import { Target } from "@phosphor-icons/react/Target";
-import { UsersThree } from "@phosphor-icons/react/UsersThree";
 import { VideoCamera } from "@phosphor-icons/react/VideoCamera";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { badgeByIconKey } from "@/components/shared/context-badges";
 import { DecodedImage } from "@/components/shared/DecodedImage";
 import {
   getDrills,
-  getFriendsSummary,
   getJournalEntries,
   type DrillFilterInput,
   type JournalEntrySummary,
 } from "@/data";
+import { getConnectionsSummary } from "@/data/connections";
 import { SignOutButton } from "@/features/auth/SignOutButton";
 import type { CurrentAppUser } from "@/modules/auth";
 import { ProfileAvatar } from "./ProfileAvatar";
@@ -54,9 +53,9 @@ export function ProfileView({ currentUser }: ProfileViewProps) {
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
     staleTime: 60 * 1000,
   });
-  const friendsQuery = useQuery({
-    queryKey: ["friends", "summary"],
-    queryFn: ({ signal }) => getFriendsSummary({ requestInit: { signal } }),
+  const connectionsQuery = useQuery({
+    queryKey: ["connections", "summary"],
+    queryFn: ({ signal }) => getConnectionsSummary({ requestInit: { signal } }),
     staleTime: 30 * 1000,
   });
   const drills = drillsQuery.data?.drills ?? [];
@@ -72,11 +71,29 @@ export function ProfileView({ currentUser }: ProfileViewProps) {
         <div className={styles.identity}>
           <p className="eyebrow">Profile</p>
           <h1>{currentUser.username ? `@${currentUser.username}` : currentUser.displayName}</h1>
-          <p>{drillsQuery.isPending ? "Loading entries" : `${drills.length} entries`}</p>
         </div>
         <Link className={styles.editLink} href="/profile/edit" prefetch aria-label="Edit profile">
           <PencilSimple size={21} weight="regular" aria-hidden="true" />
         </Link>
+        <div className={styles.profileStats} aria-label="Profile counts">
+          <span>
+            <strong>{drillsQuery.isPending ? "–" : drills.length}</strong>
+            Drills
+          </span>
+          <Link href="/connections?tab=followers" prefetch>
+            <strong>{connectionsQuery.data?.counts.followers ?? "–"}</strong>
+            Followers
+            {(connectionsQuery.data?.counts.incoming ?? 0) > 0 && (
+              <small aria-label={`${connectionsQuery.data?.counts.incoming} pending follow requests`}>
+                {connectionsQuery.data?.counts.incoming}
+              </small>
+            )}
+          </Link>
+          <Link href="/connections?tab=following" prefetch>
+            <strong>{connectionsQuery.data?.counts.following ?? "–"}</strong>
+            Following
+          </Link>
+        </div>
       </header>
 
       {drillsQuery.isError && (
@@ -84,29 +101,6 @@ export function ProfileView({ currentUser }: ProfileViewProps) {
           Couldn’t load profile entries. Retry
         </button>
       )}
-
-      <Link
-        className={styles.friendsLink}
-        href="/friends"
-        prefetch
-        aria-label={friendsQuery.isError
-          ? "Friends unavailable. Open to retry."
-          : undefined}
-      >
-        <UsersThree size={20} weight="regular" aria-hidden="true" />
-        <span>Friends</span>
-        <strong>{friendsQuery.data?.counts.friends ?? "–"}</strong>
-        {friendsQuery.isError ? (
-          <small>Unavailable</small>
-        ) : (friendsQuery.data?.counts.incoming ?? 0) > 0 && (
-          <small
-            className={styles.friendRequestBadge}
-            aria-label={`${friendsQuery.data?.counts.incoming} pending friend requests`}
-          >
-            {friendsQuery.data?.counts.incoming}
-          </small>
-        )}
-      </Link>
 
       <nav className={styles.savedRail} aria-label="Saved drill lists">
         <SavedListLink
