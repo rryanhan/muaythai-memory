@@ -2,12 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireOnboardedUserId } from "@/modules/auth";
 import {
-  cancelFriendRequest,
   friendErrorResponse,
   friendMutationResponseSchema,
-  respondToFriendRequest,
   respondToFriendRequestInputSchema,
 } from "@/modules/friends";
+import {
+  cancelLegacyFriendRequest,
+  respondToLegacyFriendRequest,
+} from "@/modules/friends/compatibility";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -24,7 +26,7 @@ export async function PATCH(
     const input = respondToFriendRequestInputSchema.parse(await request.json());
     return NextResponse.json(
       friendMutationResponseSchema.parse(
-        await respondToFriendRequest(currentUserId, userId, input),
+        await respondToLegacyFriendRequest(currentUserId, userId, input),
       ),
     );
   } catch (error) {
@@ -41,7 +43,7 @@ export async function DELETE(
     const { userId } = paramsSchema.parse(await context.params);
     return NextResponse.json(
       friendMutationResponseSchema.parse(
-        await cancelFriendRequest(currentUserId, userId),
+        await cancelLegacyFriendRequest(currentUserId, userId),
       ),
     );
   } catch (error) {

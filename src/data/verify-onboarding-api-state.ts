@@ -68,8 +68,8 @@ async function main() {
     {
       cookie: guideIncompleteCookie,
       expectedStatus: 403,
-      label: "friends API rejects guide-incomplete user",
-      path: "/api/friends",
+      label: "connections API rejects guide-incomplete user",
+      path: "/api/connections",
       state: "guide-incomplete",
     },
     {
@@ -92,8 +92,8 @@ async function main() {
     {
       cookie: fullyOnboardedCookie,
       expectedStatus: 200,
-      label: "friends API authorizes fully onboarded user",
-      path: "/api/friends",
+      label: "connections API authorizes fully onboarded user",
+      path: "/api/connections",
       state: "fully-onboarded",
     },
     {

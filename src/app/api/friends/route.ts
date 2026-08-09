@@ -5,9 +5,11 @@ import {
   friendSectionSchema,
   friendErrorResponse,
   friendsSummaryResponseSchema,
-  getFriendsSummary,
-  getFriendSectionPage,
 } from "@/modules/friends";
+import {
+  getLegacyFriendsSummary,
+  getLegacyFriendSectionPage,
+} from "@/modules/friends/compatibility";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -21,7 +23,7 @@ export async function GET(request: NextRequest) {
       const rawLimit = Number(request.nextUrl.searchParams.get("limit") ?? 20);
       return NextResponse.json(
         friendSectionPageResponseSchema.parse(
-          await getFriendSectionPage(
+          await getLegacyFriendSectionPage(
             userId,
             section,
             request.nextUrl.searchParams.get("cursor"),
@@ -32,7 +34,7 @@ export async function GET(request: NextRequest) {
     }
 
     return NextResponse.json(
-      friendsSummaryResponseSchema.parse(await getFriendsSummary(userId)),
+      friendsSummaryResponseSchema.parse(await getLegacyFriendsSummary(userId)),
     );
   } catch (error) {
     return friendErrorResponse(error, "Friends could not be loaded.");

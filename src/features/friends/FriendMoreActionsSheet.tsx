@@ -5,7 +5,7 @@ import { Flag } from "@phosphor-icons/react/Flag";
 import { Prohibit } from "@phosphor-icons/react/Prohibit";
 import { ShareNetwork } from "@phosphor-icons/react/ShareNetwork";
 import { useDrawerFocus } from "@/features/media/use-drawer-focus";
-import type { FighterSummary } from "@/data/friends";
+import type { FighterSummary } from "@/data/connections";
 import styles from "./Friends.module.css";
 
 export function FriendMoreActionsSheet({

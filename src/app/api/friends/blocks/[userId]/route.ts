@@ -4,8 +4,8 @@ import { requireOnboardedUserId } from "@/modules/auth";
 import {
   friendErrorResponse,
   friendMutationResponseSchema,
-  unblockFighter,
 } from "@/modules/friends";
+import { unblockLegacyFighter } from "@/modules/friends/compatibility";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -21,7 +21,7 @@ export async function DELETE(
     const { userId } = paramsSchema.parse(await context.params);
     return NextResponse.json(
       friendMutationResponseSchema.parse(
-        await unblockFighter(currentUserId, userId),
+        await unblockLegacyFighter(currentUserId, userId),
       ),
     );
   } catch (error) {

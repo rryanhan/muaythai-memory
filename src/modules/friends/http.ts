@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 import { authenticationErrorResponse } from "@/modules/auth";
+import { ConnectionMutationError } from "@/modules/connections/errors";
 import { FriendMutationError } from "./errors";
 
 export function friendErrorResponse(
@@ -16,7 +17,7 @@ export function friendErrorResponse(
       { status: 400 },
     );
   }
-  if (error instanceof FriendMutationError) {
+  if (error instanceof FriendMutationError || error instanceof ConnectionMutationError) {
     return NextResponse.json(
       { error: error.message },
       { status: error.status },

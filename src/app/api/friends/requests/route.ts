@@ -3,9 +3,9 @@ import { requireOnboardedUserId } from "@/modules/auth";
 import {
   friendErrorResponse,
   friendMutationResponseSchema,
-  sendFriendRequest,
   sendFriendRequestInputSchema,
 } from "@/modules/friends";
+import { sendLegacyFriendRequest } from "@/modules/friends/compatibility";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
     const input = sendFriendRequestInputSchema.parse(await request.json());
     return NextResponse.json(
       friendMutationResponseSchema.parse(
-        await sendFriendRequest(userId, input.username),
+        await sendLegacyFriendRequest(userId, input.username),
       ),
       { status: 201 },
     );

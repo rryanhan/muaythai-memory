@@ -9,13 +9,14 @@ import {
   notExists,
   or,
   sql,
+  type SQLWrapper,
 } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
 import {
   drillShares,
   drills,
-  friendships,
+  follows,
   userBlocks,
   users,
 } from "@/db/schema";
@@ -23,7 +24,10 @@ import {
   getDrillById,
   getDrillSummariesByIds,
 } from "@/modules/drills/queries";
-import { findFighterByUsername, getFriendSectionPage } from "@/modules/friends/queries";
+import {
+  findFighterByUsername,
+  getReciprocalConnectionPage,
+} from "@/modules/connections/queries";
 import type {
   DrillShareFriendPage,
   SharedDrillDetailResponse,
@@ -50,7 +54,7 @@ export async function getDrillShareFriendPage(
     .limit(1);
   if (!ownedDrill) throw new DrillShareError("Drill not found.", 404);
 
-  const page = await getFriendSectionPage(ownerUserId, "friends", cursor, 20);
+  const page = await getReciprocalConnectionPage(ownerUserId, cursor, 20);
   const friendIds = page.items.map((item) => item.profile.id);
   const sharedRows = friendIds.length > 0
     ? await db
@@ -81,30 +85,13 @@ export async function listSharedDrills(
   let ownerUserId: string | null = null;
   if (ownerUsername) {
     const owner = await findFighterByUsername(viewerUserId, ownerUsername);
-    if (!owner || owner.relationship !== "friends") {
+    if (!owner || !owner.mutual) {
       throw new DrillShareError("Fighter not found.", 404);
     }
     ownerUserId = owner.profile.id;
   }
 
-  const relationshipExists = exists(
-    db
-      .select({ value: sql`1` })
-      .from(friendships)
-      .where(and(
-        eq(friendships.status, "accepted"),
-        or(
-          and(
-            eq(friendships.userOneId, viewerUserId),
-            eq(friendships.userTwoId, drills.userId),
-          ),
-          and(
-            eq(friendships.userOneId, drills.userId),
-            eq(friendships.userTwoId, viewerUserId),
-          ),
-        ),
-      )),
-  );
+  const relationshipExists = reciprocalFollowCondition(viewerUserId, drills.userId);
   const pairIsUnblocked = notExists(
     db
       .select({ value: sql`1` })
@@ -218,24 +205,7 @@ async function loadSharedAccess(viewerUserId: string, drillId: string) {
       eq(drillShares.drillId, drillId),
       eq(drillShares.recipientUserId, viewerUserId),
       isNotNull(users.username),
-      exists(
-        db
-          .select({ value: sql`1` })
-          .from(friendships)
-          .where(and(
-            eq(friendships.status, "accepted"),
-            or(
-              and(
-                eq(friendships.userOneId, viewerUserId),
-                eq(friendships.userTwoId, drills.userId),
-              ),
-              and(
-                eq(friendships.userOneId, drills.userId),
-                eq(friendships.userTwoId, viewerUserId),
-              ),
-            ),
-          )),
-      ),
+      reciprocalFollowCondition(viewerUserId, drills.userId),
       notExists(
         db
           .select({ value: sql`1` })
@@ -254,6 +224,34 @@ async function loadSharedAccess(viewerUserId: string, drillId: string) {
     ))
     .limit(1);
   return rows[0] ?? null;
+}
+
+function reciprocalFollowCondition(
+  viewerUserId: string,
+  ownerUserId: SQLWrapper,
+) {
+  return and(
+    exists(
+      db
+        .select({ value: sql`1` })
+        .from(follows)
+        .where(and(
+          eq(follows.followerId, viewerUserId),
+          eq(follows.followingId, ownerUserId),
+          eq(follows.status, "accepted"),
+        )),
+    ),
+    exists(
+      db
+        .select({ value: sql`1` })
+        .from(follows)
+        .where(and(
+          eq(follows.followerId, ownerUserId),
+          eq(follows.followingId, viewerUserId),
+          eq(follows.status, "accepted"),
+        )),
+    ),
+  );
 }
 
 async function getSummariesByOwner(

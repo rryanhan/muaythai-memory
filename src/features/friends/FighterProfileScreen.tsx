@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check } from "@phosphor-icons/react/Check";
@@ -12,17 +13,15 @@ import { badgeByIconKey } from "@/components/shared/context-badges";
 import { DecodedImage } from "@/components/shared/DecodedImage";
 import {
   blockFighter,
-  cancelFriendRequest,
+  cancelOrUnfollow,
   getFighterProfile,
-  removeFriend,
   reportFighter,
-  respondToFriendRequest,
-  sendFriendRequest,
-  unblockFighter,
+  requestFollow,
+  respondToFollowRequest,
+  type ConnectionMutationResponse,
   type FighterProfile,
-  type FriendReportReason,
-  type FriendshipState,
-} from "@/data/friends";
+  type ReportReason,
+} from "@/data/connections";
 import { ProfileAvatar } from "@/features/profile/ProfileAvatar";
 import { FriendConfirmationSheet } from "./FriendConfirmationSheet";
 import { FriendMoreActionsSheet } from "./FriendMoreActionsSheet";
@@ -31,21 +30,21 @@ import { SharedDrillsSection } from "./SharedDrillsSection";
 import styles from "./Friends.module.css";
 
 type ProfileAction =
-  | "send"
+  | "follow"
   | "accept"
   | "decline"
   | "cancel"
-  | "remove"
-  | "block"
-  | "unblock";
+  | "unfollow"
+  | "block";
 
 export function FighterProfileScreen({
   initialFighter,
 }: {
   initialFighter: FighterProfile;
 }) {
+  const router = useRouter();
   const queryClient = useQueryClient();
-  const [confirmation, setConfirmation] = useState<"remove" | "block" | null>(null);
+  const [confirmation, setConfirmation] = useState<"unfollow" | "block" | null>(null);
   const [moreOpen, setMoreOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [reportCycle, setReportCycle] = useState(0);
@@ -62,31 +61,29 @@ export function FighterProfileScreen({
   });
   const actionMutation = useMutation({
     mutationFn: (action: ProfileAction) => runProfileAction(fighterQuery.data, action),
-    onSuccess: (relationship) => {
+    onSuccess: (result, action) => {
       queryClient.setQueryData<FighterProfile>(queryKey, (current) => current
         ? {
             ...current,
-            relationship,
-            stats: relationship === "friends" ? current.stats : null,
+            blockedByViewer: result.blockedByViewer,
+            outgoing: result.outgoing,
+            incoming: result.incoming,
+            mutual: result.mutual,
+            stats: result.mutual ? current.stats : null,
           }
         : current);
-      void queryClient.invalidateQueries({ queryKey: ["friends"] });
-      void queryClient.invalidateQueries({ queryKey });
+      void queryClient.invalidateQueries({ queryKey: ["connections"] });
+      void queryClient.invalidateQueries({ queryKey: ["fighter"] });
+      void queryClient.invalidateQueries({ queryKey: ["drill-share"] });
+      void queryClient.invalidateQueries({ queryKey: ["shared-drills"] });
       setConfirmation(null);
+      if (action === "block") router.replace("/connections?tab=blocked");
     },
   });
   const reportMutation = useMutation({
-    mutationFn: ({
-      reason,
-      details,
-    }: {
-      reason: FriendReportReason;
-      details: string;
-    }) => reportFighter({
-      userId: fighterQuery.data.profile.id,
-      reason,
-      details,
-    }),
+    mutationFn: ({ reason, details }: { reason: ReportReason; details: string }) => (
+      reportFighter({ userId: fighterQuery.data.profile.id, reason, details })
+    ),
     onSuccess: () => {
       setReportOpen(false);
       setProfileStatus("Report submitted. Thank you for letting us know.");
@@ -122,30 +119,42 @@ export function FighterProfileScreen({
     <main className={styles.page}>
       <div className="notebook-grid" aria-hidden="true" />
       <header className={styles.routeHeader}>
-        <Link className={styles.back} href="/friends" aria-label="Back to Friends">←</Link>
+        <Link className={styles.back} href="/connections" aria-label="Back to Connections">←</Link>
         <p className="eyebrow">Fighter Profile</p>
       </header>
 
       <section className={styles.fighterHero}>
         <ProfileAvatar
-          profile={{
-            displayName: fighter.profile.username,
-            avatarUrl: fighter.profile.avatarUrl,
-          }}
+          profile={{ displayName: fighter.profile.username, avatarUrl: fighter.profile.avatarUrl }}
           className={styles.heroAvatar}
           imageClassName={styles.avatarImage}
         />
         <h1>@{fighter.profile.username}</h1>
-        <p>{relationshipLabel(fighter.relationship)}</p>
+        <div className={styles.fighterSocialCounts} aria-label="Connection counts">
+          <SocialCount
+            count={fighter.socialCounts.followers}
+            label="Followers"
+            href={fighter.canViewConnections
+              ? `/fighters/${encodeURIComponent(fighter.profile.username)}/connections?tab=followers`
+              : null}
+          />
+          <SocialCount
+            count={fighter.socialCounts.following}
+            label="Following"
+            href={fighter.canViewConnections
+              ? `/fighters/${encodeURIComponent(fighter.profile.username)}/connections?tab=following`
+              : null}
+          />
+        </div>
       </section>
 
       <ProfileActions
-        relationship={fighter.relationship}
+        fighter={fighter}
         pending={actionMutation.isPending}
         onMore={() => setMoreOpen(true)}
         onAction={(action) => {
           actionMutation.reset();
-          if (action === "remove" || action === "block") {
+          if (action === "unfollow" || action === "block") {
             setConfirmation(action);
           } else {
             actionMutation.mutate(action);
@@ -164,13 +173,13 @@ export function FighterProfileScreen({
       )}
 
       {fighter.stats && (
-        <section className={styles.friendStats} aria-labelledby="friend-training-title">
+        <section className={styles.friendStats} aria-labelledby="fighter-training-title">
           <div className={styles.statTotal}>
             <strong>{fighter.stats.drillCount}</strong>
             <span>{fighter.stats.drillCount === 1 ? "drill recorded" : "drills recorded"}</span>
           </div>
           <div className={styles.sectionHeading}>
-            <p className="eyebrow" id="friend-training-title">Training Methods</p>
+            <p className="eyebrow" id="fighter-training-title">Training Methods</p>
           </div>
           {fighter.stats.trainingMethods.length > 0 ? (
             <div className={styles.methodStrip}>
@@ -184,42 +193,33 @@ export function FighterProfileScreen({
                       loading="eager"
                       decoding="async"
                     />
-                  ) : (
-                    <span className={styles.methodFallback} aria-hidden="true" />
-                  )}
+                  ) : <span className={styles.methodFallback} aria-hidden="true" />}
                   <strong>{method.count}</strong>
                 </div>
               ))}
             </div>
-          ) : (
-            <p className={styles.empty}>No Training Method totals yet.</p>
-          )}
+          ) : <p className={styles.empty}>No Training Method totals yet.</p>}
         </section>
       )}
 
-      {!fighter.stats && fighter.relationship === "friends" && !fighterQuery.isError && (
+      {!fighter.stats && fighter.mutual && !fighterQuery.isError && (
         <section className={styles.privateNotice} role="status">
           <p className="eyebrow">Training Totals</p>
-          <p>Loading your friend’s training totals…</p>
+          <p>Loading private training totals…</p>
         </section>
       )}
 
-      {!fighter.stats
-        && fighter.relationship !== "self"
-        && fighter.relationship !== "friends"
-        && (
-          <section className={styles.privateNotice}>
-            <p className="eyebrow">Private Training</p>
-            <p>Training totals appear after you become friends.</p>
-          </section>
-        )}
-
-      {fighter.relationship === "friends" && (
-        <SharedDrillsSection ownerUsername={fighter.profile.username} />
+      {!fighter.stats && !fighter.mutual && (
+        <section className={styles.privateNotice}>
+          <p className="eyebrow">Private Training</p>
+          <p>Training totals appear after you both follow each other.</p>
+        </section>
       )}
 
+      {fighter.mutual && <SharedDrillsSection ownerUsername={fighter.profile.username} />}
+
       <FriendConfirmationSheet
-        action={confirmation ?? "remove"}
+        action={confirmation ?? "unfollow"}
         fighter={fighter.profile}
         open={confirmation !== null}
         pending={actionMutation.isPending}
@@ -233,7 +233,7 @@ export function FighterProfileScreen({
       <FriendMoreActionsSheet
         fighter={fighter.profile}
         open={moreOpen}
-        allowBlock={fighter.relationship !== "blocked"}
+        allowBlock
         onClose={() => setMoreOpen(false)}
         onShare={() => void shareProfile()}
         onReport={() => {
@@ -263,27 +263,25 @@ export function FighterProfileScreen({
     </main>
   );
 }
+function SocialCount({ count, label, href }: { count: number; label: string; href: string | null }) {
+  const content = <><strong>{count}</strong><span>{label}</span></>;
+  return href ? <Link href={href} prefetch>{content}</Link> : <span>{content}</span>;
+}
 
 function ProfileActions({
-  relationship,
+  fighter,
   pending,
   onMore,
   onAction,
 }: {
-  relationship: FriendshipState;
+  fighter: FighterProfile;
   pending: boolean;
   onMore: () => void;
   onAction: (action: ProfileAction) => void;
 }) {
   return (
     <div className={styles.profileActions}>
-      {relationship === "none" && (
-        <button type="button" disabled={pending} onClick={() => onAction("send")}>
-          <UserPlus size={18} weight="bold" aria-hidden="true" />
-          Add Friend
-        </button>
-      )}
-      {relationship === "incoming" && (
+      {fighter.incoming.status === "pending" && (
         <>
           <button type="button" disabled={pending} onClick={() => onAction("accept")}>
             <Check size={18} weight="bold" aria-hidden="true" />
@@ -295,16 +293,24 @@ function ProfileActions({
           </button>
         </>
       )}
-      {relationship === "outgoing" && (
-        <button type="button" disabled={pending} onClick={() => onAction("cancel")}>
-          Cancel Request
+      {fighter.outgoing.status === "none" && (
+        <button type="button" disabled={pending} onClick={() => onAction("follow")}>
+          <UserPlus size={18} weight="bold" aria-hidden="true" />
+          Follow
         </button>
       )}
-      {relationship === "friends" && (
-        <button type="button" disabled={pending} onClick={() => onAction("remove")}>Remove Friend</button>
+      {fighter.outgoing.status === "pending" && (
+        <button type="button" disabled={pending} onClick={() => onAction("cancel")}>
+          Requested
+        </button>
       )}
-      {relationship === "blocked" && (
-        <button type="button" disabled={pending} onClick={() => onAction("unblock")}>Unblock Fighter</button>
+      {fighter.outgoing.status === "accepted" && (
+        <button type="button" disabled={pending} onClick={() => onAction("unfollow")}>
+          Following
+        </button>
+      )}
+      {fighter.incoming.status === "accepted" && (
+        <span className={styles.followsYou}>Follows you</span>
       )}
       <button
         className={styles.moreTrigger}
@@ -323,42 +329,18 @@ function ProfileActions({
 async function runProfileAction(
   fighter: FighterProfile,
   action: ProfileAction,
-): Promise<FriendshipState> {
+): Promise<ConnectionMutationResponse> {
   switch (action) {
-    case "send":
-      return (await sendFriendRequest(fighter.profile.username)).relationship;
+    case "follow":
+      return requestFollow(fighter.profile.username);
     case "accept":
     case "decline":
-      return (await respondToFriendRequest(
-        fighter.profile.id,
-        { action },
-      )).relationship;
+      return respondToFollowRequest(fighter.profile.id, { action });
     case "cancel":
-      return (await cancelFriendRequest(fighter.profile.id)).relationship;
-    case "remove":
-      await removeFriend(fighter.profile.id);
-      return "none";
+    case "unfollow":
+      return cancelOrUnfollow(fighter.profile.id);
     case "block":
-      return (await blockFighter(fighter.profile.id)).relationship;
-    case "unblock":
-      return (await unblockFighter(fighter.profile.id)).relationship;
-  }
-}
-
-function relationshipLabel(relationship: FriendshipState) {
-  switch (relationship) {
-    case "self":
-      return "Your profile";
-    case "none":
-      return "Not connected";
-    case "incoming":
-      return "Sent you a friend request";
-    case "outgoing":
-      return "Friend request pending";
-    case "friends":
-      return "Friends";
-    case "blocked":
-      return "Blocked";
+      return blockFighter(fighter.profile.id);
   }
 }
 

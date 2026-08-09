@@ -24,7 +24,7 @@ export function DrillShareButton({ drillId }: { drillId: string }) {
   const [open, setOpen] = useState(false);
   const contentRef = useDrawerFocus(open);
   const queryKey = ["drill-shares", drillId];
-  const friendsQuery = useInfiniteQuery({
+  const recipientsQuery = useInfiniteQuery({
     queryKey,
     queryFn: ({ pageParam, signal }) => getDrillShareFriendPage(
       drillId,
@@ -70,14 +70,14 @@ export function DrillShareButton({ drillId }: { drillId: string }) {
       void queryClient.invalidateQueries({ queryKey: ["shared-drills"] });
     },
   });
-  const friends = friendsQuery.data?.pages.flatMap((page) => page.items) ?? [];
+  const recipients = recipientsQuery.data?.pages.flatMap((page) => page.items) ?? [];
 
   return (
     <>
       <button
         className={styles.trigger}
         type="button"
-        aria-label="Share drill with friends"
+        aria-label="Share drill with connections"
         title="Share drill"
         onClick={() => setOpen(true)}
       >
@@ -103,7 +103,7 @@ export function DrillShareButton({ drillId }: { drillId: string }) {
               <div>
                 <Drawer.Title asChild><h2>Share Drill</h2></Drawer.Title>
                 <Drawer.Description asChild>
-                  <p>Choose friends who can open this drill.</p>
+                  <p>Choose fighters you follow each other with.</p>
                 </Drawer.Description>
               </div>
               <button
@@ -117,16 +117,16 @@ export function DrillShareButton({ drillId }: { drillId: string }) {
             </div>
 
             <div className={styles.list}>
-              {friendsQuery.isPending ? (
-                <p className={styles.state} role="status">Loading friends…</p>
-              ) : friendsQuery.isError ? (
-                <button className={styles.retry} type="button" onClick={() => void friendsQuery.refetch()}>
-                  Friends couldn’t be loaded. Retry
+              {recipientsQuery.isPending ? (
+                <p className={styles.state} role="status">Loading connections…</p>
+              ) : recipientsQuery.isError ? (
+                <button className={styles.retry} type="button" onClick={() => void recipientsQuery.refetch()}>
+                  Connections couldn’t be loaded. Retry
                 </button>
-              ) : friends.length === 0 ? (
-                <p className={styles.state}>Add a friend before sharing a drill.</p>
-              ) : friends.map((item) => {
-                const pendingThisFriend = mutation.isPending
+              ) : recipients.length === 0 ? (
+                <p className={styles.state}>Follow each other before sharing a drill.</p>
+              ) : recipients.map((item) => {
+                const pendingThisRecipient = mutation.isPending
                   && mutation.variables.recipientUserId === item.profile.id;
                 return (
                   <button
@@ -152,20 +152,20 @@ export function DrillShareButton({ drillId }: { drillId: string }) {
                       imageClassName={styles.avatarImage}
                     />
                     <strong>@{item.profile.username}</strong>
-                    <span data-shared={item.shared} data-pending={pendingThisFriend}>
+                    <span data-shared={item.shared} data-pending={pendingThisRecipient}>
                       {item.shared && <Check size={17} weight="bold" aria-hidden="true" />}
                     </span>
                   </button>
                 );
               })}
-              {friendsQuery.hasNextPage && (
+              {recipientsQuery.hasNextPage && (
                 <button
                   className={styles.loadMore}
                   type="button"
-                  disabled={friendsQuery.isFetchingNextPage || mutation.isPending}
-                  onClick={() => void friendsQuery.fetchNextPage()}
+                  disabled={recipientsQuery.isFetchingNextPage || mutation.isPending}
+                  onClick={() => void recipientsQuery.fetchNextPage()}
                 >
-                  {friendsQuery.isFetchingNextPage ? "Loading…" : "Load More"}
+                  {recipientsQuery.isFetchingNextPage ? "Loading…" : "Load More"}
                 </button>
               )}
             </div>

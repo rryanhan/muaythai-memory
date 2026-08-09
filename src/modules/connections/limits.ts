@@ -1,12 +1,12 @@
 import { sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { friendRateLimits } from "@/db/schema";
-import { FriendMutationError } from "./errors";
+import { ConnectionMutationError } from "./errors";
 
-export type FriendRateLimitAction = "search" | "request" | "report";
+export type ConnectionRateLimitAction = "search" | "follow" | "report";
 
 const rateLimits: Record<
-  FriendRateLimitAction,
+  ConnectionRateLimitAction,
   { limit: number; windowMs: number; message: string }
 > = {
   search: {
@@ -14,10 +14,10 @@ const rateLimits: Record<
     windowMs: 10 * 60 * 1000,
     message: "Too many fighter searches. Wait a few minutes and try again.",
   },
-  request: {
+  follow: {
     limit: 20,
     windowMs: 24 * 60 * 60 * 1000,
-    message: "Friend request limit reached. Try again tomorrow.",
+    message: "Follow request limit reached. Try again tomorrow.",
   },
   report: {
     limit: 5,
@@ -26,9 +26,9 @@ const rateLimits: Record<
   },
 };
 
-export async function consumeFriendRateLimit(
+export async function consumeConnectionRateLimit(
   userId: string,
-  action: FriendRateLimitAction,
+  action: ConnectionRateLimitAction,
   executor: Pick<typeof db, "insert"> = db,
 ): Promise<void> {
   const policy = rateLimits[action];
@@ -59,7 +59,5 @@ export async function consumeFriendRateLimit(
     })
     .returning({ requestCount: friendRateLimits.requestCount });
 
-  if (!rows[0]) {
-    throw new FriendMutationError(policy.message, 429);
-  }
+  if (!rows[0]) throw new ConnectionMutationError(policy.message, 429);
 }

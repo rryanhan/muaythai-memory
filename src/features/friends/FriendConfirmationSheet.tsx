@@ -2,7 +2,7 @@
 
 import { Drawer } from "vaul";
 import { useDrawerFocus } from "@/features/media/use-drawer-focus";
-import type { FighterSummary } from "@/data/friends";
+import type { FighterSummary } from "@/data/connections";
 import styles from "./Friends.module.css";
 
 export function FriendConfirmationSheet({
@@ -14,7 +14,7 @@ export function FriendConfirmationSheet({
   onClose,
   onConfirm,
 }: {
-  action: "remove" | "block";
+  action: "unfollow" | "block";
   fighter: FighterSummary;
   open: boolean;
   pending: boolean;
@@ -23,7 +23,7 @@ export function FriendConfirmationSheet({
   onConfirm: () => void;
 }) {
   const contentRef = useDrawerFocus(open);
-  const removing = action === "remove";
+  const unfollowing = action === "unfollow";
 
   return (
     <Drawer.Root
@@ -39,16 +39,16 @@ export function FriendConfirmationSheet({
         <Drawer.Content
           ref={contentRef}
           className={styles.confirmationSheet}
-          aria-label={removing ? "Remove friend confirmation" : "Block fighter confirmation"}
+          aria-label={unfollowing ? "Unfollow confirmation" : "Block fighter confirmation"}
         >
           <Drawer.Handle className="sheet-handle" />
           <Drawer.Title asChild>
-            <h2>{removing ? "Remove Friend?" : "Block Fighter?"}</h2>
+            <h2>{unfollowing ? "Unfollow?" : "Block Fighter?"}</h2>
           </Drawer.Title>
           <Drawer.Description asChild>
             <p>
-              {removing
-                ? `@${fighter.username} will no longer appear in your Friends.`
+              {unfollowing
+                ? `You will stop following @${fighter.username}. Any shared drills between you will be removed if you no longer follow each other.`
                 : `@${fighter.username} will not be able to find your profile or send another request.`}
             </p>
           </Drawer.Description>
@@ -65,7 +65,7 @@ export function FriendConfirmationSheet({
             <button type="button" disabled={pending} onClick={onConfirm}>
               {pending
                 ? "Working…"
-                : removing ? "Remove Friend" : "Block Fighter"}
+                : unfollowing ? "Unfollow" : "Block Fighter"}
             </button>
           </div>
         </Drawer.Content>

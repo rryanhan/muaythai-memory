@@ -2,86 +2,80 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { FighterProfile } from "@/data/friends";
+import type { FighterProfile } from "@/data/connections";
 import { FighterProfileScreen } from "./FighterProfileScreen";
 
 const mocks = vi.hoisted(() => ({
   getFighterProfile: vi.fn(),
-  respondToFriendRequest: vi.fn(),
+  respondToFollowRequest: vi.fn(),
+  routerReplace: vi.fn(),
 }));
 
-vi.mock("@/data/friends", async (importOriginal) => ({
-  ...await importOriginal<typeof import("@/data/friends")>(),
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ replace: mocks.routerReplace }),
+}));
+vi.mock("@/data/connections", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/data/connections")>(),
   blockFighter: vi.fn(),
-  cancelFriendRequest: vi.fn(),
+  cancelOrUnfollow: vi.fn(),
   getFighterProfile: mocks.getFighterProfile,
-  removeFriend: vi.fn(),
   reportFighter: vi.fn(),
-  respondToFriendRequest: mocks.respondToFriendRequest,
-  sendFriendRequest: vi.fn(),
-  unblockFighter: vi.fn(),
+  requestFollow: vi.fn(),
+  respondToFollowRequest: mocks.respondToFollowRequest,
 }));
 vi.mock("@/components/navigation/RoutedBottomNav", () => ({
   RoutedBottomNav: () => <nav aria-label="Bottom navigation" />,
 }));
 vi.mock("@/features/profile/ProfileAvatar", () => ({
-  ProfileAvatar: ({ profile }: { profile: { displayName: string } }) => (
-    <span>{profile.displayName.slice(0, 1)}</span>
-  ),
+  ProfileAvatar: ({ profile }: { profile: { displayName: string } }) => <span>{profile.displayName.slice(0, 1)}</span>,
 }));
-vi.mock("./FriendConfirmationSheet", () => ({
-  FriendConfirmationSheet: () => null,
-}));
-vi.mock("./FriendReportSheet", () => ({
-  FriendReportSheet: () => null,
-}));
-vi.mock("./SharedDrillsSection", () => ({
-  SharedDrillsSection: () => null,
-}));
+vi.mock("./FriendConfirmationSheet", () => ({ FriendConfirmationSheet: () => null }));
+vi.mock("./FriendReportSheet", () => ({ FriendReportSheet: () => null }));
+vi.mock("./SharedDrillsSection", () => ({ SharedDrillsSection: () => null }));
 vi.mock("./FriendMoreActionsSheet", () => ({
-  FriendMoreActionsSheet: ({
-    open,
-    onBlock,
-  }: {
-    open: boolean;
-    onBlock: () => void;
-  }) => open ? <button type="button" onClick={onBlock}>Block Fighter</button> : null,
+  FriendMoreActionsSheet: ({ open, onBlock }: { open: boolean; onBlock: () => void }) => (
+    open ? <button type="button" onClick={onBlock}>Block Fighter</button> : null
+  ),
 }));
 
 describe("FighterProfileScreen", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
+  beforeEach(() => vi.clearAllMocks());
 
-  it("shows a loading handoff instead of claiming accepted-friend totals are private", async () => {
+  it("shows a loading handoff when accepting creates reciprocal access", async () => {
     const profileRefresh = deferred<FighterProfile>();
     mocks.getFighterProfile.mockReturnValue(profileRefresh.promise);
-    mocks.respondToFriendRequest.mockResolvedValue({
+    mocks.respondToFollowRequest.mockResolvedValue({
       userId: fighterProfile.profile.id,
-      relationship: "friends",
+      blockedByViewer: false,
+      outgoing: direction("accepted"),
+      incoming: direction("accepted"),
+      mutual: true,
     });
     const user = userEvent.setup();
     renderScreen(fighterProfile);
 
     await user.click(screen.getByRole("button", { name: "Accept" }));
-
-    expect(await screen.findByText("Loading your friend’s training totals…"))
-      .toBeInTheDocument();
-    expect(screen.queryByText("Training totals appear after you become friends."))
+    expect(await screen.findByText("Loading private training totals…")).toBeInTheDocument();
+    expect(screen.queryByText("Training totals appear after you both follow each other."))
       .not.toBeInTheDocument();
 
     profileRefresh.resolve({
       ...fighterProfile,
-      relationship: "friends",
-      stats: {
-        drillCount: 4,
-        trainingMethods: [],
-      },
+      incoming: direction("accepted"),
+      mutual: true,
+      canViewConnections: true,
+      stats: { drillCount: 4, trainingMethods: [] },
     });
-
     await waitFor(() => expect(screen.getByText("4")).toBeInTheDocument());
-    expect(screen.queryByText("Loading your friend’s training totals…"))
-      .not.toBeInTheDocument();
+  });
+
+  it("shows both Following and Follows you without a special mutual label", () => {
+    mocks.getFighterProfile.mockResolvedValue(mutualProfile);
+    renderScreen(mutualProfile);
+
+    expect(screen.getByRole("button", { name: "Following" })).toBeInTheDocument();
+    expect(screen.getByText("Follows you")).toBeInTheDocument();
+    expect(screen.queryByText(/mutual/i)).not.toBeInTheDocument();
   });
 
   it("keeps Block inside the more-actions menu", async () => {
@@ -89,20 +83,14 @@ describe("FighterProfileScreen", () => {
     const user = userEvent.setup();
     renderScreen(fighterProfile);
 
-    expect(screen.queryByRole("button", { name: "Block Fighter" }))
-      .not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Block Fighter" })).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "More fighter actions" }));
-    expect(screen.getByRole("button", { name: "Block Fighter" }))
-      .toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Block Fighter" })).toBeInTheDocument();
   });
 });
-
 function renderScreen(initialFighter: FighterProfile) {
   const queryClient = new QueryClient({
-    defaultOptions: {
-      queries: { retry: false },
-      mutations: { retry: false },
-    },
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
   return render(
     <QueryClientProvider client={queryClient}>
@@ -111,22 +99,40 @@ function renderScreen(initialFighter: FighterProfile) {
   );
 }
 
+function direction(status: "none" | "pending" | "accepted") {
+  return {
+    status,
+    requestedAt: status === "none" ? null : new Date("2026-07-29T12:00:00Z"),
+    acceptedAt: status === "accepted" ? new Date("2026-07-29T13:00:00Z") : null,
+  };
+}
+
 const fighterProfile: FighterProfile = {
   profile: {
     id: "00000000-0000-4000-8000-000000000002",
     username: "fighter_two",
     avatarUrl: null,
   },
-  relationship: "incoming",
-  requestedAt: new Date("2026-07-29T12:00:00Z"),
-  connectedAt: null,
+  isSelf: false,
+  blockedByViewer: false,
+  outgoing: direction("accepted"),
+  incoming: direction("pending"),
+  mutual: false,
+  socialCounts: { followers: 2, following: 3 },
+  canViewConnections: false,
   stats: null,
+};
+
+const mutualProfile: FighterProfile = {
+  ...fighterProfile,
+  incoming: direction("accepted"),
+  mutual: true,
+  canViewConnections: true,
+  stats: { drillCount: 4, trainingMethods: [] },
 };
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
-  const promise = new Promise<T>((nextResolve) => {
-    resolve = nextResolve;
-  });
+  const promise = new Promise<T>((nextResolve) => { resolve = nextResolve; });
   return { promise, resolve };
 }

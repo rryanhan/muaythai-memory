@@ -62,7 +62,7 @@ describe("DrillShareButton", () => {
     });
   });
 
-  it("optimistically toggles an accepted friend and persists the share", async () => {
+  it("optimistically toggles a reciprocal connection and persists the share", async () => {
     const success = deferred<{
       drillId: string;
       recipientUserId: string;
@@ -73,7 +73,7 @@ describe("DrillShareButton", () => {
     renderButton();
 
     await user.click(screen.getByRole("button", {
-      name: "Share drill with friends",
+      name: "Share drill with connections",
     }));
     const friend = await screen.findByRole("button", {
       name: "Share drill with @training_partner",
@@ -116,7 +116,7 @@ describe("DrillShareButton", () => {
     renderButton();
 
     await user.click(screen.getByRole("button", {
-      name: "Share drill with friends",
+      name: "Share drill with connections",
     }));
     const friend = await screen.findByRole("button", {
       name: "Share drill with @training_partner",

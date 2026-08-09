@@ -101,6 +101,13 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Create Supabase API roles
+        run: |
+          psql "$DATABASE_DIRECT_URL" --set=ON_ERROR_STOP=1 <<'SQL'
+          CREATE ROLE anon NOLOGIN;
+          CREATE ROLE authenticated NOLOGIN;
+          SQL
+
       - name: Migrate ephemeral database
         run: npm run db:migrate
 
