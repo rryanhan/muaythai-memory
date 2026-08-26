@@ -6,6 +6,7 @@ import { PencilSimple } from "@phosphor-icons/react/PencilSimple";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import type { ApiError } from "@/data/api-core";
+import { CAPTURE_LIMITS } from "@/config/domain-limits";
 import { createCaptureDraft } from "@/data/capture";
 import { getTaxonomy } from "@/data/taxonomy";
 import type { CaptureDraft, CreateDrillInput, DrillDetail } from "@/data/types";
@@ -317,6 +318,7 @@ export function CaptureDraftForm({
                 value={transcriptRevision}
                 onChange={(event) => setTranscriptRevision(event.target.value)}
                 rows={6}
+                maxLength={CAPTURE_LIMITS.transcriptCharacters}
                 aria-label="Edit original transcript"
               />
               <div>
@@ -422,6 +424,7 @@ export function CaptureDraftForm({
             onChange={(event) => setTranscript(event.target.value)}
             placeholder="Example: Coach had us slip outside the cross, step through, throw the left uppercut, then pivot out before the return..."
             rows={9}
+            maxLength={CAPTURE_LIMITS.transcriptCharacters}
           />
         </label>
       </section>

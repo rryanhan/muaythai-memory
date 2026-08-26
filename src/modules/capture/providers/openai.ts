@@ -1,6 +1,7 @@
 import OpenAI from "openai";
 import { zodTextFormat } from "openai/helpers/zod";
 import type { ZodType } from "zod";
+import { CAPTURE_LIMITS } from "@/config/domain-limits";
 import { modelCaptureDraftSchema, type ModelCaptureDraft } from "../contracts";
 import {
   CaptureDraftCancelledError,
@@ -24,6 +25,11 @@ export function createOpenAiCaptureProvider(): CaptureDraftProvider {
 
   return {
     async generate(input: CaptureDraftProviderInput): Promise<ModelCaptureDraft> {
+      const timeoutSignal = AbortSignal.timeout(CAPTURE_LIMITS.openAiCleanupTimeoutMs);
+      const signal = input.signal
+        ? AbortSignal.any([input.signal, timeoutSignal])
+        : timeoutSignal;
+
       try {
         const response = await client.responses.create(
           {
@@ -36,13 +42,19 @@ export function createOpenAiCaptureProvider(): CaptureDraftProvider {
             },
             max_output_tokens: 2_000,
           },
-          { signal: input.signal },
+          { signal },
         );
 
         return parseOpenAiCaptureResponse(response, input.schema);
       } catch (error) {
         if (input.signal?.aborted) {
           throw new CaptureDraftCancelledError();
+        }
+
+        if (timeoutSignal.aborted) {
+          throw new CaptureDraftGenerationError(
+            "OpenAI took too long to clean up this drill. Try again.",
+          );
         }
 
         if (error instanceof CaptureDraftGenerationError) throw error;

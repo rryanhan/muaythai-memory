@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { CAPTURE_LIMITS } from "@/config/domain-limits";
 import {
   CaptureTranscriptionCancelledError,
   CaptureTranscriptionError,
@@ -45,33 +46,37 @@ export async function transcribeCaptureAudio(
   options: TranscribeCaptureAudioOptions = {},
 ): Promise<string> {
   validateCaptureAudioMetadata(audio);
+  const provider = getCaptureTranscriptionProvider(options);
+  return provider.transcribe(audio, { signal: options.signal });
+}
 
-  const provider =
+export function getCaptureTranscriptionProvider(
+  options: TranscribeCaptureAudioOptions = {},
+): CaptureTranscriptionProvider {
+  const providerName =
     options.provider ??
     process.env.CAPTURE_TRANSCRIPTION_PROVIDER?.trim() ??
     "whisper-local";
-  if (provider !== "whisper-local" && provider !== "openai") {
+  if (providerName !== "whisper-local" && providerName !== "openai") {
     throw new CaptureTranscriptionError(
-      `Unknown transcription provider: ${provider}.`,
+      `Unknown transcription provider: ${providerName}.`,
       503,
       "Set CAPTURE_TRANSCRIPTION_PROVIDER to whisper-local or openai.",
     );
   }
 
-  if (provider === "openai") {
-    const openAIProvider = new OpenAITranscriptionProvider({
+  if (providerName === "openai") {
+    return new OpenAITranscriptionProvider({
       fetcher: options.fetcher,
       apiKey: options.apiKey,
       model: options.model,
     });
-    return openAIProvider.transcribe(audio, { signal: options.signal });
   }
 
-  const whisperProvider = new WhisperServerTranscriptionProvider({
+  return new WhisperServerTranscriptionProvider({
     fetcher: options.fetcher,
     serverUrl: options.serverUrl,
   });
-  return whisperProvider.transcribe(audio, { signal: options.signal });
 }
 
 export class OpenAITranscriptionProvider implements CaptureTranscriptionProvider {
@@ -91,12 +96,6 @@ export class OpenAITranscriptionProvider implements CaptureTranscriptionProvider
       options.model?.trim() ||
       process.env.OPENAI_TRANSCRIPTION_MODEL?.trim() ||
       "gpt-4o-mini-transcribe";
-  }
-
-  async transcribe(
-    audio: File,
-    options: CaptureTranscriptionProviderOptions = {},
-  ): Promise<string> {
     if (!this.apiKey) {
       throw new CaptureTranscriptionError(
         "Hosted transcription is not configured.",
@@ -104,7 +103,12 @@ export class OpenAITranscriptionProvider implements CaptureTranscriptionProvider
         "Set OPENAI_API_KEY in the deployed environment.",
       );
     }
+  }
 
+  async transcribe(
+    audio: File,
+    options: CaptureTranscriptionProviderOptions = {},
+  ): Promise<string> {
     const formData = new FormData();
     formData.append("file", audio, audio.name || `capture.${extensionForMimeType(audio.type)}`);
     formData.append("model", this.model);
@@ -279,6 +283,12 @@ function parseTranscriptionTranscript(payload: unknown, providerLabel: string): 
     throw new CaptureTranscriptionError(
       "No clear speech was detected. Try recording again closer to the microphone.",
       422,
+    );
+  }
+  if (transcript.length > CAPTURE_LIMITS.transcriptCharacters) {
+    throw new CaptureTranscriptionError(
+      `The transcript is longer than ${CAPTURE_LIMITS.transcriptCharacters.toLocaleString()} characters. Record a shorter memo.`,
+      413,
     );
   }
   return transcript;

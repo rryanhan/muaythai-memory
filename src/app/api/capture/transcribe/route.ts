@@ -5,7 +5,11 @@ import {
   CaptureTranscriptionCancelledError,
   CaptureTranscriptionError,
 } from "@/modules/capture/errors";
-import { transcribeCaptureAudio } from "@/modules/capture/transcription";
+import {
+  getCaptureTranscriptionProvider,
+  validateCaptureAudioMetadata,
+} from "@/modules/capture/transcription";
+import { CaptureRateLimitError, consumeCaptureRateLimit } from "@/modules/capture/rate-limits";
 import { authenticationErrorResponse, requireProfileOnboardedUserId } from "@/modules/auth";
 
 export const dynamic = "force-dynamic";
@@ -15,7 +19,7 @@ export async function POST(request: NextRequest) {
   const requestId = randomUUID().slice(0, 8);
   const requestStartedAt = performance.now();
   try {
-    await requireProfileOnboardedUserId();
+    const userId = await requireProfileOnboardedUserId();
     const parsingStartedAt = performance.now();
     const formData = await request.formData();
     const audio = formData.get("audio");
@@ -27,6 +31,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Attach one audio recording." }, { status: 400 });
     }
 
+    validateCaptureAudioMetadata(audio);
+    const provider = getCaptureTranscriptionProvider();
+    await consumeCaptureRateLimit(userId, "transcription");
+
     logTranscriptionTiming(requestId, "upload-parsed", requestStartedAt, {
       parseMs: elapsedMilliseconds(parsingStartedAt),
       mimeType: audio.type || "unknown",
@@ -34,7 +42,7 @@ export async function POST(request: NextRequest) {
     });
 
     const providerStartedAt = performance.now();
-    const transcript = await transcribeCaptureAudio(audio, { signal: request.signal });
+    const transcript = await provider.transcribe(audio, { signal: request.signal });
     logTranscriptionTiming(requestId, "provider-complete", requestStartedAt, {
       providerMs: elapsedMilliseconds(providerStartedAt),
       mimeType: audio.type || "unknown",
@@ -47,6 +55,15 @@ export async function POST(request: NextRequest) {
     });
     const authResponse = authenticationErrorResponse(error);
     if (authResponse) return authResponse;
+    if (error instanceof CaptureRateLimitError) {
+      return NextResponse.json(
+        { error: error.message, retryAfterSeconds: error.retryAfterSeconds },
+        {
+          status: error.status,
+          headers: { "Retry-After": String(error.retryAfterSeconds) },
+        },
+      );
+    }
     if (error instanceof CaptureTranscriptionError) {
       return NextResponse.json(
         { error: error.message, ...(error.setup ? { setup: error.setup } : {}) },

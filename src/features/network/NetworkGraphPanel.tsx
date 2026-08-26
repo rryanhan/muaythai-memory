@@ -14,6 +14,7 @@ import {
   type UpdateSavedListResponse,
 } from "@/data";
 import { badgeByIconKey } from "@/components/shared/context-badges";
+import { DRILL_LIMITS } from "@/config/domain-limits";
 import { DrillDetailSheet } from "@/features/drills/DrillDetailSheet";
 import { getBuiltInStatusFilters, type BuiltInStatusFilter } from "@/features/shared/tag-filter-helpers";
 import { updateStatusTags } from "@/features/shared/saved-list-state";
@@ -32,6 +33,7 @@ import { type DrillDetailLoadState, type NetworkFilters } from "./types";
 import { NetworkStatePanel } from "./NetworkStates";
 
 type NetworkGraphPanelProps = {
+  active: boolean;
   graph: GraphResponse;
   filters: NetworkFilters;
   effectiveFilters: NetworkFilters;
@@ -54,6 +56,7 @@ type NetworkGraphPanelProps = {
 
 // Owns graph-local UI state that should not reset the outer graph fetch loop.
 export function NetworkGraphPanel({
+  active,
   graph,
   filters,
   effectiveFilters,
@@ -110,6 +113,23 @@ export function NetworkGraphPanel({
   }, [builtInStatuses, filters.statusTagSlugs]);
 
   useEffect(() => {
+    if (active) return;
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (cancelled) return;
+      setControlsOpen(false);
+      setTagSelectOpen(false);
+      onSearchOpenChange(false);
+      setDetailOpen(false);
+      setSelectedDrillId(null);
+      setDetailLoadState({ status: "idle" });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [active, onSearchOpenChange]);
+
+  useEffect(() => {
     if (!selectedDrillId) {
       setDetailLoadState({ status: "idle" });
       return;
@@ -139,17 +159,17 @@ export function NetworkGraphPanel({
   }, [detailRetryNonce, selectedDrillId]);
 
   useEffect(() => {
-    if (!searchOpen) return;
+    if (!active || !searchOpen) return;
 
     const frame = window.requestAnimationFrame(() => {
       searchInputRef.current?.focus({ preventScroll: true });
     });
 
     return () => window.cancelAnimationFrame(frame);
-  }, [searchOpen]);
+  }, [active, searchOpen]);
 
   useEffect(() => {
-    if (!searchOpen) return;
+    if (!active || !searchOpen) return;
 
     const html = document.documentElement;
     const body = document.body;
@@ -163,13 +183,10 @@ export function NetworkGraphPanel({
       html.style.overflow = previousHtmlOverflow;
       body.style.overflow = previousBodyOverflow;
     };
-  }, [searchOpen]);
+  }, [active, searchOpen]);
 
   useEffect(() => {
-    if (!searchOpen) {
-      setKeyboardInset(0);
-      return;
-    }
+    if (!active || !searchOpen) return;
 
     const viewport = window.visualViewport;
 
@@ -194,7 +211,7 @@ export function NetworkGraphPanel({
       viewport.removeEventListener("resize", updateKeyboardInset);
       viewport.removeEventListener("scroll", updateKeyboardInset);
     };
-  }, [searchOpen]);
+  }, [active, searchOpen]);
 
   if (methods.length === 0 && drillCount === 0) {
     return <NetworkStatePanel title="No graph data" body="No Training Method or drill nodes were returned." />;
@@ -365,6 +382,7 @@ export function NetworkGraphPanel({
           </div>
 
           <NetworkForceGraph
+            active={active}
             graph={graph}
             badgeByIconKey={badgeByIconKey}
             focusedMethodSlugs={filters.methodSlugs}
@@ -375,7 +393,7 @@ export function NetworkGraphPanel({
         </div>
       </div>
 
-      {searchOpen && (
+      {active && searchOpen && (
         <form
           className="network-search-popover"
           style={searchPopoverStyle}
@@ -390,13 +408,14 @@ export function NetworkGraphPanel({
             aria-label="Search keyword"
             placeholder="Search for keyword"
             value={searchDraft}
+            maxLength={DRILL_LIMITS.filterKeywordCharacters}
             onChange={(event) => onSearchDraftChange(event.target.value)}
           />
         </form>
       )}
 
       <NetworkControlsSheet
-        open={controlsOpen}
+        open={active && controlsOpen}
         onOpenChange={(open) => {
           setControlsOpen(open);
           if (!open) {
@@ -422,8 +441,8 @@ export function NetworkGraphPanel({
         <button
           type="button"
           aria-label="Network controls"
-          aria-expanded={controlsOpen}
-          data-active={controlsOpen}
+          aria-expanded={active && controlsOpen}
+          data-active={active && controlsOpen}
           onClick={() => setControlsOpen((open) => !open)}
         >
           <SlidersHorizontal size={25} weight="regular" aria-hidden="true" />
@@ -431,8 +450,8 @@ export function NetworkGraphPanel({
         <button
           type="button"
           aria-label="Search network"
-          aria-expanded={searchOpen}
-          data-active={searchOpen}
+          aria-expanded={active && searchOpen}
+          data-active={active && searchOpen}
           onClick={toggleSearch}
         >
           <MagnifyingGlass size={26} weight="regular" aria-hidden="true" />
@@ -447,7 +466,7 @@ export function NetworkGraphPanel({
         </Link>
       </div>
 
-      {selectedDrillId && visibleDetailState.status !== "idle" && (
+      {active && selectedDrillId && visibleDetailState.status !== "idle" && (
         <DrillDetailSheet
           state={visibleDetailState}
           badgeByIconKey={badgeByIconKey}

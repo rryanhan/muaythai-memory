@@ -9,6 +9,7 @@ import {
 } from "./contracts";
 import { CaptureDraftGenerationError } from "./errors";
 import { getCaptureDraftProvider } from "./providers";
+import { consumeCaptureRateLimit } from "./rate-limits";
 import type { TaxonomyResponse } from "@/modules/taxonomy/contracts";
 
 export type GenerateCaptureDraftOptions = {
@@ -26,6 +27,7 @@ export async function generateCaptureDraft(
     taxonomy.trainingMethods.map((method) => method.slug),
     taxonomy.standardTags.map((tag) => tag.slug),
   );
+  await consumeCaptureRateLimit(userId, "cleanup");
   const modelDraft = await provider.generate({
     instructions: buildCaptureInstructions(taxonomy),
     prompt: buildCaptureInput(transcript),

@@ -13,6 +13,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { badgeByIconKey } from "@/components/shared/context-badges";
 import skeletonStyles from "@/components/shared/Skeleton.module.css";
+import { DRILL_LIMITS } from "@/config/domain-limits";
 import captureStyles from "@/features/capture/Capture.module.css";
 import { SavedListToken } from "@/features/shared/SavedListToken";
 import { getBuiltInStatusFilters } from "@/features/shared/tag-filter-helpers";
@@ -25,7 +26,6 @@ import {
   hasPendingDrillCleanup,
   mergeDrillCleanup,
   type DrillCleanupField,
-  type DrillCleanupValues,
   type DrillDirtyFields,
   type PendingDrillCleanup,
 } from "./cleanup-merge";
@@ -182,6 +182,10 @@ export function AddDrillForm({
   }
 
   function addStep() {
+    if (steps.length >= DRILL_LIMITS.steps) {
+      setFormMessage(`A drill can have up to ${DRILL_LIMITS.steps} steps.`);
+      return;
+    }
     markDirty("steps");
     setSteps((current) => [...current, ""]);
   }
@@ -227,8 +231,12 @@ export function AddDrillForm({
     const trimmedSteps = steps.map((step) => step.trim()).filter(Boolean);
     const validationMessage = getValidationMessage({
       title,
+      summary,
+      notes,
       steps: trimmedSteps,
       trainingMethodSlugs,
+      tagSlugs,
+      statusTagSlugs,
     });
 
     if (validationMessage) {
@@ -302,6 +310,7 @@ export function AddDrillForm({
                   setTitle(event.target.value);
                 }}
                 placeholder="Slip right uppercut exit"
+                maxLength={DRILL_LIMITS.titleCharacters}
               />
             </label>
             <label>
@@ -314,6 +323,7 @@ export function AddDrillForm({
                 }}
                 placeholder="What this drill is for, if a short recap helps."
                 rows={3}
+                maxLength={DRILL_LIMITS.summaryCharacters}
               />
             </label>
             <label>
@@ -326,6 +336,7 @@ export function AddDrillForm({
                 }}
                 placeholder="Coach cues, specifics, common mistakes, or reminders."
                 rows={4}
+                maxLength={DRILL_LIMITS.notesCharacters}
               />
             </label>
           </section>
@@ -340,6 +351,7 @@ export function AddDrillForm({
                     value={step}
                     onChange={(event) => updateStep(index, event.target.value)}
                     placeholder={index === 0 ? "Start with..." : "Next step"}
+                    maxLength={DRILL_LIMITS.stepCharacters}
                   />
                   <button type="button" disabled={steps.length === 1} onClick={() => removeStep(index)}>
                     Remove
@@ -347,9 +359,18 @@ export function AddDrillForm({
                 </div>
               ))}
             </div>
-            <button type="button" className="add-drill-secondary-button" onClick={addStep}>
+            <button
+              type="button"
+              className="add-drill-secondary-button"
+              disabled={steps.length >= DRILL_LIMITS.steps}
+              aria-describedby="add-drill-step-limit"
+              onClick={addStep}
+            >
               Add step
             </button>
+            <p className="add-drill-limit" id="add-drill-step-limit">
+              Up to {DRILL_LIMITS.steps} steps.
+            </p>
           </section>
         </>
       )}
@@ -652,12 +673,36 @@ function toggleSlug(current: string[], slug: string): string[] {
 
 function getValidationMessage(input: {
   title: string;
+  summary: string;
+  notes: string;
   steps: string[];
   trainingMethodSlugs: string[];
+  tagSlugs: string[];
+  statusTagSlugs: string[];
 }): string | null {
   if (!input.title.trim()) return "Add a title before saving.";
+  if (input.title.trim().length > DRILL_LIMITS.titleCharacters) {
+    return `Keep the title to ${DRILL_LIMITS.titleCharacters} characters or fewer.`;
+  }
+  if (input.summary.trim().length > DRILL_LIMITS.summaryCharacters) {
+    return `Keep the summary to ${DRILL_LIMITS.summaryCharacters.toLocaleString()} characters or fewer.`;
+  }
+  if (input.notes.trim().length > DRILL_LIMITS.notesCharacters) {
+    return `Keep the notes to ${DRILL_LIMITS.notesCharacters.toLocaleString()} characters or fewer.`;
+  }
   if (input.steps.length === 0) return "Add at least one step before saving.";
+  if (input.steps.length > DRILL_LIMITS.steps) return `Use no more than ${DRILL_LIMITS.steps} steps.`;
+  if (input.steps.some((step) => step.length > DRILL_LIMITS.stepCharacters)) {
+    return `Keep each step to ${DRILL_LIMITS.stepCharacters} characters or fewer.`;
+  }
   if (input.trainingMethodSlugs.length === 0) return "Choose at least one Training Method.";
+  if (input.trainingMethodSlugs.length > DRILL_LIMITS.trainingMethods) {
+    return `Choose no more than ${DRILL_LIMITS.trainingMethods} Training Methods.`;
+  }
+  if (input.tagSlugs.length > DRILL_LIMITS.tags) return `Choose no more than ${DRILL_LIMITS.tags} tags.`;
+  if (input.statusTagSlugs.length > DRILL_LIMITS.savedLists) {
+    return `Choose no more than ${DRILL_LIMITS.savedLists} Saved Lists.`;
+  }
   return null;
 }
 

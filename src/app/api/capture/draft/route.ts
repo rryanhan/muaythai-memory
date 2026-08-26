@@ -7,6 +7,7 @@ import {
   CaptureDraftConfigError,
   CaptureDraftGenerationError,
 } from "@/modules/capture/errors";
+import { CaptureRateLimitError } from "@/modules/capture/rate-limits";
 import { authenticationErrorResponse, requireProfileOnboardedUserId } from "@/modules/auth";
 
 export const dynamic = "force-dynamic";
@@ -33,6 +34,16 @@ function handleRouteError(error: unknown) {
     return NextResponse.json(
       { error: "Invalid capture draft request or response shape.", issues: error.issues },
       { status: 400 },
+    );
+  }
+
+  if (error instanceof CaptureRateLimitError) {
+    return NextResponse.json(
+      { error: error.message, retryAfterSeconds: error.retryAfterSeconds },
+      {
+        status: error.status,
+        headers: { "Retry-After": String(error.retryAfterSeconds) },
+      },
     );
   }
 

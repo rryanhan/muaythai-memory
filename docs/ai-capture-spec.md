@@ -43,6 +43,18 @@ OPENAI_TRANSCRIPTION_MODEL=gpt-4o-mini-transcribe
 
 Hosted transcription also requires the server-only `OPENAI_API_KEY` environment variable.
 
+## Launch Limits
+
+Capture quotas are enforced atomically in Postgres for every configured provider. Transcription
+and cleanup have independent counters: each permits five dispatched attempts per fixed ten-minute
+window, with UTC daily limits of 20 transcriptions and 40 cleanups. Invalid requests do not consume
+quota. A request that reaches a provider remains counted even if the provider rejects it or the user
+cancels it. Limited requests return `429` with `Retry-After` and never reach the provider.
+
+Typed and transcribed notes are limited to 12,000 characters. OpenAI cleanup is limited to 60
+seconds, and generated fields must satisfy the same Drill limits as manual creation; generated text
+is rejected rather than silently truncated.
+
 ## Active Output
 
 ```json
@@ -61,10 +73,10 @@ Hosted transcription also requires the server-only `OPENAI_API_KEY` environment 
 }
 ```
 
-- `title`: required, short drill name.
-- `summary`: required for AI capture; one short factual sentence describing what the drill practices.
-- `notes`: optional source-backed cues, reminders, or mistakes.
-- `steps`: one or more ordered physical actions.
+- `title`: required, short drill name, up to 120 characters.
+- `summary`: required for AI capture; one short factual sentence up to 1,000 characters.
+- `notes`: optional source-backed cues, reminders, or mistakes, up to 5,000 characters.
+- `steps`: 1–50 ordered physical actions, up to 500 characters each.
 - `trainingMethodSlugs`: zero or more AI-selected values from the active Training Method taxonomy. The user must select at least one before saving.
 - `tagSlugs`: AI-selected values from the active standard-tag taxonomy.
 

@@ -4,7 +4,7 @@ import type { Dispatch, ReactNode, SetStateAction } from "react";
 import { CaretDown } from "@phosphor-icons/react/CaretDown";
 import { MagnifyingGlass } from "@phosphor-icons/react/MagnifyingGlass";
 import { Drawer } from "vaul";
-import type { GraphOptions, TagDto, TaxonomyResponse } from "@/data";
+import type { GraphOptions, TaxonomyResponse } from "@/data";
 import { SavedListToken } from "@/features/shared/SavedListToken";
 import {
   filterBuiltInStatuses,

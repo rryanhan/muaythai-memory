@@ -164,6 +164,8 @@ Relationship metadata lives in Postgres:
   reason, optional details, and timestamps
 - `friend_rate_limits`: fixed-window counters for search, follow, and report
   abuse controls
+- `capture_rate_limits`: server-only fixed-window counters for transcription
+  and AI cleanup burst/daily quotas
 - `drill_shares`: an explicit owner-to-reciprocal-follow grant for one Drill
 
 A directional composite key prevents duplicate requests without preventing a

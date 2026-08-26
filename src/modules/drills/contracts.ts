@@ -1,29 +1,39 @@
 import { z } from "zod";
+import { DRILL_LIMITS } from "@/config/domain-limits";
 import { statusTagDtoSchema, tagDtoSchema, trainingMethodDtoSchema } from "@/modules/taxonomy/contracts";
 
 const slugSchema = z
   .string()
   .trim()
   .min(1)
+  .max(DRILL_LIMITS.slugCharacters)
   .regex(/^[a-z0-9-]+$/);
+
+const drillTitleSchema = z.string().trim().min(1).max(DRILL_LIMITS.titleCharacters);
+const drillSummaryTextSchema = z.string().max(DRILL_LIMITS.summaryCharacters);
+const drillNotesSchema = z.string().max(DRILL_LIMITS.notesCharacters);
+const drillStepBodySchema = z.string().trim().min(1).max(DRILL_LIMITS.stepCharacters);
 
 // "all" means every selected tag/status must be present. "any" lets search
 // panels preview broader results without changing the underlying taxonomy.
 export const filterModeSchema = z.enum(["all", "any"]);
 
 export const drillFiltersSchema = z.object({
-  keywords: z.array(z.string().trim().min(1)).default([]),
-  methodSlugs: z.array(slugSchema).default([]),
-  tagSlugs: z.array(slugSchema).default([]),
-  statusTagSlugs: z.array(slugSchema).default([]),
+  keywords: z
+    .array(z.string().trim().min(1).max(DRILL_LIMITS.filterKeywordCharacters))
+    .max(DRILL_LIMITS.filterKeywords)
+    .default([]),
+  methodSlugs: z.array(slugSchema).max(DRILL_LIMITS.trainingMethods).default([]),
+  tagSlugs: z.array(slugSchema).max(DRILL_LIMITS.tags).default([]),
+  statusTagSlugs: z.array(slugSchema).max(DRILL_LIMITS.savedLists).default([]),
   tagMode: filterModeSchema.default("all"),
   statusMode: filterModeSchema.default("all"),
 });
 
 export const drillSummarySchema = z.object({
   id: z.string().uuid(),
-  title: z.string(),
-  summary: z.string(),
+  title: drillTitleSchema,
+  summary: drillSummaryTextSchema,
   trainingMethods: z.array(trainingMethodDtoSchema),
   tags: z.array(tagDtoSchema),
   customTags: z.array(tagDtoSchema),
@@ -33,12 +43,12 @@ export const drillSummarySchema = z.object({
 });
 
 export const drillDetailSchema = drillSummarySchema.extend({
-  notes: z.string().nullable(),
+  notes: drillNotesSchema.nullable(),
   steps: z.array(
     z.object({
       id: z.string().uuid(),
       position: z.number().int(),
-      body: z.string(),
+      body: drillStepBodySchema,
     }),
   ),
 });
@@ -71,23 +81,25 @@ export const updateSavedListResponseSchema = z.object({
 });
 
 export const createDrillInputSchema = z.object({
-  title: z.string().trim().min(1),
+  title: drillTitleSchema,
   summary: z
     .string()
     .trim()
+    .max(DRILL_LIMITS.summaryCharacters)
     .optional()
     .nullable()
     .transform((value) => value ?? ""),
   notes: z
     .string()
     .trim()
+    .max(DRILL_LIMITS.notesCharacters)
     .optional()
     .nullable()
     .transform((value) => value || null),
-  steps: z.array(z.string().trim().min(1)).min(1),
-  trainingMethodSlugs: z.array(slugSchema).min(1),
-  tagSlugs: z.array(slugSchema).default([]),
-  statusTagSlugs: z.array(slugSchema).default([]),
+  steps: z.array(drillStepBodySchema).min(1).max(DRILL_LIMITS.steps),
+  trainingMethodSlugs: z.array(slugSchema).min(1).max(DRILL_LIMITS.trainingMethods),
+  tagSlugs: z.array(slugSchema).max(DRILL_LIMITS.tags).default([]),
+  statusTagSlugs: z.array(slugSchema).max(DRILL_LIMITS.savedLists).default([]),
 });
 
 // Edit Drill v1 uses the same editable fields as manual creation. The API

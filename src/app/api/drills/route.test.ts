@@ -49,7 +49,8 @@ vi.mock("@/modules/drills/queries", () => ({
   listDrills: mocks.listDrills,
 }));
 
-import { GET } from "./route";
+import { DRILL_LIMITS } from "@/config/domain-limits";
+import { GET, POST } from "./route";
 
 describe("GET /api/drills onboarding states", () => {
   beforeEach(() => {
@@ -111,3 +112,47 @@ describe("GET /api/drills onboarding states", () => {
     );
   });
 });
+
+describe("drill API input boundaries", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.requireOnboardedUserId.mockResolvedValue(
+      "00000000-0000-4000-8000-000000000001",
+    );
+  });
+
+  it("rejects oversized create payloads before the mutation", async () => {
+    const response = await POST(jsonRequest({
+      title: "x".repeat(DRILL_LIMITS.titleCharacters + 1),
+      summary: "",
+      notes: null,
+      steps: ["Step"],
+      trainingMethodSlugs: ["pad-work"],
+      tagSlugs: [],
+      statusTagSlugs: [],
+    }));
+
+    expect(response.status).toBe(400);
+    expect(mocks.createDrill).not.toHaveBeenCalled();
+  });
+
+  it("rejects too many query keywords before the owned drill query", async () => {
+    const url = new URL("https://example.test/api/drills");
+    for (let index = 0; index <= DRILL_LIMITS.filterKeywords; index += 1) {
+      url.searchParams.append("keyword", `keyword-${index}`);
+    }
+
+    const response = await GET(new NextRequest(url));
+
+    expect(response.status).toBe(400);
+    expect(mocks.listDrills).not.toHaveBeenCalled();
+  });
+});
+
+function jsonRequest(body: unknown): NextRequest {
+  return new NextRequest("https://example.test/api/drills", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}

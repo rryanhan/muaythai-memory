@@ -209,6 +209,7 @@
 }
 
 .form :global(.add-drill-step-row) button:disabled,
+.form :global(.add-drill-secondary-button):disabled,
 .form :global(.add-drill-actions) button:disabled {
   cursor: default;
   opacity: 0.44;
@@ -218,6 +219,13 @@
   justify-self: start;
   padding: 0 12px;
   color: var(--accent);
+}
+
+.form :global(.add-drill-limit) {
+  margin: -2px 0 0;
+  color: var(--muted);
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 11px;
 }
 
 .form :global(.add-drill-method-grid) {

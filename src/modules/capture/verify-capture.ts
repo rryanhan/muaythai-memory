@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { CAPTURE_LIMITS, DRILL_LIMITS } from "@/config/domain-limits";
 import {
   CAPTURE_CLIENT_TRANSCRIPTION_TIMEOUT_MS,
   CAPTURE_FINALIZATION_TIMEOUT_MS,
@@ -24,7 +25,11 @@ import {
   shouldRecorderStopSetIdle,
 } from "@/features/capture/voice-state";
 import { mergeDrillCleanup, type DrillDirtyFields } from "@/features/drills/cleanup-merge";
-import { createModelCaptureDraftSchema, modelCaptureDraftSchema } from "./contracts";
+import {
+  captureDraftRequestSchema,
+  createModelCaptureDraftSchema,
+  modelCaptureDraftSchema,
+} from "./contracts";
 import {
   CaptureDraftGenerationError,
   CaptureTranscriptionCancelledError,
@@ -38,7 +43,9 @@ import {
   transcribeCaptureAudio,
   validateCaptureAudioMetadata,
 } from "./transcription";
+import { getCaptureRateLimitPolicies, startOfFixedWindow } from "./rate-limits";
 verifyCaptureContract();
+verifyCaptureRateLimits();
 verifyOpenAiCaptureResponse();
 verifyCleanupMerge();
 verifyRecorderRules();
@@ -81,6 +88,28 @@ function verifyCaptureContract() {
     true,
     "Model summary should accept a factual sentence.",
   );
+  assert.equal(
+    captureDraftRequestSchema.safeParse({
+      transcript: "x".repeat(CAPTURE_LIMITS.transcriptCharacters),
+    }).success,
+    true,
+  );
+  assert.equal(
+    captureDraftRequestSchema.safeParse({
+      transcript: "x".repeat(CAPTURE_LIMITS.transcriptCharacters + 1),
+    }).success,
+    false,
+    "Capture transcripts must reject content above the shared limit.",
+  );
+  assert.equal(
+    modelCaptureDraftSchema.safeParse({
+      ...baseDraft,
+      summary: "Practice the stated sequence.",
+      steps: ["x".repeat(DRILL_LIMITS.stepCharacters + 1)],
+    }).success,
+    false,
+    "AI output must reject oversized steps rather than truncating them.",
+  );
 
   const constrainedSchema = createModelCaptureDraftSchema(
     ["pad-work", "partner-drill"],
@@ -112,6 +141,19 @@ function verifyCaptureContract() {
     }).success,
     false,
     "AI capture must reject tags outside the active standard taxonomy.",
+  );
+}
+
+function verifyCaptureRateLimits() {
+  assert.equal(CAPTURE_LIMITS.openAiCleanupTimeoutMs, 60_000);
+  assert.deepEqual(getCaptureRateLimitPolicies("transcription").map((policy) => policy.limit), [5, 20]);
+  assert.deepEqual(getCaptureRateLimitPolicies("cleanup").map((policy) => policy.limit), [5, 40]);
+  assert.equal(
+    startOfFixedWindow(
+      new Date("2026-08-10T23:59:59.999Z"),
+      CAPTURE_LIMITS.dailyWindowMs,
+    ).toISOString(),
+    "2026-08-10T00:00:00.000Z",
   );
 }
 

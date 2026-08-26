@@ -1,22 +1,34 @@
 import { z } from "zod";
+import { CAPTURE_LIMITS, DRILL_LIMITS } from "@/config/domain-limits";
 
 const slugSchema = z
   .string()
   .trim()
   .min(1)
+  .max(DRILL_LIMITS.slugCharacters)
   .regex(/^[a-z0-9-]+$/);
 
 export const captureDraftRequestSchema = z.object({
-  transcript: z.string().trim().min(12, "Describe the drill in a little more detail."),
+  transcript: z
+    .string()
+    .trim()
+    .min(12, "Describe the drill in a little more detail.")
+    .max(
+      CAPTURE_LIMITS.transcriptCharacters,
+      `Keep the training note to ${CAPTURE_LIMITS.transcriptCharacters.toLocaleString()} characters or fewer.`,
+    ),
 });
 
 export const captureDraftSchema = z.object({
-  title: z.string().trim().min(1),
-  summary: z.string().trim().min(1),
-  notes: z.string().trim().nullable(),
-  steps: z.array(z.string().trim().min(1)).min(1),
-  trainingMethodSlugs: z.array(slugSchema),
-  tagSlugs: z.array(slugSchema),
+  title: z.string().trim().min(1).max(DRILL_LIMITS.titleCharacters),
+  summary: z.string().trim().min(1).max(DRILL_LIMITS.summaryCharacters),
+  notes: z.string().trim().max(DRILL_LIMITS.notesCharacters).nullable(),
+  steps: z
+    .array(z.string().trim().min(1).max(DRILL_LIMITS.stepCharacters))
+    .min(1)
+    .max(DRILL_LIMITS.steps),
+  trainingMethodSlugs: z.array(slugSchema).max(DRILL_LIMITS.trainingMethods),
+  tagSlugs: z.array(slugSchema).max(DRILL_LIMITS.tags),
 });
 
 export const captureDraftResponseSchema = z.object({
@@ -25,22 +37,22 @@ export const captureDraftResponseSchema = z.object({
 });
 
 export const captureTranscriptionResponseSchema = z.object({
-  transcript: z.string().trim().min(1),
+  transcript: z.string().trim().min(1).max(CAPTURE_LIMITS.transcriptCharacters),
 });
 
 const modelCaptureTextShape = {
-  title: z.string(),
-  summary: z.string().min(1),
-  notes: z.string().nullable(),
-  steps: z.array(z.string()),
+  title: z.string().max(DRILL_LIMITS.titleCharacters),
+  summary: z.string().min(1).max(DRILL_LIMITS.summaryCharacters),
+  notes: z.string().max(DRILL_LIMITS.notesCharacters).nullable(),
+  steps: z.array(z.string().max(DRILL_LIMITS.stepCharacters)).max(DRILL_LIMITS.steps),
 };
 
 // The broad schema supports shared types and offline fixtures. Live providers
 // receive the stricter taxonomy-enum schema created below.
 export const modelCaptureDraftSchema = z.object({
   ...modelCaptureTextShape,
-  trainingMethodSlugs: z.array(slugSchema),
-  tagSlugs: z.array(slugSchema),
+  trainingMethodSlugs: z.array(slugSchema).max(DRILL_LIMITS.trainingMethods),
+  tagSlugs: z.array(slugSchema).max(DRILL_LIMITS.tags),
 });
 
 export function createModelCaptureDraftSchema(
@@ -49,8 +61,10 @@ export function createModelCaptureDraftSchema(
 ) {
   return z.object({
     ...modelCaptureTextShape,
-    trainingMethodSlugs: z.array(toSlugEnum(trainingMethodSlugs, "Training Method")),
-    tagSlugs: z.array(toSlugEnum(tagSlugs, "standard tag")),
+    trainingMethodSlugs: z
+      .array(toSlugEnum(trainingMethodSlugs, "Training Method"))
+      .max(DRILL_LIMITS.trainingMethods),
+    tagSlugs: z.array(toSlugEnum(tagSlugs, "standard tag")).max(DRILL_LIMITS.tags),
   });
 }
 

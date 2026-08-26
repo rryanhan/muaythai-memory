@@ -2,6 +2,7 @@
 
 import { FunnelSimple } from "@phosphor-icons/react/FunnelSimple";
 import { MagnifyingGlass } from "@phosphor-icons/react/MagnifyingGlass";
+import { DRILL_LIMITS } from "@/config/domain-limits";
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { getDrills, getTaxonomy, type TagDto } from "@/data";
@@ -224,6 +225,7 @@ export function LibraryView() {
               aria-label="Search drills by keyword"
               placeholder="Search for keyword"
               value={filters.keyword}
+              maxLength={DRILL_LIMITS.filterKeywordCharacters}
               onChange={(event) => setKeyword(event.target.value)}
             />
           </label>

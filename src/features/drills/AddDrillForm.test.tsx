@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { DRILL_LIMITS } from "@/config/domain-limits";
 import { AddDrillForm } from "./AddDrillForm";
 
 const mocks = vi.hoisted(() => ({
@@ -19,12 +20,10 @@ vi.mock("next/navigation", () => ({
     refresh: mocks.refresh,
   }),
 }));
+vi.mock("@/data/taxonomy", () => ({ getTaxonomy: mocks.getTaxonomy }));
 vi.mock("@/data/drills", () => ({
   createDrill: mocks.createDrill,
   updateDrill: mocks.updateDrill,
-}));
-vi.mock("@/data/taxonomy", () => ({
-  getTaxonomy: mocks.getTaxonomy,
 }));
 
 describe("AddDrillForm creation commit", () => {
@@ -81,6 +80,49 @@ describe("AddDrillForm creation commit", () => {
     await waitFor(() => expect(alert).toHaveFocus());
     expect(screen.getByRole("button", { name: "Cancel" })).toBeEnabled();
     expect(onCommitChange).toHaveBeenLastCalledWith(false);
+  });
+});
+
+describe("AddDrillForm input limits", () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    mocks.getTaxonomy.mockResolvedValue({
+      trainingMethods: [],
+      tagCategories: [],
+      standardTags: [],
+      customTags: [],
+      statusTags: [],
+    });
+  });
+
+  it("exposes matching browser limits and disables the 51st step", async () => {
+    renderForm(
+      <AddDrillForm
+        initialValues={{
+          title: "Boundary drill",
+          summary: "",
+          notes: "",
+          steps: Array.from({ length: DRILL_LIMITS.steps }, (_, index) => `Step ${index + 1}`),
+          trainingMethodSlugs: [],
+          tagSlugs: [],
+          statusTagSlugs: [],
+        }}
+      />,
+    );
+
+    const addStep = await screen.findByRole("button", { name: "Add step" });
+    expect(addStep).toBeDisabled();
+    expect(addStep).toHaveAttribute("aria-describedby", "add-drill-step-limit");
+    expect(screen.getByText(`Up to ${DRILL_LIMITS.steps} steps.`)).toBeInTheDocument();
+    expect(screen.getByLabelText("Title")).toHaveAttribute(
+      "maxlength",
+      String(DRILL_LIMITS.titleCharacters),
+    );
+    expect(screen.getAllByPlaceholderText(/Start with|Next step/)).toHaveLength(DRILL_LIMITS.steps);
+    expect(screen.getAllByPlaceholderText(/Start with|Next step/)[0]).toHaveAttribute(
+      "maxlength",
+      String(DRILL_LIMITS.stepCharacters),
+    );
   });
 });
 

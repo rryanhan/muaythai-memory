@@ -52,7 +52,7 @@ export function AppShell({ currentUser, initialGraph, initialView = "network" }:
         {/* Keep mounted views alive so returning to Network does not refetch or reset local graph state. */}
         {networkHasMounted && (
           <div className="app-view-pane" hidden={activeView !== "network"}>
-            <NetworkView initialGraph={initialGraph} />
+            <NetworkView active={activeView === "network"} initialGraph={initialGraph} />
           </div>
         )}
         {libraryHasMounted && (

@@ -31,9 +31,15 @@ import {
   type Size,
   type StoredPosition,
 } from "./network-physics";
+import {
+  getVisibleViewportSize,
+  pauseNetworkSimulation,
+  resumeNetworkSimulation,
+} from "./network-lifecycle";
 import styles from "./NetworkForceGraph.module.css";
 
 type NetworkForceGraphProps = {
+  active: boolean;
   graph: GraphResponse;
   badgeByIconKey: Record<string, string>;
   focusedMethodSlugs: string[];
@@ -58,6 +64,7 @@ const semanticZoomExponent = 0.15;
 const semanticNodeScaleBounds = { min: 0.9, max: 1.15 };
 
 export function NetworkForceGraph({
+  active,
   graph,
   badgeByIconKey,
   focusedMethodSlugs,
@@ -72,6 +79,7 @@ export function NetworkForceGraph({
   const positionsRef = useRef<Map<string, StoredPosition>>(new Map());
   const simulationRef = useRef<PhysicsSimulation | null>(null);
   const dragStateRef = useRef<DragState | null>(null);
+  const activeRef = useRef(active);
   const [viewportSize, setViewportSize] = useState<Size | null>(null);
   const [cameraTransform, setCameraTransform] = useState<ZoomTransform>(() => zoomIdentity);
   const [zoomLevel, setZoomLevel] = useState<"near" | "far">("near");
@@ -119,24 +127,45 @@ export function NetworkForceGraph({
     setPhysicsLinks([...simulation.links]);
   }, []);
 
+  const measureViewport = useCallback(() => {
+    const frame = frameRef.current;
+    if (!frame) return;
+    const rect = frame.getBoundingClientRect();
+    const nextSize = getVisibleViewportSize(rect.width, rect.height);
+    if (!nextSize) return;
+    setViewportSize((current) => (
+      current?.width === nextSize.width && current.height === nextSize.height
+        ? current
+        : nextSize
+    ));
+  }, []);
+
   useEffect(() => {
     const frame = frameRef.current;
     if (!frame) return;
 
-    const updateSize = () => {
-      const rect = frame.getBoundingClientRect();
-      setViewportSize({
-        width: Math.max(Math.round(rect.width), 1),
-        height: Math.max(Math.round(rect.height), 1),
-      });
-    };
-
-    updateSize();
-    const resizeObserver = new ResizeObserver(updateSize);
+    measureViewport();
+    const resizeObserver = new ResizeObserver(measureViewport);
     resizeObserver.observe(frame);
 
     return () => resizeObserver.disconnect();
-  }, []);
+  }, [measureViewport]);
+
+  useEffect(() => {
+    activeRef.current = active;
+    const simulation = simulationRef.current;
+
+    if (!active) {
+      pauseNetworkSimulation(simulation, cancelAnimationFrame);
+      dragStateRef.current = null;
+      return;
+    }
+
+    measureViewport();
+    resumeNetworkSimulation(active, simulation, (current) => {
+      runNetworkSimulation(current, commitSimulationFrame);
+    });
+  }, [active, commitSimulationFrame, measureViewport]);
 
   useEffect(() => {
     if (!viewportSize) return;
@@ -157,7 +186,7 @@ export function NetworkForceGraph({
 
     simulationRef.current = simulation;
     commitSimulationFrame(simulation);
-    runNetworkSimulation(simulation, commitSimulationFrame);
+    if (activeRef.current) runNetworkSimulation(simulation, commitSimulationFrame);
 
     return () => {
       if (simulation.frame) {

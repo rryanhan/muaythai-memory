@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { DRILL_LIMITS } from "@/config/domain-limits";
 
 const mocks = vi.hoisted(() => {
   class AuthenticationRequiredError extends Error {
@@ -161,6 +162,16 @@ describe("POST /api/onboarding/first-drill", () => {
     expect(malformed.status).toBe(400);
     expect(mocks.createGuidedFirstDrill).not.toHaveBeenCalled();
     expect(mocks.invalidateOnboardingState).not.toHaveBeenCalled();
+  });
+
+  it("rejects oversized guided drill content before creating a drill", async () => {
+    const response = await POST(request({
+      ...input,
+      steps: ["x".repeat(DRILL_LIMITS.stepCharacters + 1)],
+    }, creationKey));
+
+    expect(response.status).toBe(400);
+    expect(mocks.createGuidedFirstDrill).not.toHaveBeenCalled();
   });
 
   it("returns 409 when a key is reused with a different payload", async () => {

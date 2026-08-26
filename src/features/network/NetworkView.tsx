@@ -25,11 +25,12 @@ import {
 import styles from "./Network.module.css";
 
 type NetworkViewProps = {
+  active: boolean;
   initialGraph?: GraphResponse;
 };
 
 // Owns graph API loading. Graph-local interactions live in NetworkGraphPanel.
-export function NetworkView({ initialGraph }: NetworkViewProps) {
+export function NetworkView({ active, initialGraph }: NetworkViewProps) {
   const [filters, setFilters] = useState<NetworkFilters>(emptyNetworkFilters);
   const [layerOptions, setLayerOptions] = useState(defaultNetworkLayerOptions);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -108,6 +109,7 @@ export function NetworkView({ initialGraph }: NetworkViewProps) {
 
       {loadState.status === "loaded" && (
         <NetworkGraphPanel
+          active={active}
           graph={loadState.graph}
           filters={filters}
           effectiveFilters={effectiveFilters}

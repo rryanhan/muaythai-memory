@@ -1,4 +1,5 @@
 import { sql } from "drizzle-orm";
+import { DRILL_LIMITS } from "@/config/domain-limits";
 import {
   boolean,
   check,
@@ -208,6 +209,36 @@ export const friendRateLimits = pgTable(
   }),
 );
 
+// Capture quotas protect paid and local AI capacity across serverless instances.
+// Burst and daily rows are consumed together in one transaction per attempt.
+export const captureRateLimits = pgTable(
+  "capture_rate_limits",
+  {
+    userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    action: varchar("action", { length: 32 }).notNull(),
+    windowKind: varchar("window_kind", { length: 16 }).notNull(),
+    windowStart: timestamp("window_start", { withTimezone: true }).notNull(),
+    requestCount: integer("request_count").notNull().default(1),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.userId, table.action, table.windowKind, table.windowStart] }),
+    windowIdx: index("capture_rate_limits_window_idx").on(table.windowStart),
+    actionCheck: check(
+      "capture_rate_limits_action_check",
+      sql`${table.action} in ('transcription', 'cleanup')`,
+    ),
+    windowKindCheck: check(
+      "capture_rate_limits_window_kind_check",
+      sql`${table.windowKind} in ('burst', 'daily')`,
+    ),
+    countCheck: check(
+      "capture_rate_limits_count_check",
+      sql`${table.requestCount} > 0`,
+    ),
+  }),
+);
+
 // Recovery grants are short-lived server-only capabilities. The database stores
 // only keyed hashes/fingerprints; the signed browser grant carries the random
 // jti. State and attempt counters bridge the non-atomic boundary between
@@ -376,6 +407,18 @@ export const drills = pgTable(
     userIdx: index("drills_user_id_idx").on(table.userId),
     titleIdx: index("drills_title_idx").on(table.title),
     archivedIdx: index("drills_archived_at_idx").on(table.archivedAt),
+    titleLengthCheck: check(
+      "drills_title_length_check",
+      sql`char_length(btrim(${table.title})) between 1 and ${sql.raw(String(DRILL_LIMITS.titleCharacters))}`,
+    ),
+    summaryLengthCheck: check(
+      "drills_summary_length_check",
+      sql`char_length(${table.summary}) <= ${sql.raw(String(DRILL_LIMITS.summaryCharacters))}`,
+    ),
+    notesLengthCheck: check(
+      "drills_notes_length_check",
+      sql`${table.notes} is null or char_length(${table.notes}) <= ${sql.raw(String(DRILL_LIMITS.notesCharacters))}`,
+    ),
   }),
 );
 
@@ -408,6 +451,10 @@ export const drillSteps = pgTable(
   (table) => ({
     drillPositionUnique: uniqueIndex("drill_steps_drill_position_unique").on(table.drillId, table.position),
     drillIdx: index("drill_steps_drill_id_idx").on(table.drillId),
+    bodyLengthCheck: check(
+      "drill_steps_body_length_check",
+      sql`char_length(btrim(${table.body})) between 1 and ${sql.raw(String(DRILL_LIMITS.stepCharacters))}`,
+    ),
   }),
 );
 
@@ -551,6 +598,8 @@ export type FriendReport = typeof friendReports.$inferSelect;
 export type NewFriendReport = typeof friendReports.$inferInsert;
 export type FriendRateLimit = typeof friendRateLimits.$inferSelect;
 export type NewFriendRateLimit = typeof friendRateLimits.$inferInsert;
+export type CaptureRateLimit = typeof captureRateLimits.$inferSelect;
+export type NewCaptureRateLimit = typeof captureRateLimits.$inferInsert;
 export type AuthRecoveryGrant = typeof authRecoveryGrants.$inferSelect;
 export type NewAuthRecoveryGrant = typeof authRecoveryGrants.$inferInsert;
 export type Drill = typeof drills.$inferSelect;
