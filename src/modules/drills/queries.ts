@@ -14,8 +14,6 @@ import {
 import type { StatusTagDto, TagDto, TrainingMethodDto } from "@/modules/taxonomy/contracts";
 import type { DrillDetail, DrillFilters, DrillListResponse, DrillSummary, FilterMode } from "./contracts";
 
-type DrillBaseRow = typeof drills.$inferSelect;
-
 type DrillStepDto = DrillDetail["steps"][number];
 
 // Returns list-ready drill summaries. Full steps are intentionally left out so
@@ -327,27 +325,6 @@ async function loadStatusTagsForDrill(drillId: string): Promise<StatusTagDto[]> 
     .orderBy(asc(statusTags.sortOrder), asc(statusTags.name));
 
   return rows;
-}
-
-async function loadStepsByDrillId(drillIds: string[]): Promise<Map<string, DrillStepDto[]>> {
-  if (drillIds.length === 0) return new Map();
-
-  const rows = await db
-    .select({
-      drillId: drillSteps.drillId,
-      id: drillSteps.id,
-      position: drillSteps.position,
-      body: drillSteps.body,
-    })
-    .from(drillSteps)
-    .where(inArray(drillSteps.drillId, drillIds))
-    .orderBy(asc(drillSteps.position));
-
-  return groupByDrillId(rows, (row) => ({
-    id: row.id,
-    position: row.position,
-    body: row.body,
-  }));
 }
 
 async function loadStepsForDrill(drillId: string): Promise<DrillStepDto[]> {

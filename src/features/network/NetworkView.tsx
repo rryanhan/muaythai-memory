@@ -5,7 +5,6 @@ import { useQuery } from "@tanstack/react-query";
 import { getGraph, getTaxonomy, type GraphResponse } from "@/data";
 import {
   addPreviewKeyword,
-  buildGraphRequestKey,
   getNetworkErrorMessage,
   isAbortError,
   isDefaultLayerSet,
@@ -44,10 +43,6 @@ export function NetworkView({ active, initialGraph }: NetworkViewProps) {
     () => addPreviewKeyword(filters, previewKeyword),
     [filters, previewKeyword],
   );
-  const graphRequestKey = useMemo(
-    () => buildGraphRequestKey(effectiveFilters, layerOptions),
-    [effectiveFilters, layerOptions],
-  );
   const taxonomyQuery = useQuery({
     queryKey: ["taxonomy"],
     queryFn: ({ signal }) => getTaxonomy({ requestInit: { signal } }),
@@ -63,25 +58,40 @@ export function NetworkView({ active, initialGraph }: NetworkViewProps) {
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
+
     if (isEmptyFilterSet(effectiveFilters) && isDefaultLayerSet(layerOptions) && initialGraph) {
-      setLoadState({ status: "loaded", graph: initialGraph, refreshing: false });
-      return;
+      queueMicrotask(() => {
+        if (!cancelled) {
+          setLoadState({ status: "loaded", graph: initialGraph, refreshing: false });
+        }
+      });
+      return () => {
+        cancelled = true;
+      };
     }
 
     const controller = new AbortController();
 
-    setLoadState((current) => {
-      if (current.status === "loaded") {
-        return { ...current, refreshing: true, errorMessage: undefined };
-      }
+    queueMicrotask(() => {
+      if (cancelled) return;
+      setLoadState((current) => {
+        if (current.status === "loaded") {
+          return { ...current, refreshing: true, errorMessage: undefined };
+        }
 
-      return { status: "loading" };
+        return { status: "loading" };
+      });
     });
 
     getGraph(toDrillFilters(effectiveFilters), layerOptions, { requestInit: { signal: controller.signal } })
-      .then((graph) => setLoadState({ status: "loaded", graph, refreshing: false }))
+      .then((graph) => {
+        if (!cancelled && !controller.signal.aborted) {
+          setLoadState({ status: "loaded", graph, refreshing: false });
+        }
+      })
       .catch((error: unknown) => {
-        if (isAbortError(error)) return;
+        if (cancelled || controller.signal.aborted || isAbortError(error)) return;
         const message = getNetworkErrorMessage(error);
         setLoadState((current) => {
           if (current.status === "loaded") {
@@ -92,8 +102,11 @@ export function NetworkView({ active, initialGraph }: NetworkViewProps) {
         });
       });
 
-    return () => controller.abort();
-  }, [graphRequestKey, initialGraph, layerOptions, retryNonce]);
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, [effectiveFilters, initialGraph, layerOptions, retryNonce]);
 
   return (
     <section className={styles.view} aria-label="Network view">

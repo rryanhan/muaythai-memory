@@ -92,10 +92,6 @@ export function NetworkForceGraph({
     () => getInitialZoomTransform(renderSize, layoutSize),
     [layoutSize, renderSize],
   );
-  const graphModel = useMemo(
-    () => buildGraphModel(graph, badgeByIconKey, positionsRef.current, layoutSize),
-    [badgeByIconKey, graph, layoutSize],
-  );
   const drillNodes = useMemo(() => physicsNodes.filter((node) => node.type === "drill"), [physicsNodes]);
   const methodNodes = useMemo(
     () => physicsNodes.filter((node) => node.type === "trainingMethod"),
@@ -174,6 +170,7 @@ export function NetworkForceGraph({
       cancelAnimationFrame(simulationRef.current.frame);
     }
 
+    const graphModel = buildGraphModel(graph, badgeByIconKey, positionsRef.current, layoutSize);
     const simulation: PhysicsSimulation = {
       alpha: 1,
       frame: null,
@@ -193,7 +190,7 @@ export function NetworkForceGraph({
         cancelAnimationFrame(simulation.frame);
       }
     };
-  }, [commitSimulationFrame, graphModel, layoutSize, viewportSize]);
+  }, [badgeByIconKey, commitSimulationFrame, graph, layoutSize, viewportSize]);
 
   useEffect(() => {
     const svg = svgRef.current;

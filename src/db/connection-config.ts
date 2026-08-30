@@ -54,6 +54,21 @@ export function getMigrationDatabaseUrl(
   return connectionString;
 }
 
+export function getSupabaseSessionPoolerUrl(
+  environment: DatabaseEnvironment = process.env,
+): string {
+  const { connectionString } = getRuntimeDatabaseConfig(environment);
+  const url = parseDatabaseUrl(connectionString, "DATABASE_POOLER_URL");
+  if (!isSupabaseSharedPooler(url)) {
+    throw new Error(
+      "A Supabase pooler URL is required to derive a session-mode migration connection.",
+    );
+  }
+
+  url.port = "5432";
+  return url.toString();
+}
+
 export function describeDatabaseUrl(connectionString: string): string {
   const url = parseDatabaseUrl(connectionString, "database URL");
   return `${url.hostname}:${effectivePort(url)}`;

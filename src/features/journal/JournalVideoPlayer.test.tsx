@@ -34,13 +34,15 @@ describe("JournalVideoPlayer autoplay", () => {
     expect(video.muted).toBe(false);
 
     rerender(<JournalVideoPlayer src="blob:second" autoPlay initialMuted />);
-    Object.defineProperty(video, "readyState", {
+    const nextVideo = screen.getByLabelText("Training video") as HTMLVideoElement;
+    expect(nextVideo).not.toBe(video);
+    Object.defineProperty(nextVideo, "readyState", {
       configurable: true,
       value: HTMLMediaElement.HAVE_FUTURE_DATA,
     });
-    fireEvent.canPlay(video);
+    fireEvent.canPlay(nextVideo);
     await waitFor(() => expect(play).toHaveBeenCalledTimes(2));
-    fireEvent.canPlay(video);
+    fireEvent.canPlay(nextVideo);
     expect(play).toHaveBeenCalledTimes(2);
   });
 });

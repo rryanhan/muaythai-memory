@@ -5,6 +5,7 @@ import { MagnifyingGlass } from "@phosphor-icons/react/MagnifyingGlass";
 import { DRILL_LIMITS } from "@/config/domain-limits";
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import Image from "next/image";
 import { getDrills, getTaxonomy, type TagDto } from "@/data";
 import { badgeByIconKey } from "@/components/shared/context-badges";
 import { LibraryDrillRow, LibraryLoadingList, LibraryStatePanel } from "./LibraryDrillList";
@@ -62,21 +63,17 @@ export function LibraryView() {
   const methods = taxonomy?.trainingMethods ?? [];
   const standardTagCategories = taxonomy?.tagCategories ?? [];
   const customTags = taxonomy?.customTags ?? [];
-  const builtInStatuses = useMemo(() => getBuiltInStatusFilters(taxonomy?.statusTags ?? []), [taxonomy?.statusTags]);
+  const builtInStatuses = getBuiltInStatusFilters(taxonomy?.statusTags ?? []);
   const selectedMethod = filters.methodSlug
     ? methods.find((method) => method.slug === filters.methodSlug)
     : undefined;
-  const selectedTags = useMemo(() => {
-    const allTags = [...(taxonomy?.standardTags ?? []), ...(taxonomy?.customTags ?? [])];
-    return filters.tagSlugs
-      .map((slug) => allTags.find((tag) => tag.slug === slug))
-      .filter((tag): tag is TagDto => Boolean(tag));
-  }, [filters.tagSlugs, taxonomy]);
-  const selectedStatuses = useMemo(() => {
-    return filters.statusTagSlugs
-      .map((slug) => builtInStatuses.find((status) => status.slug === slug))
-      .filter((status): status is BuiltInStatusFilter => Boolean(status));
-  }, [builtInStatuses, filters.statusTagSlugs]);
+  const allTags = [...(taxonomy?.standardTags ?? []), ...(taxonomy?.customTags ?? [])];
+  const selectedTags = filters.tagSlugs
+    .map((slug) => allTags.find((tag) => tag.slug === slug))
+    .filter((tag): tag is TagDto => Boolean(tag));
+  const selectedStatuses = filters.statusTagSlugs
+    .map((slug) => builtInStatuses.find((status) => status.slug === slug))
+    .filter((status): status is BuiltInStatusFilter => Boolean(status));
   const drills = drillListState.status === "loaded" ? drillListState.response.drills : [];
   const total = drillListState.status === "loaded" ? drillListState.response.total : 0;
   const hasFilters = hasActiveFilters(filters);
@@ -212,7 +209,9 @@ export function LibraryView() {
       <header className="library-header">
         <p className="eyebrow">Training Log</p>
         <div className="library-title-row">
-          {pageBadge && <img src={pageBadge} alt="" aria-hidden="true" />}
+          {pageBadge && (
+            <Image src={pageBadge} width={56} height={56} alt="" aria-hidden="true" />
+          )}
           <div>
             <h1>{pageTitle}</h1>
             <p>{pageSubtitle}</p>

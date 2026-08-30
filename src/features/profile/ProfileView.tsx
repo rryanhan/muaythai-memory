@@ -9,6 +9,7 @@ import { Star } from "@phosphor-icons/react/Star";
 import { Target } from "@phosphor-icons/react/Target";
 import { VideoCamera } from "@phosphor-icons/react/VideoCamera";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import Image from "next/image";
 import { badgeByIconKey } from "@/components/shared/context-badges";
 import { DecodedImage } from "@/components/shared/DecodedImage";
 import {
@@ -128,7 +129,13 @@ export function ProfileView({ currentUser }: ProfileViewProps) {
             {methodCounts.map(({ method, count }) => (
               <div key={method.id} className={styles.methodStat} aria-label={`${method.name}: ${count} drills`}>
                 {method.iconKey && badgeByIconKey[method.iconKey] ? (
-                  <img src={badgeByIconKey[method.iconKey]} alt="" aria-hidden="true" />
+                  <Image
+                    src={badgeByIconKey[method.iconKey]}
+                    width={30}
+                    height={30}
+                    alt=""
+                    aria-hidden="true"
+                  />
                 ) : <span className={styles.methodFallback} aria-hidden="true" />}
                 <strong>{count}</strong>
               </div>

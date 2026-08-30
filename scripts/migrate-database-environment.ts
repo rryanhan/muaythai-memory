@@ -5,6 +5,7 @@ import {
   type DeploymentEnvironment,
   verifyDeploymentEnvironment,
 } from "@/config/deployment-environment";
+import { getSupabaseSessionPoolerUrl } from "@/db/connection-config";
 
 const options = parseOptions(process.argv.slice(2));
 const environmentFile =
@@ -13,7 +14,10 @@ const environmentFile =
     : ".env.staging.local";
 
 process.env.APP_ENV_FILE = environmentFile;
-config({ path: environmentFile });
+config({ path: environmentFile, override: true });
+if (options.useSessionPooler) {
+  process.env.DATABASE_DIRECT_URL = getSupabaseSessionPoolerUrl();
+}
 verifyDeploymentEnvironment(options.environment);
 
 if (options.environment === "production" && !options.confirmProduction) {
@@ -39,6 +43,7 @@ process.exitCode = result.status ?? 1;
 function parseOptions(args: string[]): {
   environment: DeploymentEnvironment;
   confirmProduction: boolean;
+  useSessionPooler: boolean;
 } {
   const environment = args
     .find((argument) => argument.startsWith("--environment="))
@@ -54,5 +59,6 @@ function parseOptions(args: string[]): {
   return {
     environment: environment as DeploymentEnvironment,
     confirmProduction: args.includes("--confirm-production"),
+    useSessionPooler: args.includes("--use-session-pooler"),
   };
 }

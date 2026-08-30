@@ -26,7 +26,6 @@ export async function getMuayThaiGraph(
   const hasMethodFilters = normalizedFilters.methodSlugs.length > 0;
   const matchedDrillIds = new Set(matchedDrills.map((drill) => drill.id));
   const layerDrills = hasActiveFilters ? matchedDrills : allDrills;
-  const layerDrillIds = new Set(layerDrills.map((drill) => drill.id));
   const selectedMethodSlugs = new Set(normalizedFilters.methodSlugs);
   const activeMethodSlugs = hasMethodFilters ? selectedMethodSlugs : collectMethodSlugs(matchedDrills, []);
   const visibleTagSlugs = collectTagSlugs(layerDrills, normalizedFilters.tagSlugs);

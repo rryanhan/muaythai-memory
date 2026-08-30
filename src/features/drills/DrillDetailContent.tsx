@@ -1,3 +1,4 @@
+import Image from "next/image";
 import type { DrillDetail } from "@/data";
 import styles from "./DrillDetail.module.css";
 
@@ -16,7 +17,14 @@ export function DrillDetailContent({ drill, badgeByIconKey }: DrillDetailContent
     <article className={`${styles.content} drill-detail-content`}>
       <div className="drill-detail-title-row">
         {primaryBadge && (
-          <img className="drill-detail-method-badge" src={primaryBadge} alt="" aria-hidden="true" />
+          <Image
+            className="drill-detail-method-badge"
+            src={primaryBadge}
+            width={48}
+            height={48}
+            alt=""
+            aria-hidden="true"
+          />
         )}
         <div>
           <h2>{drill.title}</h2>

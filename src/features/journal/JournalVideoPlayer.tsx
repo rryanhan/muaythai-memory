@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { ArrowsOut } from "@phosphor-icons/react/ArrowsOut";
 import { Pause } from "@phosphor-icons/react/Pause";
 import { Play } from "@phosphor-icons/react/Play";
@@ -20,7 +20,16 @@ type JournalVideoPlayerProps = {
   preload?: "none" | "metadata" | "auto";
 };
 
-export function JournalVideoPlayer({
+export function JournalVideoPlayer(props: JournalVideoPlayerProps) {
+  return (
+    <JournalVideoPlayerSource
+      key={props.src}
+      {...props}
+    />
+  );
+}
+
+function JournalVideoPlayerSource({
   src,
   label = "Training video",
   onDuration,
@@ -33,27 +42,12 @@ export function JournalVideoPlayer({
 }: JournalVideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const autoplayAttemptedSourceRef = useRef<string | null>(null);
-  const initialMutedRef = useRef(initialMuted);
-  initialMutedRef.current = initialMuted;
   const [playing, setPlaying] = useState(false);
   const [muted, setMuted] = useState(initialMuted);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [unavailable, setUnavailable] = useState(false);
   const [autoplayBlocked, setAutoplayBlocked] = useState(false);
-
-  useEffect(() => {
-    const video = videoRef.current;
-    setPlaying(false);
-    setCurrentTime(0);
-    setDuration(0);
-    setUnavailable(false);
-    setAutoplayBlocked(false);
-    const sourceInitialMuted = initialMutedRef.current;
-    setMuted(sourceInitialMuted);
-    autoplayAttemptedSourceRef.current = null;
-    if (video) video.muted = sourceInitialMuted;
-  }, [src]);
 
   async function attemptAutoplay(video: HTMLVideoElement) {
     if (!autoPlay || unavailable || video.readyState < HTMLMediaElement.HAVE_FUTURE_DATA) return;

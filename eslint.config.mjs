@@ -24,5 +24,6 @@ export default defineConfig([
     "build/**",
     "next-env.d.ts",
     "out/**",
+    "wireframe/**",
   ]),
 ]);

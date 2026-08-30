@@ -19,8 +19,9 @@ Hosted environment credentials stay in ignored files:
 Never copy staging credentials into the production file. Each file must set
 `DEPLOYMENT_ENVIRONMENT` and contain public Supabase values, the server-only
 service key, a unique server-only `AUTH_FLOW_SECRET`, a port `6543` runtime
-pooler URL, and a port `5432` direct migration URL for the same Supabase
-project.
+pooler URL, and a port `5432` direct or session-pooler migration URL for the
+same Supabase project. Use the session pooler when the maintenance machine
+cannot reach Supabase's IPv6 direct database host.
 
 Verify the files without printing secrets:
 
@@ -40,6 +41,10 @@ Apply every migration to staging first:
 npm run db:migrate:staging
 APP_ENV_FILE=.env.staging.local npm run db:verify-taxonomy
 ```
+
+The environment-aware migration commands use Supabase session mode on port
+`5432`, derived in memory from the matching transaction-pooler URL. No derived
+credential is written to disk or sent to Vercel.
 
 After the staging application passes smoke testing, apply the same committed
 migrations to production. Production requires a second explicit flag:

@@ -4,6 +4,7 @@ import { ListBullets } from "@phosphor-icons/react/ListBullets";
 import { ListChecks } from "@phosphor-icons/react/ListChecks";
 import { Microphone } from "@phosphor-icons/react/Microphone";
 import { Plus } from "@phosphor-icons/react/Plus";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef } from "react";
@@ -44,10 +45,10 @@ export function LibraryIndexPanel({
   }
 
   useEffect(() => {
-    prefetchAddDrill();
-    prefetchCaptureDraft();
-    prefetchFirstDrillGuide();
-  }, []);
+    router.prefetch("/drills/new");
+    router.prefetch("/capture/new?mode=voice&from=library");
+    router.prefetch("/onboarding/first-drill?replay=1&next=%2F%3Fview%3Dlibrary");
+  }, [router]);
 
   useEffect(() => {
     const panel = panelRef.current;
@@ -146,7 +147,13 @@ export function LibraryIndexPanel({
                   data-selected={selectedMethodSlug === method.slug}
                   onClick={() => onSelectMethod(method.slug)}
                 >
-                  <img src={badgeByIconKey[method.iconKey]} alt="" aria-hidden="true" />
+                  <Image
+                    src={badgeByIconKey[method.iconKey]}
+                    width={42}
+                    height={42}
+                    alt=""
+                    aria-hidden="true"
+                  />
                   <span>{method.name}</span>
                 </button>
               ))}

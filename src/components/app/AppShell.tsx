@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { BottomNav, type AppView } from "@/components/navigation/BottomNav";
 import { LibraryView } from "@/features/library/LibraryView";
@@ -24,25 +24,16 @@ type AppShellProps = {
 
 export function AppShell({ currentUser, initialGraph, initialView = "network" }: AppShellProps) {
   const searchParams = useSearchParams();
-  const [activeView, setActiveView] = useState<AppView>(initialView);
-  const [networkHasMounted, setNetworkHasMounted] = useState(initialView === "network");
-  const [libraryHasMounted, setLibraryHasMounted] = useState(initialView === "library");
-  const [profileHasMounted, setProfileHasMounted] = useState(initialView === "profile");
+  const activeView = parseView(searchParams.get("view"));
+  const [mountedViews, setMountedViews] = useState<ReadonlySet<AppView>>(
+    () => new Set([initialView]),
+  );
 
-  useEffect(() => {
-    const nextView = parseView(searchParams.get("view"));
-
-    if (nextView === "network") setNetworkHasMounted(true);
-    if (nextView === "library") setLibraryHasMounted(true);
-    if (nextView === "profile") setProfileHasMounted(true);
-    setActiveView(nextView);
-  }, [searchParams]);
+  if (!mountedViews.has(activeView)) {
+    setMountedViews(new Set([...mountedViews, activeView]));
+  }
 
   function changeView(view: AppView) {
-    if (view === "network") setNetworkHasMounted(true);
-    if (view === "library") setLibraryHasMounted(true);
-    if (view === "profile") setProfileHasMounted(true);
-    setActiveView(view);
     writeViewToUrl(view);
   }
 
@@ -50,17 +41,17 @@ export function AppShell({ currentUser, initialGraph, initialView = "network" }:
     <main className={styles.shell}>
       <div className={styles.screen} aria-label={`${viewLabels[activeView]} view`}>
         {/* Keep mounted views alive so returning to Network does not refetch or reset local graph state. */}
-        {networkHasMounted && (
+        {(mountedViews.has("network") || activeView === "network") && (
           <div className="app-view-pane" hidden={activeView !== "network"}>
             <NetworkView active={activeView === "network"} initialGraph={initialGraph} />
           </div>
         )}
-        {libraryHasMounted && (
+        {(mountedViews.has("library") || activeView === "library") && (
           <div className="app-view-pane" hidden={activeView !== "library"}>
             <LibraryView />
           </div>
         )}
-        {profileHasMounted && (
+        {(mountedViews.has("profile") || activeView === "profile") && (
           <div className="app-view-pane" hidden={activeView !== "profile"}>
             <ProfileView currentUser={currentUser} />
           </div>

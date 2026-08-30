@@ -27,7 +27,7 @@ type PendingNavigation = { kind: "route"; destination: string } | { kind: "histo
 
 export function JournalUploadScreen() {
   const router = useRouter();
-  const today = useMemo(localToday, []);
+  const today = useMemo(() => localToday(), []);
   const upload = useJournalUpload();
   const [selectionError, setSelectionError] = useState<string | null>(null);
   const [coverEditorOpen, setCoverEditorOpen] = useState(false);
@@ -223,6 +223,8 @@ export function JournalUploadScreen() {
             <div className={styles.coverFieldBody}>
               <div className={styles.coverPreview} data-state={upload.draft.posterStatus}>
                 {upload.draft.posterPreviewUrl ? (
+                  // The generated local blob URL cannot pass through Next's image optimizer.
+                  // eslint-disable-next-line @next/next/no-img-element
                   <img src={upload.draft.posterPreviewUrl} alt="Selected journal cover" />
                 ) : upload.draft.posterStatus === "generating" ? (
                   <span>Finding a clear frame...</span>
@@ -324,9 +326,10 @@ export function JournalUploadScreen() {
 
       <RoutedBottomNav activeView="profile" onNavigate={(destination) => requestNavigation(destination)} />
       <JournalDiscardSheet open={discardOpen} pending={discarding} onStay={stay} onDiscard={() => void discard()} />
-      {coverEditorOpen && upload.draft.file && (
+      {coverEditorOpen && upload.draft.file && upload.draft.previewUrl && (
         <JournalCoverEditor
           file={upload.draft.file}
+          sourceUrl={upload.draft.previewUrl}
           initialTimeSeconds={upload.draft.posterTimeSeconds}
           onCancel={() => setCoverEditorOpen(false)}
           onUseCover={(poster) => {

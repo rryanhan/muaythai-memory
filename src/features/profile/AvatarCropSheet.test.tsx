@@ -64,14 +64,6 @@ import { AvatarCropSheet } from "./AvatarCropSheet";
 beforeEach(() => {
   cropperMock.props = null;
   avatarMock.createCroppedAvatar.mockReset();
-  Object.defineProperty(URL, "createObjectURL", {
-    configurable: true,
-    value: vi.fn(() => "blob:avatar-source"),
-  });
-  Object.defineProperty(URL, "revokeObjectURL", {
-    configurable: true,
-    value: vi.fn(),
-  });
 });
 
 describe("AvatarCropSheet", () => {
@@ -86,7 +78,7 @@ describe("AvatarCropSheet", () => {
     const onUsePhoto = vi.fn();
     const { unmount } = render(
       <AvatarCropSheet
-        file={new File(["avatar"], "avatar.png", { type: "image/png" })}
+        imageUrl="blob:avatar-source"
         onCancel={vi.fn()}
         onUsePhoto={onUsePhoto}
       />,
@@ -127,7 +119,7 @@ describe("AvatarCropSheet", () => {
   it("shows a visible error and blocks export when the browser decoder returns a blank image", async () => {
     render(
       <AvatarCropSheet
-        file={new File(["avatar"], "avatar.png", { type: "image/png" })}
+        imageUrl="blob:avatar-source"
         onCancel={vi.fn()}
         onUsePhoto={vi.fn()}
       />,

@@ -4,7 +4,6 @@ import { and, asc, eq } from "drizzle-orm";
 import { db, postgresClient } from "@/db/client";
 import {
   drillCreationKeys,
-  drills,
   tags,
   trainingMethods,
   users,

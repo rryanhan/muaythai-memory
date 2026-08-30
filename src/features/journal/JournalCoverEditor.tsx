@@ -8,26 +8,26 @@ import styles from "./JournalMedia.module.css";
 
 type JournalCoverEditorProps = {
   file: File;
+  sourceUrl: string;
   initialTimeSeconds: number | null;
   onCancel: () => void;
   onUseCover: (poster: GeneratedVideoPoster) => void;
 };
 
-export function JournalCoverEditor({ file, initialTimeSeconds, onCancel, onUseCover }: JournalCoverEditorProps) {
+export function JournalCoverEditor({
+  file,
+  sourceUrl,
+  initialTimeSeconds,
+  onCancel,
+  onUseCover,
+}: JournalCoverEditorProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const extractionAbortRef = useRef<AbortController | null>(null);
   const contentRef = useDrawerFocus(true);
-  const [sourceUrl, setSourceUrl] = useState<string | null>(null);
   const [duration, setDuration] = useState(0);
   const [timeSeconds, setTimeSeconds] = useState(initialTimeSeconds ?? 0);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    const nextUrl = URL.createObjectURL(file);
-    setSourceUrl(nextUrl);
-    return () => URL.revokeObjectURL(nextUrl);
-  }, [file]);
 
   useEffect(() => () => extractionAbortRef.current?.abort(), []);
 
@@ -81,21 +81,19 @@ export function JournalCoverEditor({ file, initialTimeSeconds, onCancel, onUseCo
           </header>
 
           <div className={styles.coverStage}>
-            {sourceUrl && (
-              <video
-                ref={videoRef}
-                src={sourceUrl}
-                muted
-                playsInline
-                preload="auto"
-                onLoadedMetadata={(event) => {
-                  const nextDuration = Number.isFinite(event.currentTarget.duration) ? event.currentTarget.duration : 0;
-                  setDuration(nextDuration);
-                  seek(Math.min(initialTimeSeconds ?? nextDuration * 0.2, nextDuration));
-                }}
-                onError={() => setError("This browser cannot decode the video to choose a cover.")}
-              />
-            )}
+            <video
+              ref={videoRef}
+              src={sourceUrl}
+              muted
+              playsInline
+              preload="auto"
+              onLoadedMetadata={(event) => {
+                const nextDuration = Number.isFinite(event.currentTarget.duration) ? event.currentTarget.duration : 0;
+                setDuration(nextDuration);
+                seek(Math.min(initialTimeSeconds ?? nextDuration * 0.2, nextDuration));
+              }}
+              onError={() => setError("This browser cannot decode the video to choose a cover.")}
+            />
           </div>
 
           <div className={styles.coverTimeline}>

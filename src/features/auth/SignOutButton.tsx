@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
 import { useJournalUpload } from "@/features/journal/JournalUploadProvider";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
@@ -11,6 +12,7 @@ type SignOutButtonProps = {
 };
 
 export function SignOutButton({ className, errorClassName }: SignOutButtonProps) {
+  const router = useRouter();
   const queryClient = useQueryClient();
   const journalUpload = useJournalUpload();
   const [pending, setPending] = useState(false);
@@ -34,7 +36,8 @@ export function SignOutButton({ className, errorClassName }: SignOutButtonProps)
     }
 
     queryClient.clear();
-    window.location.assign("/auth/sign-in");
+    router.replace("/auth/sign-in");
+    router.refresh();
   }
 
   return (

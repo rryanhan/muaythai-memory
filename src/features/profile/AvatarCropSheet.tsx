@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { MagnifyingGlassMinus } from "@phosphor-icons/react/MagnifyingGlassMinus";
 import { MagnifyingGlassPlus } from "@phosphor-icons/react/MagnifyingGlassPlus";
 import Cropper, { type Area, type Point } from "react-easy-crop";
@@ -10,29 +10,19 @@ import { createCroppedAvatar } from "./create-cropped-avatar";
 import styles from "./ProfileEdit.module.css";
 
 type AvatarCropSheetProps = {
-  file: File;
+  imageUrl: string;
   onCancel: () => void;
   onUsePhoto: (file: File) => void;
 };
 
-export function AvatarCropSheet({ file, onCancel, onUsePhoto }: AvatarCropSheetProps) {
+export function AvatarCropSheet({ imageUrl, onCancel, onUsePhoto }: AvatarCropSheetProps) {
   const contentRef = useDrawerFocus(true);
-  const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [crop, setCrop] = useState<Point>({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
   const [cropPixels, setCropPixels] = useState<Area | null>(null);
   const [imageDecoded, setImageDecoded] = useState(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    const nextUrl = URL.createObjectURL(file);
-    setImageDecoded(false);
-    setCropPixels(null);
-    setError(null);
-    setImageUrl(nextUrl);
-    return () => URL.revokeObjectURL(nextUrl);
-  }, [file]);
 
   async function confirmCrop() {
     if (!imageUrl || !cropPixels || pending) return;
@@ -76,46 +66,44 @@ export function AvatarCropSheet({ file, onCancel, onUsePhoto }: AvatarCropSheetP
           </header>
 
           <div className={styles.cropStage} data-exporting={pending}>
-            {imageUrl && (
-              <Cropper
-                image={imageUrl}
-                crop={crop}
-                zoom={zoom}
-                minZoom={1}
-                maxZoom={3}
-                zoomSpeed={0.16}
-                aspect={1}
-                cropShape="round"
-                showGrid={false}
-                onCropChange={(nextCrop) => {
-                  if (!pending) setCrop(nextCrop);
-                }}
-                onZoomChange={(nextZoom) => {
-                  if (!pending) setZoom(nextZoom);
-                }}
-                onCropComplete={(_area, pixels) => {
-                  if (!pending) setCropPixels(pixels);
-                }}
-                onMediaLoaded={() => setImageDecoded(true)}
-                mediaProps={{
-                  onError: () => {
-                    setImageDecoded(false);
-                    setCropPixels(null);
-                    setError("Profile photo could not be decoded. Choose another image.");
-                  },
-                }}
-                onTouchRequest={() => !pending}
-                onWheelRequest={() => !pending}
-                cropperProps={pending
-                  ? {
-                      tabIndex: -1,
-                      "aria-disabled": true,
-                      onKeyDown: (event) => event.preventDefault(),
-                      onKeyUp: (event) => event.preventDefault(),
-                    }
-                  : {}}
-              />
-            )}
+            <Cropper
+              image={imageUrl}
+              crop={crop}
+              zoom={zoom}
+              minZoom={1}
+              maxZoom={3}
+              zoomSpeed={0.16}
+              aspect={1}
+              cropShape="round"
+              showGrid={false}
+              onCropChange={(nextCrop) => {
+                if (!pending) setCrop(nextCrop);
+              }}
+              onZoomChange={(nextZoom) => {
+                if (!pending) setZoom(nextZoom);
+              }}
+              onCropComplete={(_area, pixels) => {
+                if (!pending) setCropPixels(pixels);
+              }}
+              onMediaLoaded={() => setImageDecoded(true)}
+              mediaProps={{
+                onError: () => {
+                  setImageDecoded(false);
+                  setCropPixels(null);
+                  setError("Profile photo could not be decoded. Choose another image.");
+                },
+              }}
+              onTouchRequest={() => !pending}
+              onWheelRequest={() => !pending}
+              cropperProps={pending
+                ? {
+                    tabIndex: -1,
+                    "aria-disabled": true,
+                    onKeyDown: (event) => event.preventDefault(),
+                    onKeyUp: (event) => event.preventDefault(),
+                  }
+                : {}}
+            />
           </div>
 
           <div className={styles.zoomControl}>

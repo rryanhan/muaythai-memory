@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { GraphOptions, GraphResponse } from "@/data";
@@ -29,8 +29,18 @@ vi.mock("./NetworkControlsSheet", () => ({
   ),
 }));
 vi.mock("@/features/drills/DrillDetailSheet", () => ({
-  DrillDetailSheet: ({ open }: { open: boolean }) => (
-    <div data-testid="detail-sheet" data-open={String(open)} />
+  DrillDetailSheet: ({
+    open,
+    state,
+    onRetry,
+  }: {
+    open: boolean;
+    state: { status: string };
+    onRetry: () => void;
+  }) => (
+    <div data-testid="detail-sheet" data-open={String(open)} data-status={state.status}>
+      <button type="button" onClick={onRetry}>Retry fixture drill</button>
+    </div>
   ),
 }));
 
@@ -68,19 +78,7 @@ const graph = {
 describe("NetworkGraphPanel hidden lifecycle", () => {
   beforeEach(() => {
     vi.resetAllMocks();
-    mocks.getDrill.mockResolvedValue({
-      id: drillId,
-      title: "Fixture drill",
-      summary: "",
-      notes: null,
-      steps: [],
-      trainingMethods: [],
-      tags: [],
-      customTags: [],
-      statusTags: [],
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
+    mocks.getDrill.mockResolvedValue(drillDetail);
   });
 
   it("closes every portaled surface when Network becomes inactive", async () => {
@@ -104,7 +102,54 @@ describe("NetworkGraphPanel hidden lifecycle", () => {
       expect(screen.getByTestId("force-graph")).toHaveAttribute("data-active", "false");
     });
   });
+
+  it("shows loading again immediately while retrying a failed drill detail", async () => {
+    const user = userEvent.setup();
+    let rejectFirstRequest!: (error: Error) => void;
+    let resolveSecondRequest!: (drill: typeof drillDetail) => void;
+    mocks.getDrill
+      .mockReturnValueOnce(new Promise((_, reject) => {
+        rejectFirstRequest = reject;
+      }))
+      .mockReturnValueOnce(new Promise((resolve) => {
+        resolveSecondRequest = resolve;
+      }));
+    render(<Harness active />);
+
+    await user.click(screen.getByRole("button", { name: "Open fixture drill" }));
+    expect(screen.getByTestId("detail-sheet")).toHaveAttribute("data-status", "loading");
+
+    rejectFirstRequest(new Error("Connection lost"));
+    await waitFor(() => {
+      expect(screen.getByTestId("detail-sheet")).toHaveAttribute("data-status", "error");
+    });
+
+    await user.click(screen.getByRole("button", { name: "Retry fixture drill" }));
+    expect(screen.getByTestId("detail-sheet")).toHaveAttribute("data-status", "loading");
+    await act(async () => {
+      resolveSecondRequest(drillDetail);
+      await Promise.resolve();
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId("detail-sheet")).toHaveAttribute("data-status", "loaded");
+    });
+    expect(mocks.getDrill).toHaveBeenCalledTimes(2);
+  });
 });
+
+const drillDetail = {
+  id: drillId,
+  title: "Fixture drill",
+  summary: "",
+  notes: null,
+  steps: [],
+  trainingMethods: [],
+  tags: [],
+  customTags: [],
+  statusTags: [],
+  createdAt: new Date(),
+  updatedAt: new Date(),
+};
 
 function Harness({ active }: { active: boolean }) {
   const [searchOpen, setSearchOpen] = useState(false);

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Star } from "@phosphor-icons/react/Star";
 import { Target } from "@phosphor-icons/react/Target";
 import { useQueryClient } from "@tanstack/react-query";
@@ -26,19 +26,33 @@ export function SavedListActions({
   statusTags,
   onSuccess,
 }: SavedListActionsProps) {
-  const queryClient = useQueryClient();
-  const statusSignature = statusTags.map((status) => status.slug).sort().join("|");
-  const initialSelected = useMemo(
-    () => new Set(statusSignature.split("|").filter(isSavedListSlug)),
-    [statusSignature],
+  const statusSignature = statusTags
+    .map((status) => status.slug)
+    .filter(isSavedListSlug)
+    .sort()
+    .join("|");
+
+  return (
+    <SavedListActionsState
+      key={`${drillId}:${statusSignature}`}
+      drillId={drillId}
+      statusTags={statusTags}
+      onSuccess={onSuccess}
+    />
   );
-  const [selectedSlugs, setSelectedSlugs] = useState(initialSelected);
+}
+
+function SavedListActionsState({
+  drillId,
+  statusTags,
+  onSuccess,
+}: SavedListActionsProps) {
+  const queryClient = useQueryClient();
+  const [selectedSlugs, setSelectedSlugs] = useState<Set<SavedListSlug>>(
+    () => new Set(statusTags.map((status) => status.slug).filter(isSavedListSlug)),
+  );
   const [pendingSlugs, setPendingSlugs] = useState<Set<SavedListSlug>>(new Set());
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-
-  useEffect(() => {
-    setSelectedSlugs(initialSelected);
-  }, [initialSelected]);
 
   useEffect(() => {
     if (!errorMessage) return;

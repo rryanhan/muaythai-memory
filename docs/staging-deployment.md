@@ -43,10 +43,12 @@ Use Supabase's transaction pooler on port `6543` for
 `DATABASE_POOLER_URL`. The Postgres client disables prepared statements for
 compatibility with transaction pooling.
 
-Do not add `DATABASE_DIRECT_URL` to the Vercel runtime. Keep it in `.env.local`
-or protected CI secrets and use it only for Drizzle migrations. The direct
-connection normally uses port `5432`; `DATABASE_URL` remains a temporary local
-fallback for older environments.
+Do not add `DATABASE_DIRECT_URL` to the Vercel runtime. Keep it in the ignored
+maintenance environment file or protected CI secrets and use it only for
+Drizzle migrations. It may use either the direct database host or Supabase's
+session pooler; both use port `5432`. Prefer the session pooler when the local
+network cannot reach Supabase's IPv6 direct host. `DATABASE_URL` remains a
+temporary local fallback for older environments.
 
 Verify connection roles without printing credentials:
 
@@ -62,6 +64,11 @@ npm run db:migrate:staging
 APP_ENV_FILE=.env.staging.local npm run db:verify-taxonomy
 npm run db:verify-access-control -- --expect=staging
 ```
+
+The environment-aware migration command derives a port `5432` session-pooler
+connection from `DATABASE_POOLER_URL`. This keeps migrations reachable on
+networks without direct-host IPv6 while leaving the port `6543` application
+connection unchanged.
 
 ## Supabase Auth
 

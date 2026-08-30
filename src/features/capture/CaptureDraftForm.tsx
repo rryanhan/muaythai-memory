@@ -156,9 +156,16 @@ export function CaptureDraftForm({
   useEffect(() => {
     if (!pendingVoiceTranscript || !taxonomyQuery.data) return;
     const readyTranscript = pendingVoiceTranscript;
-    setPendingVoiceTranscript(null);
-    void beginDraft(readyTranscript, "voice");
-    // The transcript is consumed once the shared drill form taxonomy is ready.
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (cancelled) return;
+      setPendingVoiceTranscript(null);
+      void beginDraft(readyTranscript, "voice");
+    });
+    // Consume the captured transcript once taxonomy becomes available.
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingVoiceTranscript, taxonomyQuery.data]);
 

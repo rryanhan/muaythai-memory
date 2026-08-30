@@ -28,18 +28,11 @@ import { CaptureDiscardSheet } from "@/features/capture/CaptureDiscardSheet";
 
 describe("media drawer focus", () => {
   it("focuses and restores the journal cover drawer", async () => {
-    Object.defineProperty(URL, "createObjectURL", {
-      configurable: true,
-      value: vi.fn(() => "blob:journal-video"),
-    });
-    Object.defineProperty(URL, "revokeObjectURL", {
-      configurable: true,
-      value: vi.fn(),
-    });
     const opener = focusedOpener();
     const { unmount } = render(
       <JournalCoverEditor
         file={new File(["video"], "video.mp4", { type: "video/mp4" })}
+        sourceUrl="blob:journal-video"
         initialTimeSeconds={null}
         onCancel={vi.fn()}
         onUseCover={vi.fn()}

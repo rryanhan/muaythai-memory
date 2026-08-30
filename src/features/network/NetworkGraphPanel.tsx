@@ -130,13 +130,9 @@ export function NetworkGraphPanel({
   }, [active, onSearchOpenChange]);
 
   useEffect(() => {
-    if (!selectedDrillId) {
-      setDetailLoadState({ status: "idle" });
-      return;
-    }
+    if (!selectedDrillId) return;
 
     const controller = new AbortController();
-    setDetailLoadState({ status: "loading", drillId: selectedDrillId });
 
     getDrill(selectedDrillId, { requestInit: { signal: controller.signal } })
       .then((drill) => {
@@ -254,8 +250,15 @@ export function NetworkGraphPanel({
   }
 
   function openDrillDetail(drillId: string) {
+    setDetailLoadState({ status: "loading", drillId });
     setSelectedDrillId(drillId);
     setDetailOpen(true);
+  }
+
+  function retryDrillDetail() {
+    if (!selectedDrillId) return;
+    setDetailLoadState({ status: "loading", drillId: selectedDrillId });
+    setDetailRetryNonce((current) => current + 1);
   }
 
   function handleDetailAnimationEnd(open: boolean) {
@@ -473,7 +476,7 @@ export function NetworkGraphPanel({
           open={detailOpen}
           onOpenChange={setDetailOpen}
           onAnimationEnd={handleDetailAnimationEnd}
-          onRetry={() => setDetailRetryNonce((current) => current + 1)}
+          onRetry={retryDrillDetail}
           onSavedListChange={handleDetailSavedListChange}
         />
       )}

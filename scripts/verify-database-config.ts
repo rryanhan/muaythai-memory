@@ -6,6 +6,7 @@ import {
   describeDatabaseUrl,
   getMigrationDatabaseUrl,
   getRuntimeDatabaseConfig,
+  getSupabaseSessionPoolerUrl,
 } from "../src/db/connection-config";
 
 config({ path: getEnvironmentFilePath() });
@@ -53,6 +54,18 @@ function verifyConnectionRules() {
     getMigrationDatabaseUrl({ DATABASE_DIRECT_URL: directUrl }),
     directUrl,
   );
+  assert.equal(
+    getMigrationDatabaseUrl({ DATABASE_DIRECT_URL: sessionUrl }),
+    sessionUrl,
+  );
+  assert.equal(
+    getSupabaseSessionPoolerUrl({ DATABASE_POOLER_URL: transactionUrl }),
+    sessionUrl,
+  );
+  assert.throws(
+    () => getSupabaseSessionPoolerUrl({ DATABASE_POOLER_URL: directUrl }),
+    /Supabase pooler URL/,
+  );
   assert.throws(
     () => getMigrationDatabaseUrl({ DATABASE_DIRECT_URL: transactionUrl }),
     /direct database host/,
@@ -68,6 +81,7 @@ function verifyEnvironmentIsolationRules() {
     NEXT_PUBLIC_SUPABASE_URL: `https://${projectRef}.supabase.co`,
     NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "public-key",
     SUPABASE_SERVICE_ROLE_KEY: "service-key",
+    AUTH_FLOW_SECRET: "test-auth-flow-secret-with-at-least-thirty-two-bytes",
     DATABASE_POOLER_URL:
       `postgresql://postgres.${projectRef}:password@aws-1-us-west-2.pooler.supabase.com:6543/postgres`,
     DATABASE_DIRECT_URL:

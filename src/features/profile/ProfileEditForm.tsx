@@ -24,13 +24,15 @@ export function ProfileEditForm({ initialProfile, onDirtyChange, onCancel, onSav
   const [lastName, setLastName] = useState(initialProfile.lastName ?? "");
   const [location, setLocation] = useState(initialProfile.location ?? "");
   const [avatar, setAvatar] = useState<File | null>(null);
-  const [cropSource, setCropSource] = useState<File | null>(null);
+  const [cropSourceUrl, setCropSourceUrl] = useState<string | null>(null);
   const [removeAvatar, setRemoveAvatar] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const avatarPreparationAbortRef = useRef<AbortController | null>(null);
+  const previewUrlRef = useRef<string | null>(null);
+  const cropSourceUrlRef = useRef<string | null>(null);
   const dirty =
     username.trim() !== (initialProfile.username ?? initialProfile.displayName) ||
     firstName.trim() !== (initialProfile.firstName ?? "") ||
@@ -48,18 +50,15 @@ export function ProfileEditForm({ initialProfile, onDirtyChange, onCancel, onSav
 
   useEffect(() => onDirtyChange(dirty), [dirty, onDirtyChange]);
 
-  useEffect(() => () => avatarPreparationAbortRef.current?.abort(), []);
-
   useEffect(() => {
-    if (!avatar) {
-      setPreviewUrl(null);
-      return;
-    }
-
-    const objectUrl = URL.createObjectURL(avatar);
-    setPreviewUrl(objectUrl);
-    return () => URL.revokeObjectURL(objectUrl);
-  }, [avatar]);
+    return () => {
+      const preparation = avatarPreparationAbortRef.current;
+      avatarPreparationAbortRef.current = null;
+      preparation?.abort();
+      if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
+      if (cropSourceUrlRef.current) URL.revokeObjectURL(cropSourceUrlRef.current);
+    };
+  }, []);
 
   async function chooseAvatar(file: File | undefined) {
     if (!file) return;
@@ -84,7 +83,9 @@ export function ProfileEditForm({ initialProfile, onDirtyChange, onCancel, onSav
         maxDecodeEdge: 4_096,
         signal: controller.signal,
       });
-      if (avatarPreparationAbortRef.current === controller) setCropSource(preparedFile);
+      if (!controller.signal.aborted && avatarPreparationAbortRef.current === controller) {
+        replaceCropSourceUrl(preparedFile);
+      }
     } catch (error) {
       if (!(error instanceof DOMException && error.name === "AbortError")) {
         setErrorMessage(error instanceof Error ? error.message : "Profile photo could not be prepared.");
@@ -99,6 +100,7 @@ export function ProfileEditForm({ initialProfile, onDirtyChange, onCancel, onSav
     avatarPreparationAbortRef.current?.abort();
     avatarPreparationAbortRef.current = null;
     setAvatar(null);
+    replacePreviewUrl(null);
     setRemoveAvatar(Boolean(initialProfile.avatarUrl));
     resetFileInput();
   }
@@ -125,6 +127,22 @@ export function ProfileEditForm({ initialProfile, onDirtyChange, onCancel, onSav
 
   function resetFileInput() {
     if (fileInputRef.current) fileInputRef.current.value = "";
+  }
+
+  function replacePreviewUrl(file: File | null) {
+    const previousUrl = previewUrlRef.current;
+    const nextUrl = file ? URL.createObjectURL(file) : null;
+    previewUrlRef.current = nextUrl;
+    setPreviewUrl(nextUrl);
+    if (previousUrl) URL.revokeObjectURL(previousUrl);
+  }
+
+  function replaceCropSourceUrl(file: File | null) {
+    const previousUrl = cropSourceUrlRef.current;
+    const nextUrl = file ? URL.createObjectURL(file) : null;
+    cropSourceUrlRef.current = nextUrl;
+    setCropSourceUrl(nextUrl);
+    if (previousUrl) URL.revokeObjectURL(previousUrl);
   }
 
   return (
@@ -188,17 +206,19 @@ export function ProfileEditForm({ initialProfile, onDirtyChange, onCancel, onSav
         <button type="submit" disabled={pending || !dirty}>{pending ? "Saving..." : "Save profile"}</button>
       </div>
 
-      {cropSource && (
+      {cropSourceUrl && (
         <AvatarCropSheet
-          file={cropSource}
+          key={cropSourceUrl}
+          imageUrl={cropSourceUrl}
           onCancel={() => {
-            setCropSource(null);
+            replaceCropSourceUrl(null);
             resetFileInput();
           }}
           onUsePhoto={(croppedAvatar) => {
             setAvatar(croppedAvatar);
+            replacePreviewUrl(croppedAvatar);
             setRemoveAvatar(false);
-            setCropSource(null);
+            replaceCropSourceUrl(null);
             resetFileInput();
           }}
         />

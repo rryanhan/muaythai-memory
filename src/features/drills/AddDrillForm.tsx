@@ -10,6 +10,7 @@ import {
   type ReactNode,
 } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { badgeByIconKey } from "@/components/shared/context-badges";
 import skeletonStyles from "@/components/shared/Skeleton.module.css";
@@ -490,7 +491,13 @@ function MethodToken({
 }) {
   return (
     <button type="button" data-selected={selected} onClick={onToggle}>
-      <img src={badgeByIconKey[method.iconKey]} alt="" aria-hidden="true" />
+      <Image
+        src={badgeByIconKey[method.iconKey]}
+        width={38}
+        height={38}
+        alt=""
+        aria-hidden="true"
+      />
       <span>{method.name}</span>
     </button>
   );
