@@ -114,5 +114,8 @@ jobs:
       - name: Verify journal operation claims in PostgreSQL
         run: npm test -- --run src/modules/journal/operation-claims.postgres.test.ts
 
+      - name: Verify capture rate-limit concurrency in PostgreSQL
+        run: npm test -- --run src/modules/capture/rate-limits.postgres.test.ts
+
       - name: Verify recovery grant concurrency and retention
         run: npm run auth:verify-recovery-grants
