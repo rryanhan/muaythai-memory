@@ -111,7 +111,6 @@ export type DrillFilters = z.infer<typeof drillFiltersSchema>;
 export type DrillSummary = z.infer<typeof drillSummarySchema>;
 export type DrillDetail = z.infer<typeof drillDetailSchema>;
 export type DrillListResponse = z.infer<typeof drillListResponseSchema>;
-export type DrillDetailResponse = z.infer<typeof drillDetailResponseSchema>;
 export type DeleteDrillResponse = z.infer<typeof deleteDrillResponseSchema>;
 export type SavedListSlug = z.infer<typeof savedListSlugSchema>;
 export type UpdateSavedListInput = z.infer<typeof updateSavedListInputSchema>;

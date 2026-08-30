@@ -39,8 +39,6 @@ export const graphResponseSchema = z.object({
   options: graphOptionsSchema,
 });
 
-export type GraphNodeType = z.infer<typeof graphNodeTypeSchema>;
-export type GraphEdgeType = z.infer<typeof graphEdgeTypeSchema>;
 export type GraphNode = z.infer<typeof graphNodeSchema>;
 export type GraphEdge = z.infer<typeof graphEdgeSchema>;
 export type GraphOptions = z.infer<typeof graphOptionsSchema>;

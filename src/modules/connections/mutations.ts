@@ -241,32 +241,6 @@ export async function reportFighter(
   return { reportId: report.id, reportedUserId: otherUserId };
 }
 
-// Temporary compatibility behavior for DELETE /api/friends/[id]. The old
-// endpoint represented a mutual relationship, so it removes both directions.
-export async function removeLegacyFriendship(
-  currentUserId: string,
-  otherUserId: string,
-): Promise<{ removedUserId: string }> {
-  if (currentUserId === otherUserId) throw followNotFound();
-  return db.transaction(async (tx) => {
-    await lockConnectionPair(tx, currentUserId, otherUserId);
-    await tx
-      .delete(follows)
-      .where(or(
-        and(
-          eq(follows.followerId, currentUserId),
-          eq(follows.followingId, otherUserId),
-        ),
-        and(
-          eq(follows.followerId, otherUserId),
-          eq(follows.followingId, currentUserId),
-        ),
-      ));
-    await revokePairShares(tx, currentUserId, otherUserId);
-    return { removedUserId: otherUserId };
-  });
-}
-
 async function lockConnectionPair(
   tx: ConnectionTransaction,
   firstUserId: string,

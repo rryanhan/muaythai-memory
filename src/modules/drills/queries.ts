@@ -63,16 +63,6 @@ export async function getDrillById(userId: string, id: string): Promise<DrillDet
   };
 }
 
-export async function getFirstDrillDetail(
-  userId: string,
-  filters: Partial<DrillFilters> = {},
-): Promise<DrillDetail | null> {
-  const drillList = await listDrills(userId, filters);
-  const firstDrill = drillList.drills[0];
-  if (!firstDrill) return null;
-  return getDrillById(userId, firstDrill.id);
-}
-
 export async function getDrillSummariesByIds(
   userId: string,
   drillIds: string[],

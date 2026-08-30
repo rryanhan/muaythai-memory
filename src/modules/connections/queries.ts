@@ -162,20 +162,6 @@ export async function getReciprocalConnectionPage(
   return toSectionPage("following", rows, limit);
 }
 
-export async function getReciprocalConnectionCount(
-  currentUserId: string,
-): Promise<number> {
-  const rows = await db
-    .select({ count: count() })
-    .from(follows)
-    .where(and(
-      eq(follows.followerId, currentUserId),
-      eq(follows.status, "accepted"),
-      reverseAcceptedCondition(currentUserId, follows.followingId),
-    ));
-  return rows[0]?.count ?? 0;
-}
-
 export async function findFighterByUsername(
   currentUserId: string,
   username: string,

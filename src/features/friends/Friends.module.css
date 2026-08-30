@@ -37,8 +37,7 @@
 
 .back:focus-visible,
 .friendIdentityLink:focus-visible,
-.searchResultAction a:focus-visible,
-.blockedSection summary:focus-visible {
+.searchResultAction a:focus-visible {
   outline: 1px solid rgba(209, 74, 50, 0.5);
   outline-offset: 3px;
 }
@@ -94,7 +93,6 @@
   outline-offset: 2px;
 }
 
-.shareStatus,
 .profileStatus {
   margin: 9px 0 0;
   color: var(--muted);
@@ -186,8 +184,7 @@
   margin: 0;
 }
 
-.sectionHeading > span,
-.blockedSection summary span {
+.sectionHeading > span {
   min-width: 22px;
   color: var(--accent);
   font-family: "IBM Plex Mono", ui-monospace, monospace;
@@ -515,29 +512,6 @@
   font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
-}
-
-.blockedSection {
-  border-bottom: 1px solid var(--border);
-  padding: 16px 0;
-}
-
-.blockedSection summary {
-  display: flex;
-  min-height: 44px;
-  align-items: center;
-  justify-content: space-between;
-  cursor: pointer;
-  color: var(--muted);
-  font-family: "IBM Plex Mono", ui-monospace, monospace;
-  font-size: 12px;
-  font-weight: 700;
-  list-style: none;
-  text-transform: uppercase;
-}
-
-.blockedSection summary::-webkit-details-marker {
-  display: none;
 }
 
 .loadingRows {

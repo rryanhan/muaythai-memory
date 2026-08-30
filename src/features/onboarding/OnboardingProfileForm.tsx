@@ -33,7 +33,7 @@ export function OnboardingProfileForm({ user, nextPath }: { user: CurrentAppUser
     <form className={styles.form} onSubmit={(event) => void submit(event)}>
       <section className={styles.fields}>
         <label><span>Username</span><input autoCapitalize="none" autoCorrect="off" autoComplete="username" maxLength={30} value={username} onChange={(event) => setUsername(normalizeUsernameInput(event.target.value))} /></label>
-        <p className={styles.privacy}><strong>Public later:</strong> your username will identify you when friend profiles arrive.</p>
+        <p className={styles.privacy}><strong>Public:</strong> your username identifies you on fighter profiles and in connections.</p>
         <label><span>First name <small>(optional)</small></span><input autoComplete="given-name" maxLength={80} value={firstName} onChange={(event) => setFirstName(event.target.value)} /></label>
         <label><span>Last name <small>(optional)</small></span><input autoComplete="family-name" maxLength={80} value={lastName} onChange={(event) => setLastName(event.target.value)} /></label>
         <label><span>Location <small>(optional)</small></span><input autoComplete="address-level2" maxLength={120} placeholder="Vancouver, BC" value={location} onChange={(event) => setLocation(event.target.value)} /></label>

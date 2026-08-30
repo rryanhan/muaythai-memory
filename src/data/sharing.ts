@@ -1,12 +1,10 @@
 import { z } from "zod";
 import {
   drillShareFriendPageSchema,
-  sharedDrillDetailResponseSchema,
   sharedDrillListResponseSchema,
   updateDrillShareInputSchema,
   updateDrillShareResponseSchema,
   type DrillShareFriendPage,
-  type SharedDrillDetailResponse,
   type SharedDrillListResponse,
   type UpdateDrillShareInput,
   type UpdateDrillShareResponse,
@@ -70,18 +68,6 @@ export async function getSharedDrills(
   return fetchJson(
     `/api/shared-drills${query}`,
     sharedDrillListResponseSchema,
-    options,
-  );
-}
-
-export async function getSharedDrill(
-  drillId: string,
-  options: ApiClientOptions = {},
-): Promise<SharedDrillDetailResponse> {
-  const id = z.string().uuid().parse(drillId);
-  return fetchJson(
-    `/api/shared-drills/${encodeURIComponent(id)}`,
-    sharedDrillDetailResponseSchema,
     options,
   );
 }

@@ -3,7 +3,6 @@ import { safeInternalPath } from "@/lib/safe-internal-path";
 import {
   AuthenticationRequiredError,
   getOnboardingPath,
-  isProfileOnboarded,
   OnboardingRequiredError,
   requireCurrentAppUser,
   requireCurrentOnboardingState,
@@ -53,12 +52,4 @@ export async function requireAuthenticatedPageUser(nextPath = "/") {
     if (!(error instanceof AuthenticationRequiredError)) throw error;
     redirect(`/auth/sign-in?next=${encodeURIComponent(safeInternalPath(nextPath))}`);
   }
-}
-
-export async function requireProfileOnboardedPageUser(nextPath = "/") {
-  const user = await requireAuthenticatedPageUser(nextPath);
-  if (!isProfileOnboarded(user)) {
-    redirect(`/onboarding/profile?next=${encodeURIComponent(safeInternalPath(nextPath))}`);
-  }
-  return user;
 }

@@ -1,8 +1,6 @@
 import { z } from "zod";
 import { JOURNAL_VIDEO_MAX_BYTES, JOURNAL_VIDEO_MIME_TYPES } from "./constants";
 
-export const journalEntryStatusSchema = z.enum(["uploading", "ready"]);
-
 export const journalDateSchema = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}$/, "Use a valid training date.")

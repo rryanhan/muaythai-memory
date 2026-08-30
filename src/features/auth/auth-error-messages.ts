@@ -1,6 +1,5 @@
 import type { AuthError } from "@supabase/supabase-js";
 
-export type AuthFailureReason = "invalid-link";
 export type AuthOperation = "sign-in" | "create" | "recovery";
 
 export function getAuthErrorMessage(

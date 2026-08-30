@@ -20,13 +20,6 @@ export function sortMethods(nodes: GraphNode[]): GraphNode[] {
   return [...nodes].sort((a, b) => getMethodRank(a.slug) - getMethodRank(b.slug));
 }
 
-export function buildGraphRequestKey(filters: NetworkFilters, layerOptions: GraphOptionsInput): string {
-  return JSON.stringify({
-    filters: normalizeNetworkFilters(filters),
-    layerOptions: normalizeLayerOptions(layerOptions),
-  });
-}
-
 export function normalizeNetworkFilters(filters: NetworkFilters): NetworkFilters {
   return {
     methodSlugs: normalizeSlugList(filters.methodSlugs),

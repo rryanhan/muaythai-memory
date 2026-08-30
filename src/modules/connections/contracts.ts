@@ -146,7 +146,6 @@ export type ConnectionSectionPageResponse = z.infer<typeof connectionSectionPage
 export type FighterConnection = z.infer<typeof fighterConnectionSchema>;
 export type FighterProfile = z.infer<typeof fighterProfileSchema>;
 export type AuthorizedConnectionPageResponse = z.infer<typeof authorizedConnectionPageResponseSchema>;
-export type RequestFollowInput = z.infer<typeof requestFollowInputSchema>;
 export type RespondToFollowRequestInput = z.infer<typeof respondToFollowRequestInputSchema>;
 export type ConnectionMutationResponse = z.infer<typeof connectionMutationResponseSchema>;
 export type ReportReason = z.infer<typeof reportReasonSchema>;

@@ -40,11 +40,6 @@ export async function getDrillJournalPreview(
   );
 }
 
-export async function getJournalEntry(id: string, options: ApiClientOptions = {}): Promise<JournalEntryDetail> {
-  const response = await fetchJson(`/api/journal/${encodeURIComponent(id)}`, journalDetailResponseSchema, options);
-  return response.entry;
-}
-
 export async function createJournalUpload(
   rawInput: CreateJournalUploadInput,
   options: ApiClientOptions = {},
