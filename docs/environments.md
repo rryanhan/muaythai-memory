@@ -35,7 +35,11 @@ origins.
 
 ## Database Releases
 
-Apply every migration to staging first:
+Apply every migration to staging first. Additive, backward-compatible
+migrations run before their application consumer. Destructive contract
+migrations run only after compatible application code is live, smoke-tested,
+and all older deployments have been removed from traffic. Run these commands at
+the migration point required by that release order:
 
 ```bash
 npm run db:migrate:staging
@@ -46,8 +50,9 @@ The environment-aware migration commands use Supabase session mode on port
 `5432`, derived in memory from the matching transaction-pooler URL. No derived
 credential is written to disk or sent to Vercel.
 
-After the staging application passes smoke testing, apply the same committed
-migrations to production. Production requires a second explicit flag:
+After the staging application and schema pass smoke testing, release the same
+commit to production with the same compatibility order. Production requires a
+second explicit flag at its migration step:
 
 ```bash
 npm run db:migrate:production -- --confirm-production
@@ -107,6 +112,9 @@ password for copying.
 ## Release Boundary
 
 Staging is disposable and may contain seed data. Production starts empty except
-for shared taxonomy. Schema changes are committed as Drizzle migrations, tested
-on staging, and then applied unchanged to production before the corresponding
-application deployment.
+for shared taxonomy. Schema changes are committed as Drizzle migrations and
+tested on staging before production. Use an expand/contract release when
+compatibility spans versions: apply the expand migration before its application
+consumer, then deploy code that no longer needs the legacy contract, and apply
+the destructive contract migration only after that code is the sole live
+version.

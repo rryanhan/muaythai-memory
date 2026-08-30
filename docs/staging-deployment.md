@@ -50,17 +50,27 @@ session pooler; both use port `5432`. Prefer the session pooler when the local
 network cannot reach Supabase's IPv6 direct host. `DATABASE_URL` remains a
 temporary local fallback for older environments.
 
-Verify connection roles without printing credentials:
-
-```bash
-npm run db:verify-config
-```
-
-Run migrations before deploying application code:
+Verify the target and connection roles before every release without printing
+credentials:
 
 ```bash
 npm run env:verify:staging
+npm run db:verify-config
+```
+
+Additive, backward-compatible migrations may run before the application deploy.
+Contract migrations that remove an old table, column, trigger, or accepted
+value reverse that order: first deploy and smoke-test application code that no
+longer uses the legacy contract, then verify that no older deployment is still
+receiving traffic, and only then run the migration with explicit approval.
+
+For the directed-follows contract migration, the staging sequence after the
+compatible application is live is:
+
+```bash
+APP_ENV_FILE=.env.staging.local npm run follows:contract:verify -- --expect=expand
 npm run db:migrate:staging
+APP_ENV_FILE=.env.staging.local npm run follows:contract:verify -- --expect=contract
 APP_ENV_FILE=.env.staging.local npm run db:verify-taxonomy
 npm run db:verify-access-control -- --expect=staging
 ```

@@ -36,7 +36,7 @@
 }
 
 .back:focus-visible,
-.friendIdentityLink:focus-visible,
+.connectionIdentityLink:focus-visible,
 .searchResultAction a:focus-visible {
   outline: 1px solid rgba(209, 74, 50, 0.5);
   outline-offset: 3px;
@@ -102,7 +102,7 @@
 .searchSection,
 .section,
 .sharedSection,
-.friendStats,
+.trainingStats,
 .privateNotice {
   padding: 20px 0;
   border-bottom: 1px solid var(--border);
@@ -436,7 +436,7 @@
   border-top: 1px dashed var(--border);
 }
 
-.friendRow {
+.connectionRow {
   display: flex;
   min-width: 0;
   min-height: 62px;
@@ -447,7 +447,7 @@
   padding: 8px 0;
 }
 
-.friendIdentityLink {
+.connectionIdentityLink {
   display: flex;
   min-width: 0;
   min-height: 44px;
@@ -456,14 +456,14 @@
   text-decoration: none;
 }
 
-.friendIdentity {
+.connectionIdentity {
   display: flex;
   min-width: 0;
   align-items: center;
   gap: 11px;
 }
 
-.friendIdentity strong {
+.connectionIdentity strong {
   overflow: hidden;
   font-size: 15px;
   text-overflow: ellipsis;

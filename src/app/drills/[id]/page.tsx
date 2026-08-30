@@ -8,7 +8,7 @@ import { DrillDetailBackButton } from "@/features/drills/DrillDetailBackButton";
 import { DrillDetailContent } from "@/features/drills/DrillDetailContent";
 import { SavedListActions } from "@/features/shared/SavedListActions";
 import { DrillJournalPreview } from "@/features/journal/DrillJournalPreview";
-import { DrillShareButton } from "@/features/friends/DrillShareButton";
+import { DrillShareButton } from "@/features/connections/DrillShareButton";
 import { RoutedBottomNav } from "@/components/navigation/RoutedBottomNav";
 import { getDrillById } from "@/modules/drills/queries";
 import routeStyles from "@/features/drills/DrillRouteShell.module.css";

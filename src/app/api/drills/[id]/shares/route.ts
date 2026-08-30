@@ -3,8 +3,8 @@ import { z } from "zod";
 import { requireOnboardedUserId } from "@/modules/auth";
 import {
   drillShareErrorResponse,
-  drillShareFriendPageSchema,
-  getDrillShareFriendPage,
+  drillShareRecipientPageSchema,
+  getDrillShareRecipientPage,
   updateDrillShare,
   updateDrillShareInputSchema,
   updateDrillShareResponseSchema,
@@ -23,8 +23,8 @@ export async function GET(
     const ownerUserId = await requireOnboardedUserId();
     const { id } = paramsSchema.parse(await context.params);
     return NextResponse.json(
-      drillShareFriendPageSchema.parse(
-        await getDrillShareFriendPage(
+      drillShareRecipientPageSchema.parse(
+        await getDrillShareRecipientPage(
           ownerUserId,
           id,
           request.nextUrl.searchParams.get("cursor"),

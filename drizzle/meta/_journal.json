@@ -113,6 +113,13 @@
       "when": 1786387326857,
       "tag": "0015_flat_taskmaster",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1788054974010,
+      "tag": "0016_drop-legacy-friendships",
+      "breakpoints": true
     }
   ]
 }

@@ -1,10 +1,10 @@
 import { z } from "zod";
 import {
-  drillShareFriendPageSchema,
+  drillShareRecipientPageSchema,
   sharedDrillListResponseSchema,
   updateDrillShareInputSchema,
   updateDrillShareResponseSchema,
-  type DrillShareFriendPage,
+  type DrillShareRecipientPage,
   type SharedDrillListResponse,
   type UpdateDrillShareInput,
   type UpdateDrillShareResponse,
@@ -13,8 +13,8 @@ import { fetchJson } from "./api-core";
 import type { ApiClientOptions } from "./types";
 
 export type {
-  DrillShareFriendItem,
-  DrillShareFriendPage,
+  DrillShareRecipientItem,
+  DrillShareRecipientPage,
   SharedDrillDetailResponse,
   SharedDrillListItem,
   SharedDrillListResponse,
@@ -22,18 +22,18 @@ export type {
   UpdateDrillShareResponse,
 } from "@/modules/sharing/contracts";
 
-export async function getDrillShareFriendPage(
+export async function getDrillShareRecipientPage(
   drillId: string,
   cursor: string | null,
   options: ApiClientOptions = {},
-): Promise<DrillShareFriendPage> {
+): Promise<DrillShareRecipientPage> {
   const id = z.string().uuid().parse(drillId);
   const params = new URLSearchParams();
   if (cursor) params.set("cursor", cursor);
   const query = params.size > 0 ? `?${params.toString()}` : "";
   return fetchJson(
     `/api/drills/${encodeURIComponent(id)}/shares${query}`,
-    drillShareFriendPageSchema,
+    drillShareRecipientPageSchema,
     options,
   );
 }

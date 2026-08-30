@@ -29,11 +29,11 @@ vi.mock("@/components/navigation/RoutedBottomNav", () => ({
 vi.mock("@/features/profile/ProfileAvatar", () => ({
   ProfileAvatar: ({ profile }: { profile: { displayName: string } }) => <span>{profile.displayName.slice(0, 1)}</span>,
 }));
-vi.mock("./FriendConfirmationSheet", () => ({ FriendConfirmationSheet: () => null }));
-vi.mock("./FriendReportSheet", () => ({ FriendReportSheet: () => null }));
+vi.mock("./FighterActionConfirmationSheet", () => ({ FighterActionConfirmationSheet: () => null }));
+vi.mock("./FighterReportSheet", () => ({ FighterReportSheet: () => null }));
 vi.mock("./SharedDrillsSection", () => ({ SharedDrillsSection: () => null }));
-vi.mock("./FriendMoreActionsSheet", () => ({
-  FriendMoreActionsSheet: ({ open, onBlock }: { open: boolean; onBlock: () => void }) => (
+vi.mock("./FighterMoreActionsSheet", () => ({
+  FighterMoreActionsSheet: ({ open, onBlock }: { open: boolean; onBlock: () => void }) => (
     open ? <button type="button" onClick={onBlock}>Block Fighter</button> : null
   ),
 }));

@@ -14,20 +14,37 @@ It uses the `muaythai-memory` Vercel project and the isolated Supabase project
 3. Verify `.env.production-maintenance.local` with
    `npm run env:verify:production`. This name intentionally prevents Next.js
    from loading production credentials during ordinary local builds.
-4. Apply the same committed migrations with:
+4. Choose the production order from the migration's compatibility:
+   - For an additive, backward-compatible migration, migrate and verify before
+     deploying its application consumer.
+   - For a destructive contract migration, first deploy and smoke-test the
+     compatible application commit, confirm that no older deployment is still
+     receiving traffic, and only then migrate with separate explicit approval.
+5. At the migration step, apply the same committed migration with:
 
    ```bash
    npm run db:migrate:production -- --confirm-production
    ```
 
-5. Verify production taxonomy:
+6. Verify production taxonomy and database access control:
 
    ```bash
    APP_ENV_FILE=.env.production-maintenance.local npm run db:verify-taxonomy
+   npm run db:verify-access-control -- --expect=production
    ```
 
-6. Deploy the verified commit to the `muaythai-memory` Vercel project.
-7. Smoke-test sign-in, Library, Network, Profile, Capture, and journal uploads.
+7. Deploy the verified commit to the `muaythai-memory` Vercel project if the
+   compatibility order did not require deploying it before step 5.
+8. Smoke-test sign-in, Library, Network, Profile, Capture, and journal uploads.
+
+For the directed-follows contract, run the phase verifier immediately before
+and after its production migration:
+
+```bash
+APP_ENV_FILE=.env.production-maintenance.local npm run follows:contract:verify -- --expect=expand
+npm run db:migrate:production -- --confirm-production
+APP_ENV_FILE=.env.production-maintenance.local npm run follows:contract:verify -- --expect=contract
+```
 
 ## Runtime Variables
 

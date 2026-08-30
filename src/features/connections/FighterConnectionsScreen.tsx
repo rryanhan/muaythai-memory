@@ -10,7 +10,7 @@ import {
   type PublicConnectionSection,
 } from "@/data/connections";
 import { ProfileAvatar } from "@/features/profile/ProfileAvatar";
-import styles from "./Friends.module.css";
+import styles from "./Connections.module.css";
 
 export function FighterConnectionsScreen({
   initialPage,
@@ -79,9 +79,9 @@ export function FighterConnectionsScreen({
         ) : items.length > 0 ? (
           <div className={styles.rows}>
             {items.map(({ profile }) => (
-              <div className={styles.friendRow} key={profile.id}>
-                <Link className={styles.friendIdentityLink} href={`/fighters/${encodeURIComponent(profile.username)}`} prefetch>
-                  <span className={styles.friendIdentity}>
+              <div className={styles.connectionRow} key={profile.id}>
+                <Link className={styles.connectionIdentityLink} href={`/fighters/${encodeURIComponent(profile.username)}`} prefetch>
+                  <span className={styles.connectionIdentity}>
                     <ProfileAvatar
                       profile={{ displayName: profile.username, avatarUrl: profile.avatarUrl }}
                       className={styles.avatar}

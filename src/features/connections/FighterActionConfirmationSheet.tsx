@@ -3,9 +3,9 @@
 import { Drawer } from "vaul";
 import { useDrawerFocus } from "@/features/media/use-drawer-focus";
 import type { FighterSummary } from "@/data/connections";
-import styles from "./Friends.module.css";
+import styles from "./Connections.module.css";
 
-export function FriendConfirmationSheet({
+export function FighterActionConfirmationSheet({
   action,
   fighter,
   open,

@@ -7,7 +7,7 @@ import type {
   ConnectionSectionItem,
   FighterConnection,
 } from "@/data/connections";
-import { ConnectionsScreen } from "./ConnectionsScreen";
+import { ConnectionsScreen, type ConnectionsTab } from "./ConnectionsScreen";
 
 const mocks = vi.hoisted(() => ({
   cancelOrUnfollow: vi.fn(),
@@ -144,7 +144,7 @@ describe("ConnectionsScreen", () => {
   });
 });
 
-function renderScreen(initialTab: "followers" | "following" | "requests" | "blocked") {
+function renderScreen(initialTab: ConnectionsTab) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });

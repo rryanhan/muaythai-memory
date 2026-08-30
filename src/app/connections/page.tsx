@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { ConnectionsScreen, type ConnectionsTab } from "@/features/friends/ConnectionsScreen";
+import { ConnectionsScreen, type ConnectionsTab } from "@/features/connections/ConnectionsScreen";
 import { requireCurrentPageUser } from "@/modules/auth";
 
 export const dynamic = "force-dynamic";

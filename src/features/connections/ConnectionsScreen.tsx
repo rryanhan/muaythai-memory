@@ -32,7 +32,7 @@ import {
 import { ProfileAvatar } from "@/features/profile/ProfileAvatar";
 import { ProfileInviteSheet } from "./ProfileInviteSheet";
 import { SharedDrillsSection } from "./SharedDrillsSection";
-import styles from "./Friends.module.css";
+import styles from "./Connections.module.css";
 
 export type ConnectionsTab = "followers" | "following" | "requests" | "blocked";
 
@@ -277,7 +277,7 @@ function SearchResult({
   const { profile, outgoing, incoming, isSelf } = connection;
   return (
     <div className={styles.searchResult}>
-      <Link className={styles.friendIdentityLink} href={`/fighters/${encodeURIComponent(profile.username)}`} prefetch>
+      <Link className={styles.connectionIdentityLink} href={`/fighters/${encodeURIComponent(profile.username)}`} prefetch>
         <ConnectionIdentity profile={profile} />
       </Link>
       <div className={styles.searchResultAction}>
@@ -437,9 +437,9 @@ function ConnectionRow({
   children?: React.ReactNode;
 }) {
   return (
-    <div className={styles.friendRow}>
+    <div className={styles.connectionRow}>
       {linked ? (
-        <Link className={styles.friendIdentityLink} href={`/fighters/${encodeURIComponent(profile.username)}`} prefetch>
+        <Link className={styles.connectionIdentityLink} href={`/fighters/${encodeURIComponent(profile.username)}`} prefetch>
           <ConnectionIdentity profile={profile} />
         </Link>
       ) : <ConnectionIdentity profile={profile} />}
@@ -450,7 +450,7 @@ function ConnectionRow({
 
 function ConnectionIdentity({ profile }: { profile: FighterSummary }) {
   return (
-    <div className={styles.friendIdentity}>
+    <div className={styles.connectionIdentity}>
       <ProfileAvatar
         profile={{ displayName: profile.username, avatarUrl: profile.avatarUrl }}
         className={styles.avatar}

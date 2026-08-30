@@ -20,7 +20,6 @@ const EXPECTED_PUBLIC_TABLES = [
   "follows",
   "friend_rate_limits",
   "friend_reports",
-  "friendships",
   "journal_entries",
   "journal_media",
   "status_tags",

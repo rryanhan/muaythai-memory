@@ -29,7 +29,7 @@ import {
   getReciprocalConnectionPage,
 } from "@/modules/connections/queries";
 import type {
-  DrillShareFriendPage,
+  DrillShareRecipientPage,
   SharedDrillDetailResponse,
   SharedDrillListResponse,
 } from "./contracts";
@@ -42,11 +42,11 @@ const sharedCursorSchema = z.object({
 
 type SharedCursor = z.infer<typeof sharedCursorSchema>;
 
-export async function getDrillShareFriendPage(
+export async function getDrillShareRecipientPage(
   ownerUserId: string,
   drillId: string,
   cursor: string | null,
-): Promise<DrillShareFriendPage> {
+): Promise<DrillShareRecipientPage> {
   const [ownedDrill] = await db
     .select({ id: drills.id })
     .from(drills)
@@ -55,14 +55,14 @@ export async function getDrillShareFriendPage(
   if (!ownedDrill) throw new DrillShareError("Drill not found.", 404);
 
   const page = await getReciprocalConnectionPage(ownerUserId, cursor, 20);
-  const friendIds = page.items.map((item) => item.profile.id);
-  const sharedRows = friendIds.length > 0
+  const recipientIds = page.items.map((item) => item.profile.id);
+  const sharedRows = recipientIds.length > 0
     ? await db
         .select({ recipientUserId: drillShares.recipientUserId })
         .from(drillShares)
         .where(and(
           eq(drillShares.drillId, drillId),
-          inArray(drillShares.recipientUserId, friendIds),
+          inArray(drillShares.recipientUserId, recipientIds),
         ))
     : [];
   const sharedIds = new Set(sharedRows.map((row) => row.recipientUserId));

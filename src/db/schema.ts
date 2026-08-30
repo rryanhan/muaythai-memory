@@ -47,50 +47,9 @@ export const users = pgTable(
   }),
 );
 
-// Friendships use one canonical row per unordered user pair. requestedById
-// preserves request direction while userOneId/userTwoId prevent duplicate
-// reverse requests under concurrent writes.
-export const friendships = pgTable(
-  "friendships",
-  {
-    userOneId: uuid("user_one_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-    userTwoId: uuid("user_two_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-    requestedById: uuid("requested_by_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-    status: varchar("status", { length: 16 }).notNull().default("pending"),
-    respondedAt: timestamp("responded_at", { withTimezone: true }),
-    ...timestamps,
-  },
-  (table) => ({
-    pk: primaryKey({ columns: [table.userOneId, table.userTwoId] }),
-    userTwoIdx: index("friendships_user_two_id_idx").on(table.userTwoId),
-    requestedByIdx: index("friendships_requested_by_id_idx").on(table.requestedById),
-    statusIdx: index("friendships_status_idx").on(table.status),
-    orderedPairCheck: check(
-      "friendships_ordered_pair_check",
-      sql`${table.userOneId} < ${table.userTwoId}`,
-    ),
-    requesterMemberCheck: check(
-      "friendships_requester_member_check",
-      sql`${table.requestedById} = ${table.userOneId} or ${table.requestedById} = ${table.userTwoId}`,
-    ),
-    statusCheck: check(
-      "friendships_status_check",
-      sql`${table.status} in ('pending', 'accepted')`,
-    ),
-    responseStateCheck: check(
-      "friendships_response_state_check",
-      sql`(
-        (${table.status} = 'pending' and ${table.respondedAt} is null)
-        or (${table.status} = 'accepted' and ${table.respondedAt} is not null)
-      )`,
-    ),
-  }),
-);
-
 // Follows are directional and require approval. Reciprocal accepted rows are
 // the private-sharing trust boundary, while one accepted row is a normal
-// follower relationship. The legacy friendships table remains temporarily
-// during the staged data migration only.
+// follower relationship.
 export const follows = pgTable(
   "follows",
   {
@@ -198,9 +157,7 @@ export const friendRateLimits = pgTable(
     windowIdx: index("friend_rate_limits_window_idx").on(table.windowStart),
     actionCheck: check(
       "friend_rate_limits_action_check",
-      // `request` remains valid only through the expand rollout so an older
-      // deployment can keep serving traffic before the follows code is live.
-      sql`${table.action} in ('search', 'request', 'follow', 'report')`,
+      sql`${table.action} in ('search', 'follow', 'report')`,
     ),
     countCheck: check(
       "friend_rate_limits_count_check",
@@ -585,31 +542,3 @@ export const journalMedia = pgTable(
     storagePathUnique: uniqueIndex("journal_media_storage_path_unique").on(table.storagePath),
   }),
 );
-
-export type User = typeof users.$inferSelect;
-export type NewUser = typeof users.$inferInsert;
-export type Friendship = typeof friendships.$inferSelect;
-export type NewFriendship = typeof friendships.$inferInsert;
-export type Follow = typeof follows.$inferSelect;
-export type NewFollow = typeof follows.$inferInsert;
-export type UserBlock = typeof userBlocks.$inferSelect;
-export type NewUserBlock = typeof userBlocks.$inferInsert;
-export type FriendReport = typeof friendReports.$inferSelect;
-export type NewFriendReport = typeof friendReports.$inferInsert;
-export type FriendRateLimit = typeof friendRateLimits.$inferSelect;
-export type NewFriendRateLimit = typeof friendRateLimits.$inferInsert;
-export type CaptureRateLimit = typeof captureRateLimits.$inferSelect;
-export type NewCaptureRateLimit = typeof captureRateLimits.$inferInsert;
-export type AuthRecoveryGrant = typeof authRecoveryGrants.$inferSelect;
-export type NewAuthRecoveryGrant = typeof authRecoveryGrants.$inferInsert;
-export type Drill = typeof drills.$inferSelect;
-export type NewDrill = typeof drills.$inferInsert;
-export type TrainingMethod = typeof trainingMethods.$inferSelect;
-export type Tag = typeof tags.$inferSelect;
-export type StatusTag = typeof statusTags.$inferSelect;
-export type DrillShare = typeof drillShares.$inferSelect;
-export type NewDrillShare = typeof drillShares.$inferInsert;
-export type JournalEntry = typeof journalEntries.$inferSelect;
-export type NewJournalEntry = typeof journalEntries.$inferInsert;
-export type JournalMedia = typeof journalMedia.$inferSelect;
-export type NewJournalMedia = typeof journalMedia.$inferInsert;

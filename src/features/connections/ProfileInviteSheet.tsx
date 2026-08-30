@@ -5,7 +5,7 @@ import { Drawer } from "vaul";
 import { Copy } from "@phosphor-icons/react/Copy";
 import { ShareNetwork } from "@phosphor-icons/react/ShareNetwork";
 import { useDrawerFocus } from "@/features/media/use-drawer-focus";
-import styles from "./Friends.module.css";
+import styles from "./Connections.module.css";
 
 export function ProfileInviteSheet({
   username,

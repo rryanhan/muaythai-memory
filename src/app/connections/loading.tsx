@@ -1,5 +1,5 @@
 import { RoutedBottomNav } from "@/components/navigation/RoutedBottomNav";
-import styles from "@/features/friends/Friends.module.css";
+import styles from "@/features/connections/Connections.module.css";
 
 export default function ConnectionsLoading() {
   return (

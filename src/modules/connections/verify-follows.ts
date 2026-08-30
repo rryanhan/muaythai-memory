@@ -9,7 +9,6 @@ import {
   follows,
   friendRateLimits,
   friendReports,
-  friendships,
   trainingMethods,
   userBlocks,
   users,
@@ -263,10 +262,8 @@ async function main() {
       429,
     );
 
-    await verifyLegacyMirror(userB.id, userC.id);
-
     console.log(
-      "Follow verification passed: migration, directed requests, crossed requests, accepted-only counts, pagination, limits, private stats, reciprocal sharing, revocation, blocking, and reports are isolated.",
+      "Follow verification passed: directed requests, crossed requests, accepted-only counts, pagination, limits, private stats, reciprocal sharing, revocation, blocking, and reports are isolated.",
     );
   } finally {
     await db.delete(users).where(inArray(users.id, [userA.id, userB.id, userC.id]));
@@ -274,34 +271,6 @@ async function main() {
       await db.delete(users).where(inArray(users.id, auxiliaryUserIds));
     }
   }
-}
-
-async function verifyLegacyMirror(firstUserId: string, secondUserId: string) {
-  const [userOneId, userTwoId] = [firstUserId, secondUserId].sort();
-  await db.insert(friendships).values({
-    userOneId: userOneId!,
-    userTwoId: userTwoId!,
-    requestedById: firstUserId,
-  });
-  assert.equal((await loadPairRows(firstUserId, secondUserId)).length, 1);
-
-  const now = new Date();
-  await db
-    .update(friendships)
-    .set({ status: "accepted", respondedAt: now, updatedAt: now })
-    .where(and(
-      eq(friendships.userOneId, userOneId!),
-      eq(friendships.userTwoId, userTwoId!),
-    ));
-  const accepted = await loadPairRows(firstUserId, secondUserId);
-  assert.equal(accepted.length, 2);
-  assert.ok(accepted.every((row) => row.status === "accepted"));
-
-  await db.delete(friendships).where(and(
-    eq(friendships.userOneId, userOneId!),
-    eq(friendships.userTwoId, userTwoId!),
-  ));
-  assert.equal((await loadPairRows(firstUserId, secondUserId)).length, 0);
 }
 
 async function collectSectionPages(

@@ -23,11 +23,11 @@ import {
   type ReportReason,
 } from "@/data/connections";
 import { ProfileAvatar } from "@/features/profile/ProfileAvatar";
-import { FriendConfirmationSheet } from "./FriendConfirmationSheet";
-import { FriendMoreActionsSheet } from "./FriendMoreActionsSheet";
-import { FriendReportSheet } from "./FriendReportSheet";
+import { FighterActionConfirmationSheet } from "./FighterActionConfirmationSheet";
+import { FighterMoreActionsSheet } from "./FighterMoreActionsSheet";
+import { FighterReportSheet } from "./FighterReportSheet";
 import { SharedDrillsSection } from "./SharedDrillsSection";
-import styles from "./Friends.module.css";
+import styles from "./Connections.module.css";
 
 type ProfileAction =
   | "follow"
@@ -173,7 +173,7 @@ export function FighterProfileScreen({
       )}
 
       {fighter.stats && (
-        <section className={styles.friendStats} aria-labelledby="fighter-training-title">
+        <section className={styles.trainingStats} aria-labelledby="fighter-training-title">
           <div className={styles.statTotal}>
             <strong>{fighter.stats.drillCount}</strong>
             <span>{fighter.stats.drillCount === 1 ? "drill recorded" : "drills recorded"}</span>
@@ -218,7 +218,7 @@ export function FighterProfileScreen({
 
       {fighter.mutual && <SharedDrillsSection ownerUsername={fighter.profile.username} />}
 
-      <FriendConfirmationSheet
+      <FighterActionConfirmationSheet
         action={confirmation ?? "unfollow"}
         fighter={fighter.profile}
         open={confirmation !== null}
@@ -230,7 +230,7 @@ export function FighterProfileScreen({
         }}
         onConfirm={() => confirmation && actionMutation.mutate(confirmation)}
       />
-      <FriendMoreActionsSheet
+      <FighterMoreActionsSheet
         fighter={fighter.profile}
         open={moreOpen}
         allowBlock
@@ -247,7 +247,7 @@ export function FighterProfileScreen({
           setConfirmation("block");
         }}
       />
-      <FriendReportSheet
+      <FighterReportSheet
         key={reportCycle}
         fighter={fighter.profile}
         open={reportOpen}

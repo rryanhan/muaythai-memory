@@ -11,9 +11,9 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 import {
-  getDrillShareFriendPage,
+  getDrillShareRecipientPage,
   updateDrillShare,
-  type DrillShareFriendPage,
+  type DrillShareRecipientPage,
 } from "@/data/sharing";
 import { useDrawerFocus } from "@/features/media/use-drawer-focus";
 import { ProfileAvatar } from "@/features/profile/ProfileAvatar";
@@ -26,7 +26,7 @@ export function DrillShareButton({ drillId }: { drillId: string }) {
   const queryKey = ["drill-shares", drillId];
   const recipientsQuery = useInfiniteQuery({
     queryKey,
-    queryFn: ({ pageParam, signal }) => getDrillShareFriendPage(
+    queryFn: ({ pageParam, signal }) => getDrillShareRecipientPage(
       drillId,
       pageParam,
       { requestInit: { signal } },
@@ -46,8 +46,8 @@ export function DrillShareButton({ drillId }: { drillId: string }) {
     }) => updateDrillShare(drillId, { recipientUserId, shared }),
     onMutate: async ({ recipientUserId, shared }) => {
       await queryClient.cancelQueries({ queryKey });
-      const previous = queryClient.getQueryData<InfiniteData<DrillShareFriendPage>>(queryKey);
-      queryClient.setQueryData<InfiniteData<DrillShareFriendPage>>(queryKey, (current) => (
+      const previous = queryClient.getQueryData<InfiniteData<DrillShareRecipientPage>>(queryKey);
+      queryClient.setQueryData<InfiniteData<DrillShareRecipientPage>>(queryKey, (current) => (
         current
           ? {
               ...current,
@@ -131,7 +131,7 @@ export function DrillShareButton({ drillId }: { drillId: string }) {
                 return (
                   <button
                     key={item.profile.id}
-                    className={styles.friend}
+                    className={styles.recipient}
                     type="button"
                     aria-label={item.shared
                       ? `Stop sharing drill with @${item.profile.username}`

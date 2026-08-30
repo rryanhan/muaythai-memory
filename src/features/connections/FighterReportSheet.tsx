@@ -7,7 +7,7 @@ import type {
   FighterSummary,
   ReportReason,
 } from "@/data/connections";
-import styles from "./Friends.module.css";
+import styles from "./Connections.module.css";
 
 const reasons: Array<{ value: ReportReason; label: string }> = [
   { value: "spam", label: "Spam" },
@@ -17,7 +17,7 @@ const reasons: Array<{ value: ReportReason; label: string }> = [
   { value: "other", label: "Other" },
 ];
 
-export function FriendReportSheet({
+export function FighterReportSheet({
   fighter,
   open,
   pending,

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
-import { FighterProfileScreen } from "@/features/friends/FighterProfileScreen";
+import { FighterProfileScreen } from "@/features/connections/FighterProfileScreen";
 import { requireCurrentPageUserId } from "@/modules/auth";
 import { getFighterProfileByUsername } from "@/modules/connections";
 import { profileUsernameSchema } from "@/modules/profile/contracts";

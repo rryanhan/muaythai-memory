@@ -5,13 +5,13 @@ import {
 } from "@/modules/drills/contracts";
 import { fighterSummarySchema } from "@/modules/connections/contracts";
 
-export const drillShareFriendItemSchema = z.object({
+export const drillShareRecipientItemSchema = z.object({
   profile: fighterSummarySchema,
   shared: z.boolean(),
 });
 
-export const drillShareFriendPageSchema = z.object({
-  items: z.array(drillShareFriendItemSchema),
+export const drillShareRecipientPageSchema = z.object({
+  items: z.array(drillShareRecipientItemSchema),
   nextCursor: z.string().nullable(),
 });
 
@@ -43,8 +43,8 @@ export const sharedDrillDetailResponseSchema = z.object({
   sharedAt: z.coerce.date(),
 });
 
-export type DrillShareFriendItem = z.infer<typeof drillShareFriendItemSchema>;
-export type DrillShareFriendPage = z.infer<typeof drillShareFriendPageSchema>;
+export type DrillShareRecipientItem = z.infer<typeof drillShareRecipientItemSchema>;
+export type DrillShareRecipientPage = z.infer<typeof drillShareRecipientPageSchema>;
 export type UpdateDrillShareInput = z.infer<typeof updateDrillShareInputSchema>;
 export type UpdateDrillShareResponse = z.infer<typeof updateDrillShareResponseSchema>;
 export type SharedDrillListItem = z.infer<typeof sharedDrillListItemSchema>;

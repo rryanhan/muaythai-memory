@@ -18,7 +18,7 @@
 
 .trigger:focus-visible,
 .heading button:focus-visible,
-.friend:focus-visible,
+.recipient:focus-visible,
 .retry:focus-visible,
 .loadMore:focus-visible {
   outline: 2px solid rgba(209, 74, 50, 0.52);
@@ -92,7 +92,7 @@
   overscroll-behavior: contain;
 }
 
-.friend {
+.recipient {
   display: grid;
   width: 100%;
   min-height: 60px;
@@ -107,7 +107,7 @@
   text-align: left;
 }
 
-.friend strong {
+.recipient strong {
   overflow: hidden;
   font-size: 14px;
   text-overflow: ellipsis;
@@ -134,7 +134,7 @@
   object-fit: cover;
 }
 
-.friend > span {
+.recipient > span {
   display: grid;
   width: 24px;
   height: 24px;
@@ -144,12 +144,12 @@
   color: var(--bg);
 }
 
-.friend > span[data-shared="true"] {
+.recipient > span[data-shared="true"] {
   border-color: var(--accent);
   background: var(--accent);
 }
 
-.friend > span[data-pending="true"] {
+.recipient > span[data-pending="true"] {
   opacity: 0.5;
 }
 

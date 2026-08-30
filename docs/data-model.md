@@ -157,8 +157,6 @@ Relationship metadata lives in Postgres:
 
 - `follows`: one directed follower/following pair, pending or accepted state,
   response time, and timestamps
-- `friendships`: temporary rollout compatibility data; accepted rows were
-  expanded to two accepted follows and pending rows preserve request direction
 - `user_blocks`: directional blocker and blocked-user relationship
 - `friend_reports`: a private moderation record with reporter, reported fighter,
   reason, optional details, and timestamps

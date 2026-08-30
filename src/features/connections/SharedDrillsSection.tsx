@@ -5,7 +5,7 @@ import { useInfiniteQuery } from "@tanstack/react-query";
 import { ArrowRight } from "@phosphor-icons/react/ArrowRight";
 import { getSharedDrills } from "@/data/sharing";
 import { ProfileAvatar } from "@/features/profile/ProfileAvatar";
-import styles from "./Friends.module.css";
+import styles from "./Connections.module.css";
 
 export function SharedDrillsSection({
   ownerUsername,

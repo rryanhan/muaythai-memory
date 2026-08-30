@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DrillShareButton } from "./DrillShareButton";
 
 const mocks = vi.hoisted(() => ({
-  getDrillShareFriendPage: vi.fn(),
+  getDrillShareRecipientPage: vi.fn(),
   updateDrillShare: vi.fn(),
 }));
 
@@ -44,7 +44,7 @@ vi.mock("vaul", async () => {
 describe("DrillShareButton", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.getDrillShareFriendPage.mockResolvedValue({
+    mocks.getDrillShareRecipientPage.mockResolvedValue({
       items: [{
         profile: {
           id: "00000000-0000-4000-8000-000000000002",
@@ -75,14 +75,14 @@ describe("DrillShareButton", () => {
     await user.click(screen.getByRole("button", {
       name: "Share drill with connections",
     }));
-    const friend = await screen.findByRole("button", {
+    const recipient = await screen.findByRole("button", {
       name: "Share drill with @training_partner",
     });
-    expect(friend).toHaveAttribute("aria-pressed", "false");
+    expect(recipient).toHaveAttribute("aria-pressed", "false");
 
-    await user.click(friend);
+    await user.click(recipient);
 
-    expect(friend).toHaveAttribute("aria-pressed", "true");
+    expect(recipient).toHaveAttribute("aria-pressed", "true");
     expect(mocks.updateDrillShare).toHaveBeenCalledWith(
       "00000000-0000-4000-8000-000000000001",
       {
@@ -90,7 +90,7 @@ describe("DrillShareButton", () => {
         shared: true,
       },
     );
-    mocks.getDrillShareFriendPage.mockResolvedValue({
+    mocks.getDrillShareRecipientPage.mockResolvedValue({
       items: [{
         profile: {
           id: "00000000-0000-4000-8000-000000000002",
@@ -106,7 +106,7 @@ describe("DrillShareButton", () => {
       recipientUserId: "00000000-0000-4000-8000-000000000002",
       shared: true,
     });
-    await waitFor(() => expect(friend).toBeEnabled());
+    await waitFor(() => expect(recipient).toBeEnabled());
   });
 
   it("rolls an optimistic share back when persistence fails", async () => {
@@ -118,16 +118,16 @@ describe("DrillShareButton", () => {
     await user.click(screen.getByRole("button", {
       name: "Share drill with connections",
     }));
-    const friend = await screen.findByRole("button", {
+    const recipient = await screen.findByRole("button", {
       name: "Share drill with @training_partner",
     });
-    await user.click(friend);
-    expect(friend).toHaveAttribute("aria-pressed", "true");
+    await user.click(recipient);
+    expect(recipient).toHaveAttribute("aria-pressed", "true");
 
     failure.reject(new Error("Share failed."));
 
     await waitFor(() => {
-      expect(friend).toHaveAttribute("aria-pressed", "false");
+      expect(recipient).toHaveAttribute("aria-pressed", "false");
       expect(screen.getByRole("alert")).toHaveTextContent("Share failed.");
     });
   });

@@ -270,7 +270,6 @@ drill_status_tags
 journal_entries
 journal_media
 follows
-friendships (temporary rollout compatibility)
 user_blocks
 friend_reports
 friend_rate_limits
