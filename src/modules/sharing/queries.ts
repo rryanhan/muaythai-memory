@@ -22,7 +22,7 @@ import {
 } from "@/db/schema";
 import {
   getDrillById,
-  getDrillSummariesByIds,
+  getDrillSummariesByOwnerPairs,
 } from "@/modules/drills/queries";
 import {
   findFighterByUsername,
@@ -257,21 +257,12 @@ function reciprocalFollowCondition(
 async function getSummariesByOwner(
   rows: Array<{ drillId: string; ownerId: string }>,
 ) {
-  const ownerIds = [...new Set(rows.map((row) => row.ownerId))];
-  const summaries = await Promise.all(
-    ownerIds.map(async (ownerId) => [
-      ownerId,
-      await getDrillSummariesByIds(
-        ownerId,
-        rows.filter((row) => row.ownerId === ownerId).map((row) => row.drillId),
-      ),
-    ] as const),
-  );
+  const summaries = await getDrillSummariesByOwnerPairs(rows, {
+    includeStatusTags: false,
+  });
 
   return new Map(
-    summaries.flatMap(([, drillsForOwner]) => (
-      drillsForOwner.map((drill) => [drill.id, drill] as const)
-    )),
+    summaries.map((drill) => [drill.id, drill] as const),
   );
 }
 

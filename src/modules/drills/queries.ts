@@ -87,6 +87,39 @@ export async function getDrillSummariesByIds(
     .filter((drill): drill is DrillSummary => Boolean(drill));
 }
 
+export async function getDrillSummariesByOwnerPairs(
+  pairs: Array<{ ownerId: string; drillId: string }>,
+  options: { includeStatusTags?: boolean } = {},
+): Promise<DrillSummary[]> {
+  if (pairs.length === 0) return [];
+
+  const uniquePairs = [...new Map(
+    pairs.map((pair) => [`${pair.ownerId}:${pair.drillId}`, pair]),
+  ).values()];
+  const drillRows = await db
+    .select()
+    .from(drills)
+    .where(or(...uniquePairs.map((pair) => and(
+      eq(drills.id, pair.drillId),
+      eq(drills.userId, pair.ownerId),
+    ))));
+  const summaries = await hydrateDrillSummaries(
+    drillRows,
+    (drillIds) => loadTagsByDrillOwner(drillIds),
+    options.includeStatusTags ?? true,
+  );
+  const summaryById = new Map(summaries.map((drill) => [drill.id, drill]));
+  const validatedPairs = new Set(
+    drillRows.map((drill) => `${drill.userId}:${drill.id}`),
+  );
+
+  return pairs
+    .map((pair) => validatedPairs.has(`${pair.ownerId}:${pair.drillId}`)
+      ? summaryById.get(pair.drillId)
+      : undefined)
+    .filter((drill): drill is DrillSummary => Boolean(drill));
+}
+
 export function normalizeDrillFilters(filters: Partial<DrillFilters> = {}): DrillFilters {
   return {
     keywords: normalizeStringList(filters.keywords ?? []),
@@ -137,11 +170,24 @@ async function loadDrillSummaries(
       selectedDrillIds ? inArray(drills.id, selectedDrillIds) : undefined,
     ))
     .orderBy(desc(drills.createdAt), asc(drills.title));
+  return hydrateDrillSummaries(
+    drillRows,
+    (drillIds) => loadTagsByDrillId(userId, drillIds),
+  );
+}
+
+async function hydrateDrillSummaries(
+  drillRows: Array<typeof drills.$inferSelect>,
+  loadTags: (drillIds: string[]) => Promise<Map<string, TagDto[]>>,
+  includeStatusTags = true,
+): Promise<DrillSummary[]> {
   const drillIds = drillRows.map((drill) => drill.id);
   const [methodsByDrillId, tagsByDrillId, statusTagsByDrillId] = await Promise.all([
     loadTrainingMethodsByDrillId(drillIds),
-    loadTagsByDrillId(userId, drillIds),
-    loadStatusTagsByDrillId(drillIds),
+    loadTags(drillIds),
+    includeStatusTags
+      ? loadStatusTagsByDrillId(drillIds)
+      : Promise.resolve(new Map<string, StatusTagDto[]>()),
   ]);
 
   return drillRows.map((drill) => {
@@ -159,6 +205,35 @@ async function loadDrillSummaries(
       updatedAt: drill.updatedAt,
     };
   });
+}
+
+async function loadTagsByDrillOwner(drillIds: string[]): Promise<Map<string, TagDto[]>> {
+  if (drillIds.length === 0) return new Map();
+
+  const rows = await db
+    .select({
+      drillId: drillTags.drillId,
+      id: tags.id,
+      name: tags.name,
+      slug: tags.slug,
+      kind: tags.kind,
+      sortOrder: tags.sortOrder,
+      categoryId: tagCategories.id,
+      categoryName: tagCategories.name,
+      categorySlug: tagCategories.slug,
+    })
+    .from(drillTags)
+    .innerJoin(drills, eq(drillTags.drillId, drills.id))
+    .innerJoin(tags, eq(drillTags.tagId, tags.id))
+    .leftJoin(tagCategories, eq(tags.categoryId, tagCategories.id))
+    .where(and(
+      inArray(drillTags.drillId, drillIds),
+      eq(tags.active, true),
+      or(isNull(tags.userId), eq(tags.userId, drills.userId)),
+    ))
+    .orderBy(asc(tagCategories.sortOrder), asc(tags.sortOrder), asc(tags.name));
+
+  return groupTagRows(rows);
 }
 
 async function loadTrainingMethodsByDrillId(drillIds: string[]): Promise<Map<string, TrainingMethodDto[]>> {
@@ -184,6 +259,34 @@ async function loadTrainingMethodsByDrillId(drillIds: string[]): Promise<Map<str
     slug: row.slug,
     iconKey: row.iconKey,
     sortOrder: row.sortOrder,
+  }));
+}
+
+function groupTagRows(rows: Array<{
+  drillId: string;
+  id: string;
+  name: string;
+  slug: string;
+  kind: string;
+  sortOrder: number;
+  categoryId: string | null;
+  categoryName: string | null;
+  categorySlug: string | null;
+}>): Map<string, TagDto[]> {
+  return groupByDrillId(rows, (row) => ({
+    id: row.id,
+    name: row.name,
+    slug: row.slug,
+    kind: row.kind === "custom" ? "custom" : "standard",
+    sortOrder: row.sortOrder,
+    category:
+      row.categoryId && row.categoryName && row.categorySlug
+        ? {
+            id: row.categoryId,
+            name: row.categoryName,
+            slug: row.categorySlug,
+          }
+        : null,
   }));
 }
 
@@ -231,21 +334,7 @@ async function loadTagsByDrillId(userId: string, drillIds: string[]): Promise<Ma
     )
     .orderBy(asc(tagCategories.sortOrder), asc(tags.sortOrder), asc(tags.name));
 
-  return groupByDrillId(rows, (row) => ({
-    id: row.id,
-    name: row.name,
-    slug: row.slug,
-    kind: row.kind === "custom" ? "custom" : "standard",
-    sortOrder: row.sortOrder,
-    category:
-      row.categoryId && row.categoryName && row.categorySlug
-        ? {
-            id: row.categoryId,
-            name: row.categoryName,
-            slug: row.categorySlug,
-          }
-        : null,
-  }));
+  return groupTagRows(rows);
 }
 
 async function loadTagsForDrill(userId: string, drillId: string): Promise<TagDto[]> {
