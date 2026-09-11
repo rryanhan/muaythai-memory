@@ -2,10 +2,21 @@
 
 import { useState } from "react";
 import { CalendarBlank } from "@phosphor-icons/react/CalendarBlank";
-import { DayPicker } from "@daypicker/react";
+import dynamic from "next/dynamic";
 import { Drawer } from "vaul";
 import journalStyles from "./Journal.module.css";
 import styles from "./JournalPickers.module.css";
+
+const DayPicker = dynamic(
+  () => import("@daypicker/react").then((module) => module.DayPicker),
+  {
+    loading: () => (
+      <p className={styles.calendar} role="status">
+        Loading calendar…
+      </p>
+    ),
+  },
+);
 
 type JournalDatePickerProps = {
   value: string;
@@ -39,19 +50,21 @@ export function JournalDatePicker({ value, disabled, onChange }: JournalDatePick
               <button type="button">Close</button>
             </Drawer.Close>
           </header>
-          <DayPicker
-            className={styles.calendar}
-            mode="single"
-            selected={selected}
-            defaultMonth={selected}
-            endMonth={today}
-            disabled={{ after: today }}
-            onSelect={(date) => {
-              if (!date) return;
-              onChange(formatLocalDate(date));
-              setOpen(false);
-            }}
-          />
+          {open && (
+            <DayPicker
+              className={styles.calendar}
+              mode="single"
+              selected={selected}
+              defaultMonth={selected}
+              endMonth={today}
+              disabled={{ after: today }}
+              onSelect={(date) => {
+                if (!date) return;
+                onChange(formatLocalDate(date));
+                setOpen(false);
+              }}
+            />
+          )}
           <button
             className={styles.todayAction}
             type="button"
