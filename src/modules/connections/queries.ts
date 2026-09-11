@@ -1,7 +1,6 @@
 import {
   and,
   asc,
-  count,
   countDistinct,
   eq,
   gt,
@@ -309,22 +308,26 @@ async function loadPairFollows(firstUserId: string, secondUserId: string) {
 }
 
 async function getPublicSocialCounts(userId: string) {
-  const [followers, following] = await Promise.all([
-    countFollowRows(and(
-      eq(follows.followingId, userId),
-      eq(follows.status, "accepted"),
-    )),
-    countFollowRows(and(
-      eq(follows.followerId, userId),
-      eq(follows.status, "accepted"),
-    )),
-  ]);
-  return { followers, following };
-}
+  const [counts] = await db.execute<FighterProfile["socialCounts"]>(sql`
+    select
+      inbound."followers",
+      outbound."following"
+    from (
+      select count(*)::integer as "followers"
+      from ${follows}
+      where ${follows.followingId} = ${userId}
+        and ${follows.status} = 'accepted'
+    ) as inbound
+    cross join (
+      select count(*)::integer as "following"
+      from ${follows}
+      where ${follows.followerId} = ${userId}
+        and ${follows.status} = 'accepted'
+    ) as outbound
+  `);
 
-async function countFollowRows(condition: ReturnType<typeof and>): Promise<number> {
-  const rows = await db.select({ count: count() }).from(follows).where(condition);
-  return rows[0]?.count ?? 0;
+  if (!counts) throw new Error("Public social counts could not be loaded.");
+  return counts;
 }
 
 async function loadPrivateTrainingStats(
