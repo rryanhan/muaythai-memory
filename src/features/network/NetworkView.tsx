@@ -2,7 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { getGraph, getTaxonomy, type GraphResponse } from "@/data";
+import { getGraph } from "@/data/graph";
+import { getTaxonomy } from "@/data/taxonomy";
+import type { GraphResponse } from "@/data/types";
 import {
   addPreviewKeyword,
   getNetworkErrorMessage,

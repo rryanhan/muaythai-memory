@@ -12,13 +12,10 @@ import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import Image from "next/image";
 import { badgeByIconKey } from "@/components/shared/context-badges";
 import { DecodedImage } from "@/components/shared/DecodedImage";
-import {
-  getDrills,
-  getJournalEntries,
-  type DrillFilterInput,
-  type JournalEntrySummary,
-} from "@/data";
 import { getConnectionsSummary } from "@/data/connections";
+import { getDrills } from "@/data/drills";
+import { getJournalEntries } from "@/data/journal";
+import type { DrillFilterInput, JournalEntrySummary } from "@/data/types";
 import { SignOutButton } from "@/features/auth/SignOutButton";
 import type { CurrentAppUser } from "@/modules/auth";
 import { ProfileAvatar } from "./ProfileAvatar";

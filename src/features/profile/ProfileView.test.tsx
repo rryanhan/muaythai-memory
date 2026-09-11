@@ -11,13 +11,13 @@ const mocks = vi.hoisted(() => ({
   prefetch: vi.fn(),
 }));
 
-vi.mock("@/data", async (importOriginal) => ({
-  ...await importOriginal<typeof import("@/data")>(),
+vi.mock("@/data/drills", () => ({
   getDrills: mocks.getDrills,
+}));
+vi.mock("@/data/journal", () => ({
   getJournalEntries: mocks.getJournalEntries,
 }));
-vi.mock("@/data/connections", async (importOriginal) => ({
-  ...await importOriginal<typeof import("@/data/connections")>(),
+vi.mock("@/data/connections", () => ({
   getConnectionsSummary: mocks.getConnectionsSummary,
 }));
 vi.mock("next/navigation", () => ({

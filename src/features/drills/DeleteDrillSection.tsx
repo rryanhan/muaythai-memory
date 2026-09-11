@@ -5,7 +5,8 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Drawer } from "vaul";
-import { ApiError, deleteDrill } from "@/data";
+import type { ApiError } from "@/data/api-core";
+import { deleteDrill } from "@/data/drills";
 import styles from "./DrillForm.module.css";
 
 type DeleteDrillSectionProps = {

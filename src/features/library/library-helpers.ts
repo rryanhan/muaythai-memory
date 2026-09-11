@@ -1,11 +1,10 @@
 import type { UseQueryResult } from "@tanstack/react-query";
-import {
-  ApiError,
-  ApiResponseValidationError,
-  type DrillFilterInput,
-  type DrillListResponse,
-  type TaxonomyResponse,
-} from "@/data";
+import { ApiError, ApiResponseValidationError } from "@/data/api-core";
+import type {
+  DrillFilterInput,
+  DrillListResponse,
+  TaxonomyResponse,
+} from "@/data/types";
 import {
   filterBuiltInStatuses,
   filterTagCategories,

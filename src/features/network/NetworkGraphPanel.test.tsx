@@ -2,17 +2,14 @@ import { useState } from "react";
 import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { GraphOptions, GraphResponse } from "@/data";
+import type { GraphOptions, GraphResponse } from "@/data/types";
 import { defaultNetworkLayerOptions, emptyNetworkFilters } from "./types";
 
 const mocks = vi.hoisted(() => ({
   getDrill: vi.fn(),
 }));
 
-vi.mock("@/data", async (importOriginal) => {
-  const original = await importOriginal<typeof import("@/data")>();
-  return { ...original, getDrill: mocks.getDrill };
-});
+vi.mock("@/data/drills", () => ({ getDrill: mocks.getDrill }));
 vi.mock("./NetworkForceGraph", () => ({
   NetworkForceGraph: ({ active, onDrillSelect }: {
     active: boolean;

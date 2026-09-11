@@ -7,6 +7,23 @@ export default defineConfig([
   ...nextTypeScript,
   {
     rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          paths: [
+            {
+              name: "@/data",
+              allowTypeImports: true,
+              message: "Import runtime API clients from their focused @/data/<domain> entrypoint.",
+            },
+            {
+              name: "@/data/api",
+              allowTypeImports: true,
+              message: "Import runtime API clients from their focused @/data/<domain> entrypoint.",
+            },
+          ],
+        },
+      ],
       "react-hooks/preserve-manual-memoization": "warn",
       "react-hooks/refs": "warn",
       "react-hooks/set-state-in-effect": "warn",

@@ -5,16 +5,16 @@ import Link from "next/link";
 import { MagnifyingGlass } from "@phosphor-icons/react/MagnifyingGlass";
 import { Microphone } from "@phosphor-icons/react/Microphone";
 import { SlidersHorizontal } from "@phosphor-icons/react/SlidersHorizontal";
-import {
-  getDrill,
-  type GraphOptions,
-  type GraphResponse,
-  type TagDto,
-  type TaxonomyResponse,
-  type UpdateSavedListResponse,
-} from "@/data";
 import { badgeByIconKey } from "@/components/shared/context-badges";
 import { DRILL_LIMITS } from "@/config/domain-limits";
+import { getDrill } from "@/data/drills";
+import type {
+  GraphOptions,
+  GraphResponse,
+  TagDto,
+  TaxonomyResponse,
+  UpdateSavedListResponse,
+} from "@/data/types";
 import { DrillDetailSheet } from "@/features/drills/DrillDetailSheet";
 import { getBuiltInStatusFilters, type BuiltInStatusFilter } from "@/features/shared/tag-filter-helpers";
 import { updateStatusTags } from "@/features/shared/saved-list-state";

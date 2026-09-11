@@ -1,12 +1,11 @@
-import {
-  ApiError,
-  ApiResponseValidationError,
-  type DrillFilterInput,
-  type GraphEdge,
-  type GraphOptionsInput,
-  type GraphNode,
-  type GraphResponse,
-} from "@/data";
+import { ApiError, ApiResponseValidationError } from "@/data/api-core";
+import type {
+  DrillFilterInput,
+  GraphEdge,
+  GraphOptionsInput,
+  GraphNode,
+  GraphResponse,
+} from "@/data/types";
 import {
   defaultNetworkLayerOptions,
   emptyNetworkFilters,
