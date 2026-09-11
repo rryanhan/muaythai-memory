@@ -4,7 +4,10 @@ import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useJournalUpload } from "@/features/journal/JournalUploadProvider";
-import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+
+type SupabaseBrowserClientModule = typeof import("@/lib/supabase/client");
+
+let supabaseBrowserClientModulePromise: Promise<SupabaseBrowserClientModule> | null = null;
 
 type SignOutButtonProps = {
   className?: string;
@@ -26,10 +29,12 @@ export function SignOutButton({ className, errorClassName }: SignOutButtonProps)
     }
     setPending(true);
     setErrorMessage(null);
-    const supabase = createSupabaseBrowserClient();
-    const { error } = await supabase.auth.signOut();
-
-    if (error) {
+    try {
+      const { createSupabaseBrowserClient } = await loadSupabaseBrowserClientModule();
+      const supabase = createSupabaseBrowserClient();
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+    } catch {
       setPending(false);
       setErrorMessage("Could not sign out. Check your connection and try again.");
       return;
@@ -52,4 +57,15 @@ export function SignOutButton({ className, errorClassName }: SignOutButtonProps)
       )}
     </>
   );
+}
+
+function loadSupabaseBrowserClientModule(): Promise<SupabaseBrowserClientModule> {
+  if (!supabaseBrowserClientModulePromise) {
+    supabaseBrowserClientModulePromise = import("@/lib/supabase/client").catch((error) => {
+      supabaseBrowserClientModulePromise = null;
+      throw error;
+    });
+  }
+
+  return supabaseBrowserClientModulePromise;
 }
