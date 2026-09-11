@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, type FormEvent } from "react";
+import { lazy, Suspense, useEffect, useRef, useState, type FormEvent } from "react";
 import {
   useInfiniteQuery,
   useMutation,
@@ -30,9 +30,12 @@ import {
   type FighterSummary,
 } from "@/data/connections";
 import { ProfileAvatar } from "@/features/profile/ProfileAvatar";
-import { ProfileInviteSheet } from "./ProfileInviteSheet";
 import { SharedDrillsSection } from "./SharedDrillsSection";
 import styles from "./Connections.module.css";
+
+const ProfileInviteSheet = lazy(
+  () => import("./ProfileInviteSheet").then((module) => ({ default: module.ProfileInviteSheet })),
+);
 
 export type ConnectionsTab = "followers" | "following" | "requests" | "blocked";
 
@@ -62,6 +65,7 @@ export function ConnectionsScreen({
   const [activeTab, setActiveTab] = useState(initialTab);
   const [username, setUsername] = useState("");
   const [searchResult, setSearchResult] = useState<FighterConnection | null | undefined>();
+  const [inviteMounted, setInviteMounted] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
   const summaryQuery = useQuery({
     queryKey: ["connections", "summary"],
@@ -124,7 +128,14 @@ export function ConnectionsScreen({
             ? "Loading connections"
             : `${counts?.followers ?? 0} followers · ${counts?.following ?? 0} following`}
         </p>
-        <button className={styles.shareProfile} type="button" onClick={() => setInviteOpen(true)}>
+        <button
+          className={styles.shareProfile}
+          type="button"
+          onClick={() => {
+            setInviteMounted(true);
+            setInviteOpen(true);
+          }}
+        >
           <ShareNetwork size={18} weight="bold" aria-hidden="true" />
           Share @{currentUsername}
         </button>
@@ -255,13 +266,72 @@ export function ConnectionsScreen({
           Updating @{actionMutation.variables.profile.username}.
         </p>
       )}
-      <ProfileInviteSheet
-        username={currentUsername}
-        open={inviteOpen}
-        onClose={() => setInviteOpen(false)}
-      />
+      {inviteMounted && (
+        <Suspense
+          fallback={inviteOpen
+            ? <ProfileInviteSheetLoading onCancel={() => setInviteOpen(false)} />
+            : null}
+        >
+          <ProfileInviteSheet
+            username={currentUsername}
+            open={inviteOpen}
+            onClose={() => setInviteOpen(false)}
+          />
+        </Suspense>
+      )}
       <RoutedBottomNav activeView="profile" />
     </main>
+  );
+}
+
+function ProfileInviteSheetLoading({ onCancel }: { onCancel: () => void }) {
+  const cancelButtonRef = useRef<HTMLButtonElement>(null);
+  const returnFocusRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    returnFocusRef.current = document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null;
+    cancelButtonRef.current?.focus();
+
+    return () => {
+      const returnFocus = returnFocusRef.current;
+      returnFocusRef.current = null;
+      if (returnFocus?.isConnected) returnFocus.focus();
+    };
+  }, []);
+
+  return (
+    <>
+      <div className={styles.drawerBackdrop} aria-hidden="true" />
+      <div
+        className={styles.inviteSheet}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="profile-invite-loading-title"
+        aria-describedby="profile-invite-loading-description"
+        onKeyDown={(event) => {
+          if (event.key === "Escape") {
+            event.preventDefault();
+            onCancel();
+          } else if (event.key === "Tab") {
+            event.preventDefault();
+            cancelButtonRef.current?.focus();
+          }
+        }}
+      >
+        <div className="sheet-handle" aria-hidden="true" />
+        <h2 id="profile-invite-loading-title">Share Your Profile</h2>
+        <p id="profile-invite-loading-description" role="status" aria-live="polite">
+          Loading share tools…
+        </p>
+        <div className={styles.inviteActions}>
+          <button ref={cancelButtonRef} type="button" onClick={onCancel}>
+            Cancel
+          </button>
+        </div>
+      </div>
+    </>
   );
 }
 

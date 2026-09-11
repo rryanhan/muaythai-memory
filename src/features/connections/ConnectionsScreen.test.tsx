@@ -1,8 +1,8 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ComponentProps } from "react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type {
   ConnectionSection,
   ConnectionSectionItem,
@@ -20,7 +20,17 @@ const mocks = vi.hoisted(() => ({
   unblockFighter: vi.fn(),
   replace: vi.fn(),
   linkProps: vi.fn(),
+  profileInviteSheetLoaded: vi.fn(),
 }));
+
+const profileInviteSheetModule = vi.hoisted(() => {
+  let resolveLoading!: () => void;
+  const loadingGate = new Promise<void>((resolve) => {
+    resolveLoading = resolve;
+  });
+
+  return { loadingGate, resolveLoading };
+});
 
 vi.mock("@/data/connections", async (importOriginal) => ({
   ...await importOriginal<typeof import("@/data/connections")>(),
@@ -43,8 +53,26 @@ vi.mock("@/features/profile/ProfileAvatar", () => ({
     <span>{profile.displayName.slice(0, 1)}</span>
   ),
 }));
-vi.mock("./ProfileInviteSheet", () => ({ ProfileInviteSheet: () => null }));
+vi.mock("./ProfileInviteSheet", async () => {
+  mocks.profileInviteSheetLoaded();
+  await profileInviteSheetModule.loadingGate;
+  return {
+    ProfileInviteSheet: ({
+      open,
+      onClose,
+    }: {
+      open: boolean;
+      onClose: () => void;
+    }) => (
+      <div data-testid="profile-invite-sheet" data-open={open}>
+        {open && <button type="button" onClick={onClose}>Close invite</button>}
+      </div>
+    ),
+  };
+});
 vi.mock("./SharedDrillsSection", () => ({ SharedDrillsSection: () => null }));
+
+afterAll(() => profileInviteSheetModule.resolveLoading());
 
 describe("ConnectionsScreen", () => {
   let sectionItems: Record<ConnectionSection, ConnectionSectionItem[]>;
@@ -165,6 +193,47 @@ describe("ConnectionsScreen", () => {
     expect(props).not.toHaveProperty("onFocus");
     expect(props).not.toHaveProperty("onPointerEnter");
     expect(props).not.toHaveProperty("onTouchStart");
+  });
+
+  it("loads the profile invite sheet on demand and keeps it mounted between opens", async () => {
+    const user = userEvent.setup();
+    renderScreen("followers");
+    const shareButton = screen.getByRole("button", { name: "Share @current_fighter" });
+
+    expect(mocks.profileInviteSheetLoaded).not.toHaveBeenCalled();
+    expect(screen.queryByTestId("profile-invite-sheet")).not.toBeInTheDocument();
+
+    await user.click(shareButton);
+
+    const loadingDialog = await screen.findByRole("dialog", { name: "Share Your Profile" });
+    expect(screen.getByRole("status")).toHaveTextContent("Loading share tools…");
+    const loadingCancel = screen.getByRole("button", { name: "Cancel" });
+    expect(loadingCancel).toHaveFocus();
+    expect(mocks.profileInviteSheetLoaded).toHaveBeenCalledOnce();
+    fireEvent.keyDown(loadingDialog, { key: "Tab" });
+    expect(loadingCancel).toHaveFocus();
+
+    fireEvent.keyDown(loadingDialog, { key: "Escape" });
+    expect(screen.queryByRole("dialog", { name: "Share Your Profile" })).not.toBeInTheDocument();
+    expect(shareButton).toHaveFocus();
+
+    await user.click(shareButton);
+    expect(await screen.findByRole("dialog", { name: "Share Your Profile" })).toBeVisible();
+    await act(async () => {
+      profileInviteSheetModule.resolveLoading();
+      await profileInviteSheetModule.loadingGate;
+    });
+
+    const inviteSheet = await screen.findByTestId("profile-invite-sheet");
+    expect(mocks.profileInviteSheetLoaded).toHaveBeenCalledOnce();
+    expect(inviteSheet).toHaveAttribute("data-open", "true");
+
+    await user.click(screen.getByRole("button", { name: "Close invite" }));
+    expect(inviteSheet).toHaveAttribute("data-open", "false");
+
+    await user.click(screen.getByRole("button", { name: "Share @current_fighter" }));
+    expect(inviteSheet).toHaveAttribute("data-open", "true");
+    expect(mocks.profileInviteSheetLoaded).toHaveBeenCalledOnce();
   });
 });
 
