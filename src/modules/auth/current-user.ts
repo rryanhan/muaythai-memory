@@ -1,4 +1,5 @@
 import { cache } from "react";
+import type { User } from "@supabase/supabase-js";
 import { db } from "@/db/client";
 import { users } from "@/db/schema";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -39,6 +40,8 @@ export type CurrentAppUser = {
   firstDrillGuideSkippedAt: Date | null;
 };
 
+type VerifiedAuthUser = Pick<User, "id" | "email" | "user_metadata">;
+
 type CurrentAuthIdentity = {
   id: string;
   email: string | null;
@@ -54,7 +57,29 @@ export const requireCurrentUserId = cache(async (): Promise<string> => {
 // Profile paths synchronize the public app user before using profile fields.
 // Routine ownership checks use the smaller onboarding-state reader below.
 export const requireCurrentAppUser = cache(async (): Promise<CurrentAppUser> => {
-  const { id, email, metadata } = await requireCurrentAuthIdentity();
+  return synchronizeCurrentAppUser(await requireCurrentAuthIdentity());
+});
+
+// A successful server-side Supabase code exchange returns this user from the
+// Auth server. Callers that already hold that verified exchange result can
+// synchronize the app row without re-verifying the same new session.
+export async function synchronizeAppUserFromVerifiedAuthUser(
+  user: VerifiedAuthUser,
+): Promise<CurrentAppUser> {
+  if (!user.id) throw new AuthenticationRequiredError();
+
+  return synchronizeCurrentAppUser({
+    id: user.id,
+    email: typeof user.email === "string" ? user.email : null,
+    metadata: isRecord(user.user_metadata) ? user.user_metadata : {},
+  });
+}
+
+async function synchronizeCurrentAppUser({
+  id,
+  email,
+  metadata,
+}: CurrentAuthIdentity): Promise<CurrentAppUser> {
   const initialDisplayName = deriveDisplayName(metadata, email);
   const existingUser = await db.query.users.findFirst({
     where: (table, operators) => operators.eq(table.id, id),
@@ -77,7 +102,7 @@ export const requireCurrentAppUser = cache(async (): Promise<CurrentAppUser> => 
 
   if (!racedUser) throw new Error("Authenticated app user could not be synchronized.");
   return toCurrentAppUser(racedUser, email, metadata);
-});
+}
 
 export const requireProfileOnboardedUserId = cache(async (): Promise<string> => {
   const state = await requireCurrentOnboardingState();

@@ -1,11 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({
-  findFirst: vi.fn(),
-  getCachedOnboardingState: vi.fn(),
-  getClaims: vi.fn(),
-  insert: vi.fn(),
-}));
+const mocks = vi.hoisted(() => {
+  const getClaims = vi.fn();
+  return {
+    createSupabaseServerClient: vi.fn(async () => ({ auth: { getClaims } })),
+    findFirst: vi.fn(),
+    getCachedOnboardingState: vi.fn(),
+    getClaims,
+    insert: vi.fn(),
+  };
+});
 
 vi.mock("react", () => ({
   cache: <T extends (...args: never[]) => unknown>(callback: T) => callback,
@@ -18,15 +22,96 @@ vi.mock("@/db/client", () => ({
 }));
 vi.mock("@/db/schema", () => ({ users: { id: "id" } }));
 vi.mock("@/lib/supabase/server", () => ({
-  createSupabaseServerClient: vi.fn(async () => ({
-    auth: { getClaims: mocks.getClaims },
-  })),
+  createSupabaseServerClient: mocks.createSupabaseServerClient,
 }));
 vi.mock("./onboarding-state", () => ({
   getCachedOnboardingState: mocks.getCachedOnboardingState,
 }));
 
-import { OnboardingRequiredError, requireOnboardedUserId } from "./current-user";
+import {
+  OnboardingRequiredError,
+  requireOnboardedUserId,
+  synchronizeAppUserFromVerifiedAuthUser,
+} from "./current-user";
+
+describe("synchronizeAppUserFromVerifiedAuthUser", () => {
+  const userId = "00000000-0000-4000-8000-000000000001";
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("uses the verified identity without constructing a client or reading claims again", async () => {
+    mocks.findFirst.mockResolvedValue(appUserRow(userId));
+
+    await expect(synchronizeAppUserFromVerifiedAuthUser({
+      email: "fighter@example.com",
+      id: userId,
+      user_metadata: { full_name: "Somchai Jaidee" },
+    })).resolves.toMatchObject({
+      email: "fighter@example.com",
+      firstName: "Somchai",
+      id: userId,
+      lastName: "Jaidee",
+    });
+
+    expect(mocks.createSupabaseServerClient).not.toHaveBeenCalled();
+    expect(mocks.getClaims).not.toHaveBeenCalled();
+    expect(mocks.findFirst).toHaveBeenCalledOnce();
+    expect(mocks.insert).not.toHaveBeenCalled();
+  });
+
+  it("inserts a missing app user from the verified identity", async () => {
+    const insertedUser = {
+      ...appUserRow(userId),
+      displayName: "Somchai Jaidee",
+    };
+    const returning = vi.fn().mockResolvedValue([insertedUser]);
+    const onConflictDoNothing = vi.fn(() => ({ returning }));
+    const values = vi.fn(() => ({ onConflictDoNothing }));
+    mocks.findFirst.mockResolvedValue(undefined);
+    mocks.insert.mockReturnValue({ values });
+
+    await expect(synchronizeAppUserFromVerifiedAuthUser({
+      email: "fighter@example.com",
+      id: userId,
+      user_metadata: { full_name: "Somchai Jaidee" },
+    })).resolves.toMatchObject({
+      displayName: "Somchai Jaidee",
+      id: userId,
+    });
+
+    expect(values).toHaveBeenCalledWith({
+      displayName: "Somchai Jaidee",
+      id: userId,
+    });
+    expect(onConflictDoNothing).toHaveBeenCalledWith({ target: "id" });
+    expect(mocks.findFirst).toHaveBeenCalledOnce();
+  });
+
+  it("loads the conflict winner when another request inserts first", async () => {
+    const racedUser = appUserRow(userId);
+    const returning = vi.fn().mockResolvedValue([]);
+    const onConflictDoNothing = vi.fn(() => ({ returning }));
+    const values = vi.fn(() => ({ onConflictDoNothing }));
+    mocks.findFirst
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce(racedUser);
+    mocks.insert.mockReturnValue({ values });
+
+    await expect(synchronizeAppUserFromVerifiedAuthUser({
+      email: "fighter@example.com",
+      id: userId,
+      user_metadata: {},
+    })).resolves.toMatchObject({
+      displayName: "Nak Muay",
+      id: userId,
+    });
+
+    expect(mocks.findFirst).toHaveBeenCalledTimes(2);
+    expect(returning).toHaveBeenCalledOnce();
+  });
+});
 
 describe("requireOnboardedUserId", () => {
   const userId = "00000000-0000-4000-8000-000000000001";
@@ -90,5 +175,20 @@ function completeOnboardingState(id: string) {
     profileOnboardedAt: new Date("2026-01-01T00:00:00.000Z"),
     firstDrillGuideCompletedAt: new Date("2026-01-02T00:00:00.000Z"),
     firstDrillGuideSkippedAt: null,
+  };
+}
+
+function appUserRow(id: string) {
+  return {
+    avatarUrl: null,
+    displayName: "Nak Muay",
+    firstDrillGuideCompletedAt: null,
+    firstDrillGuideSkippedAt: null,
+    firstName: null,
+    id,
+    lastName: null,
+    location: null,
+    profileOnboardedAt: null,
+    username: null,
   };
 }

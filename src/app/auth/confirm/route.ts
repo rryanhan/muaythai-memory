@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { safeInternalPath } from "@/lib/safe-internal-path";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { getOnboardingPath, requireCurrentAppUser } from "@/modules/auth";
+import {
+  getOnboardingPath,
+  synchronizeAppUserFromVerifiedAuthUser,
+} from "@/modules/auth";
 import {
   clearRecoveryGrantCookie,
   clearRecoveryIntentCookie,
@@ -40,14 +43,19 @@ export async function GET(request: NextRequest) {
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase.auth.exchangeCodeForSession(code);
   const redirectType = getExchangeRedirectType(data);
-  if (!error && redirectType !== "recovery") {
-    const user = await requireCurrentAppUser();
+  if (
+    !error
+    && data.user
+    && data.session?.user.id === data.user.id
+    && redirectType !== "recovery"
+  ) {
+    const user = await synchronizeAppUserFromVerifiedAuthUser(data.user);
     const safeDestination = nextPath.startsWith("/auth/reset-password") ? "/" : nextPath;
     const destination = getOnboardingPath(user, safeDestination) ?? safeDestination;
     return NextResponse.redirect(new URL(destination, requestOrigin));
   }
 
-  if (!error && redirectType === "recovery") {
+  if (!error) {
     await supabase.auth.signOut({ scope: "local" });
   }
   return confirmationFailureResponse(nextPath, requestOrigin);
@@ -67,7 +75,13 @@ async function finishRecoveryExchange(
 
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase.auth.exchangeCodeForSession(code);
-  if (error || getExchangeRedirectType(data) !== "recovery") {
+  const exchangedUser = data.user;
+  if (
+    error
+    || !exchangedUser
+    || data.session?.user.id !== exchangedUser.id
+    || getExchangeRedirectType(data) !== "recovery"
+  ) {
     await supabase.auth.signOut({ scope: "local" });
     return recoveryFailureResponse(request, nextPath, requestOrigin);
   }
@@ -90,11 +104,11 @@ async function finishRecoveryExchange(
   }
 
   try {
-    const appUser = await requireCurrentAppUser();
-    if (appUser.id !== identity.userId) {
+    if (exchangedUser.id !== identity.userId) {
       await supabase.auth.signOut({ scope: "local" });
       return recoveryFailureResponse(request, nextPath, requestOrigin);
     }
+    await synchronizeAppUserFromVerifiedAuthUser(exchangedUser);
 
     const grant = createRecoveryGrant(
       {

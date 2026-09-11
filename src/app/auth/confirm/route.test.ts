@@ -10,8 +10,8 @@ const mocks = vi.hoisted(() => ({
   getOnboardingPath: vi.fn(),
   getRecoverySessionIdentity: vi.fn(),
   issueRecoveryGrantRecord: vi.fn(),
-  requireCurrentAppUser: vi.fn(),
   signOut: vi.fn(),
+  synchronizeAppUserFromVerifiedAuthUser: vi.fn(),
   verifyRecoveryIntent: vi.fn(),
 }));
 
@@ -20,7 +20,8 @@ vi.mock("@/lib/supabase/server", () => ({
 }));
 vi.mock("@/modules/auth", () => ({
   getOnboardingPath: mocks.getOnboardingPath,
-  requireCurrentAppUser: mocks.requireCurrentAppUser,
+  synchronizeAppUserFromVerifiedAuthUser:
+    mocks.synchronizeAppUserFromVerifiedAuthUser,
 }));
 vi.mock("@/modules/auth/recovery-session", () => ({
   getRecoverySessionIdentity: mocks.getRecoverySessionIdentity,
@@ -37,6 +38,12 @@ vi.mock("@/modules/auth/recovery-token", () => ({
 import { GET } from "./route";
 
 const USER_ID = "00000000-0000-4000-8000-000000000001";
+const AUTH_USER = {
+  email: "fighter@example.com",
+  id: USER_ID,
+  user_metadata: { full_name: "Nak Muay" },
+};
+const AUTH_SESSION = { user: AUTH_USER };
 
 describe("GET /auth/confirm", () => {
   beforeEach(() => {
@@ -51,7 +58,7 @@ describe("GET /auth/confirm", () => {
       },
     });
     mocks.exchangeCodeForSession.mockResolvedValue({
-      data: { redirectType: "recovery" },
+      data: { redirectType: "recovery", session: AUTH_SESSION, user: AUTH_USER },
       error: null,
     });
     mocks.getAuthFlowSecret.mockReturnValue("test-only-secret-with-more-than-thirty-two-bytes");
@@ -61,7 +68,7 @@ describe("GET /auth/confirm", () => {
       userId: USER_ID,
     });
     mocks.verifyRecoveryIntent.mockReturnValue({ claims: {}, ok: true });
-    mocks.requireCurrentAppUser.mockResolvedValue({ id: USER_ID });
+    mocks.synchronizeAppUserFromVerifiedAuthUser.mockResolvedValue({ id: USER_ID });
     mocks.createRecoveryGrant.mockReturnValue({
       expiresAt: new Date("2026-07-23T18:10:00.000Z"),
       jti: "raw-jti",
@@ -75,6 +82,51 @@ describe("GET /auth/confirm", () => {
 
   afterEach(() => {
     vi.unstubAllEnvs();
+  });
+
+  it("reuses the user verified by a successful sign-in exchange", async () => {
+    mocks.exchangeCodeForSession.mockResolvedValue({
+      data: { redirectType: null, session: AUTH_SESSION, user: AUTH_USER },
+      error: null,
+    });
+    mocks.getOnboardingPath.mockReturnValue(null);
+
+    const response = await GET(
+      new NextRequest(
+        "https://staging.example.com/auth/confirm?code=pkce-code&next=%2Fdrills",
+      ),
+    );
+
+    expect(response.headers.get("location")).toBe("https://staging.example.com/drills");
+    expect(mocks.createSupabaseServerClient).toHaveBeenCalledOnce();
+    expect(mocks.synchronizeAppUserFromVerifiedAuthUser).toHaveBeenCalledOnce();
+    expect(mocks.synchronizeAppUserFromVerifiedAuthUser).toHaveBeenCalledWith(AUTH_USER);
+    expect(mocks.getRecoverySessionIdentity).not.toHaveBeenCalled();
+  });
+
+  it("rejects a sign-in exchange whose session and user identities disagree", async () => {
+    mocks.exchangeCodeForSession.mockResolvedValue({
+      data: {
+        redirectType: null,
+        session: {
+          user: { ...AUTH_USER, id: "00000000-0000-4000-8000-000000000002" },
+        },
+        user: AUTH_USER,
+      },
+      error: null,
+    });
+
+    const response = await GET(
+      new NextRequest(
+        "https://staging.example.com/auth/confirm?code=pkce-code&next=%2Fdrills",
+      ),
+    );
+
+    expect(response.headers.get("location")).toBe(
+      "https://staging.example.com/auth/sign-in?next=%2Fdrills&reason=invalid-link",
+    );
+    expect(mocks.synchronizeAppUserFromVerifiedAuthUser).not.toHaveBeenCalled();
+    expect(mocks.signOut).toHaveBeenCalledWith({ scope: "local" });
   });
 
   it("mints a grant only after an actual recovery exchange and durable insert", async () => {
@@ -91,6 +143,8 @@ describe("GET /auth/confirm", () => {
       userId: USER_ID,
     });
     expect(response.cookies.get(RECOVERY_GRANT_COOKIE)?.value).toBe("signed-grant");
+    expect(mocks.createSupabaseServerClient).toHaveBeenCalledOnce();
+    expect(mocks.synchronizeAppUserFromVerifiedAuthUser).toHaveBeenCalledWith(AUTH_USER);
   });
 
   it("returns a preview callback to the same trusted host with a host-only grant", async () => {
@@ -166,7 +220,24 @@ describe("GET /auth/confirm", () => {
     expect(response.headers.get("location")).toContain(
       "/auth/sign-in?next=%2Fdrills&reason=invalid-link",
     );
-    expect(mocks.requireCurrentAppUser).not.toHaveBeenCalled();
+    expect(mocks.synchronizeAppUserFromVerifiedAuthUser).not.toHaveBeenCalled();
+    expect(mocks.signOut).toHaveBeenCalledWith({ scope: "local" });
+  });
+
+  it("rejects mismatched recovery identities before synchronizing the app user", async () => {
+    mocks.getRecoverySessionIdentity.mockResolvedValue({
+      email: "fighter@example.com",
+      sessionId: "recovery-session",
+      userId: "00000000-0000-4000-8000-000000000002",
+    });
+
+    const response = await GET(recoveryRequest());
+
+    expect(response.headers.get("location")).toContain(
+      "/auth/forgot-password?next=%2Fdrills&reason=invalid-recovery",
+    );
+    expect(mocks.synchronizeAppUserFromVerifiedAuthUser).not.toHaveBeenCalled();
+    expect(mocks.issueRecoveryGrantRecord).not.toHaveBeenCalled();
     expect(mocks.signOut).toHaveBeenCalledWith({ scope: "local" });
   });
 
