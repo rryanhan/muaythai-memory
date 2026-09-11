@@ -9,12 +9,20 @@ const authMocks = vi.hoisted(() => ({
   signUp: vi.fn(),
 }));
 
-vi.mock("@/lib/supabase/client", () => ({
-  createSupabaseBrowserClient: () => ({ auth: authMocks }),
+const clientModule = vi.hoisted(() => ({
+  createClient: vi.fn(() => ({ auth: authMocks })),
+  loadStarted: vi.fn(),
 }));
+
+vi.mock("@/lib/supabase/client", () => {
+  clientModule.loadStarted();
+  return { createSupabaseBrowserClient: clientModule.createClient };
+});
 
 describe("SignInForm", () => {
   beforeEach(() => {
+    clientModule.createClient.mockClear();
+    clientModule.loadStarted.mockClear();
     authMocks.signInWithOAuth.mockReset();
     authMocks.signInWithPassword.mockReset();
     authMocks.signUp.mockReset();
@@ -28,7 +36,12 @@ describe("SignInForm", () => {
     const user = userEvent.setup();
     render(<SignInForm nextPath="/?view=library" />);
 
+    expect(clientModule.loadStarted).not.toHaveBeenCalled();
     await user.click(screen.getByRole("button", { name: "Create Account" }));
+    await user.click(screen.getByRole("button", { name: "Create account" }));
+    expect(screen.getByRole("alert")).toHaveTextContent("Enter your email address.");
+    expect(clientModule.loadStarted).not.toHaveBeenCalled();
+
     await user.type(screen.getByLabelText("Email"), "Fighter@Example.com");
     await user.type(screen.getByLabelText("Password"), "new-password");
     await user.click(screen.getByRole("button", { name: "Create account" }));
@@ -37,6 +50,8 @@ describe("SignInForm", () => {
     expect(heading).toHaveFocus();
     expect(screen.getByRole("status")).toBeInTheDocument();
     expect(screen.getByText(/Confirm fighter@example.com once/)).toBeInTheDocument();
+    expect(clientModule.loadStarted).toHaveBeenCalledOnce();
+    expect(clientModule.createClient).toHaveBeenCalledOnce();
     expect(authMocks.signUp).toHaveBeenCalledWith(expect.objectContaining({
       email: "fighter@example.com",
       password: "new-password",

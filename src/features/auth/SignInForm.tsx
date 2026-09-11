@@ -1,15 +1,17 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Eye } from "@phosphor-icons/react/Eye";
 import { EyeSlash } from "@phosphor-icons/react/EyeSlash";
 import { GoogleLogo } from "@phosphor-icons/react/GoogleLogo";
 import Link from "next/link";
-import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { getAuthErrorMessage } from "./auth-error-messages";
 import styles from "./SignIn.module.css";
 
 type AuthMode = "sign-in" | "create";
+type SupabaseBrowserClientModule = typeof import("@/lib/supabase/client");
+
+let supabaseBrowserClientModulePromise: Promise<SupabaseBrowserClientModule> | null = null;
 
 type SignInFormProps = {
   nextPath: string;
@@ -22,7 +24,6 @@ export function SignInForm({
   initialError = null,
   initialSuccess = null,
 }: SignInFormProps) {
-  const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const [mode, setMode] = useState<AuthMode>("sign-in");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -52,6 +53,8 @@ export function SignInForm({
   async function continueWithGoogle() {
     setPending("google");
     setError(null);
+    const supabase = await prepareAuthClient();
+    if (!supabase) return;
     const { error: oauthError } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: { redirectTo: confirmUrl() },
@@ -70,6 +73,8 @@ export function SignInForm({
 
     setPending("email");
     setError(null);
+    const supabase = await prepareAuthClient();
+    if (!supabase) return;
 
     if (mode === "sign-in") {
       const { error: signInError } = await supabase.auth.signInWithPassword({
@@ -203,4 +208,26 @@ export function SignInForm({
     setSuccessMessage(message);
     window.setTimeout(() => window.location.assign(nextPath), 500);
   }
+
+  async function prepareAuthClient() {
+    try {
+      const { createSupabaseBrowserClient } = await loadSupabaseBrowserClientModule();
+      return createSupabaseBrowserClient();
+    } catch {
+      setPending(null);
+      setError("Authentication is temporarily unavailable. Refresh and try again.");
+      return null;
+    }
+  }
+}
+
+function loadSupabaseBrowserClientModule(): Promise<SupabaseBrowserClientModule> {
+  if (!supabaseBrowserClientModulePromise) {
+    supabaseBrowserClientModulePromise = import("@/lib/supabase/client").catch((error) => {
+      supabaseBrowserClientModulePromise = null;
+      throw error;
+    });
+  }
+
+  return supabaseBrowserClientModulePromise;
 }
