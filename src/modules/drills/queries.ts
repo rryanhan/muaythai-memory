@@ -15,12 +15,35 @@ import type { StatusTagDto, TagDto, TrainingMethodDto } from "@/modules/taxonomy
 import type { DrillDetail, DrillFilters, DrillListResponse, DrillSummary, FilterMode } from "./contracts";
 
 type DrillStepDto = DrillDetail["steps"][number];
+type DrillSummaryRow = Pick<
+  typeof drills.$inferSelect,
+  "id" | "title" | "summary" | "createdAt" | "updatedAt"
+>;
+
+export type DrillListLoadOptions = {
+  includeTags?: boolean;
+  includeStatusTags?: boolean;
+};
 
 // Returns list-ready drill summaries. Full steps are intentionally left out so
 // library/profile/network screens can load quickly on mobile.
-export async function listDrills(userId: string, filters: Partial<DrillFilters> = {}): Promise<DrillListResponse> {
+export async function listDrills(
+  userId: string,
+  filters: Partial<DrillFilters> = {},
+  options: DrillListLoadOptions = {},
+): Promise<DrillListResponse> {
   const normalizedFilters = normalizeDrillFilters(filters);
-  const allDrills = await loadDrillSummaries(userId);
+  const keywordSearchNeedsAllLabels = normalizedFilters.keywords.length > 0;
+  const allDrills = await loadDrillSummaries(userId, undefined, {
+    includeTags:
+      (options.includeTags ?? true) ||
+      keywordSearchNeedsAllLabels ||
+      normalizedFilters.tagSlugs.length > 0,
+    includeStatusTags:
+      (options.includeStatusTags ?? true) ||
+      keywordSearchNeedsAllLabels ||
+      normalizedFilters.statusTagSlugs.length > 0,
+  });
   const filteredDrills = allDrills.filter((drill) => drillMatchesFilters(drill, normalizedFilters));
 
   return {
@@ -34,7 +57,14 @@ export async function listDrills(userId: string, filters: Partial<DrillFilters> 
 // the full drill only after the user taps one.
 export async function getDrillById(userId: string, id: string): Promise<DrillDetail | null> {
   const [drillRow] = await db
-    .select()
+    .select({
+      id: drills.id,
+      title: drills.title,
+      summary: drills.summary,
+      notes: drills.notes,
+      createdAt: drills.createdAt,
+      updatedAt: drills.updatedAt,
+    })
     .from(drills)
     .where(and(eq(drills.id, id), eq(drills.userId, userId)))
     .limit(1);
@@ -97,7 +127,14 @@ export async function getDrillSummariesByOwnerPairs(
     pairs.map((pair) => [`${pair.ownerId}:${pair.drillId}`, pair]),
   ).values()];
   const drillRows = await db
-    .select()
+    .select({
+      id: drills.id,
+      userId: drills.userId,
+      title: drills.title,
+      summary: drills.summary,
+      createdAt: drills.createdAt,
+      updatedAt: drills.updatedAt,
+    })
     .from(drills)
     .where(or(...uniquePairs.map((pair) => and(
       eq(drills.id, pair.drillId),
@@ -106,7 +143,7 @@ export async function getDrillSummariesByOwnerPairs(
   const summaries = await hydrateDrillSummaries(
     drillRows,
     (drillIds) => loadTagsByDrillOwner(drillIds),
-    options.includeStatusTags ?? true,
+    { includeStatusTags: options.includeStatusTags ?? true },
   );
   const summaryById = new Map(summaries.map((drill) => [drill.id, drill]));
   const validatedPairs = new Set(
@@ -161,9 +198,16 @@ export function drillMatchesFilters(drill: DrillSummary, filters: DrillFilters):
 async function loadDrillSummaries(
   userId: string,
   selectedDrillIds?: string[],
+  options: DrillListLoadOptions = {},
 ): Promise<DrillSummary[]> {
   const drillRows = await db
-    .select()
+    .select({
+      id: drills.id,
+      title: drills.title,
+      summary: drills.summary,
+      createdAt: drills.createdAt,
+      updatedAt: drills.updatedAt,
+    })
     .from(drills)
     .where(and(
       eq(drills.userId, userId),
@@ -173,21 +217,24 @@ async function loadDrillSummaries(
   return hydrateDrillSummaries(
     drillRows,
     (drillIds) => loadTagsByDrillId(userId, drillIds),
+    options,
   );
 }
 
 async function hydrateDrillSummaries(
-  drillRows: Array<typeof drills.$inferSelect>,
+  drillRows: DrillSummaryRow[],
   loadTags: (drillIds: string[]) => Promise<Map<string, TagDto[]>>,
-  includeStatusTags = true,
+  options: DrillListLoadOptions = {},
 ): Promise<DrillSummary[]> {
   const drillIds = drillRows.map((drill) => drill.id);
   const [methodsByDrillId, tagsByDrillId, statusTagsByDrillId] = await Promise.all([
     loadTrainingMethodsByDrillId(drillIds),
-    loadTags(drillIds),
-    includeStatusTags
-      ? loadStatusTagsByDrillId(drillIds)
-      : Promise.resolve(new Map<string, StatusTagDto[]>()),
+    options.includeTags === false
+      ? Promise.resolve(new Map<string, TagDto[]>())
+      : loadTags(drillIds),
+    options.includeStatusTags === false
+      ? Promise.resolve(new Map<string, StatusTagDto[]>())
+      : loadStatusTagsByDrillId(drillIds),
   ]);
 
   return drillRows.map((drill) => {
@@ -301,7 +348,10 @@ async function loadTrainingMethodsForDrill(drillId: string): Promise<TrainingMet
     })
     .from(drillTrainingMethods)
     .innerJoin(trainingMethods, eq(drillTrainingMethods.trainingMethodId, trainingMethods.id))
-    .where(eq(drillTrainingMethods.drillId, drillId))
+    .where(and(
+      eq(drillTrainingMethods.drillId, drillId),
+      eq(trainingMethods.active, true),
+    ))
     .orderBy(asc(trainingMethods.sortOrder), asc(trainingMethods.name));
 
   return rows;
@@ -412,7 +462,10 @@ async function loadStatusTagsForDrill(drillId: string): Promise<StatusTagDto[]> 
     })
     .from(drillStatusTags)
     .innerJoin(statusTags, eq(drillStatusTags.statusTagId, statusTags.id))
-    .where(eq(drillStatusTags.drillId, drillId))
+    .where(and(
+      eq(drillStatusTags.drillId, drillId),
+      eq(statusTags.active, true),
+    ))
     .orderBy(asc(statusTags.sortOrder), asc(statusTags.name));
 
   return rows;

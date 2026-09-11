@@ -64,6 +64,13 @@ describe("capture cleanup dispatch ordering", () => {
     await generateCaptureDraft(userId, transcript);
 
     expect(mocks.consumeCaptureRateLimit).toHaveBeenCalledWith(userId, "cleanup");
+    expect(mocks.getTaxonomy).toHaveBeenCalledWith(userId, {
+      includeTagCategories: false,
+      includeCustomTags: false,
+      includeStatusTags: false,
+    });
+    expect(mocks.getTaxonomy.mock.invocationCallOrder[0])
+      .toBeLessThan(mocks.consumeCaptureRateLimit.mock.invocationCallOrder[0]);
     expect(mocks.consumeCaptureRateLimit.mock.invocationCallOrder[0])
       .toBeLessThan(mocks.generate.mock.invocationCallOrder[0]);
   });
@@ -72,6 +79,15 @@ describe("capture cleanup dispatch ordering", () => {
     mocks.consumeCaptureRateLimit.mockRejectedValue(new Error("quota blocked"));
 
     await expect(generateCaptureDraft(userId, transcript)).rejects.toThrow("quota blocked");
+    expect(mocks.getTaxonomy).toHaveBeenCalledOnce();
+    expect(mocks.generate).not.toHaveBeenCalled();
+  });
+
+  it("does not consume a dispatched attempt when taxonomy loading fails", async () => {
+    mocks.getTaxonomy.mockRejectedValue(new Error("taxonomy unavailable"));
+
+    await expect(generateCaptureDraft(userId, transcript)).rejects.toThrow("taxonomy unavailable");
+    expect(mocks.consumeCaptureRateLimit).not.toHaveBeenCalled();
     expect(mocks.generate).not.toHaveBeenCalled();
   });
 

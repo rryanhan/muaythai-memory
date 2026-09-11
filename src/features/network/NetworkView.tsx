@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { getGraph } from "@/data/graph";
 import { getTaxonomy } from "@/data/taxonomy";
-import type { GraphResponse } from "@/data/types";
+import type { GraphResponse, TaxonomyResponse } from "@/data/types";
 import {
   addPreviewKeyword,
   getNetworkErrorMessage,
@@ -28,10 +28,11 @@ import styles from "./Network.module.css";
 type NetworkViewProps = {
   active: boolean;
   initialGraph?: GraphResponse;
+  initialTaxonomy?: TaxonomyResponse;
 };
 
 // Owns graph API loading. Graph-local interactions live in NetworkGraphPanel.
-export function NetworkView({ active, initialGraph }: NetworkViewProps) {
+export function NetworkView({ active, initialGraph, initialTaxonomy }: NetworkViewProps) {
   const [filters, setFilters] = useState<NetworkFilters>(emptyNetworkFilters);
   const [layerOptions, setLayerOptions] = useState(defaultNetworkLayerOptions);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -48,6 +49,7 @@ export function NetworkView({ active, initialGraph }: NetworkViewProps) {
   const taxonomyQuery = useQuery({
     queryKey: ["taxonomy"],
     queryFn: ({ signal }) => getTaxonomy({ requestInit: { signal } }),
+    initialData: initialTaxonomy,
     staleTime: 10 * 60 * 1000,
   });
 

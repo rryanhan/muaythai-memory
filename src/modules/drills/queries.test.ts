@@ -9,7 +9,12 @@ vi.mock("@/db/client", () => ({
   db: { select: mocks.select },
 }));
 
-import { getDrillSummariesByOwnerPairs, getOwnedDrillHeader } from "./queries";
+import {
+  getDrillById,
+  getDrillSummariesByOwnerPairs,
+  getOwnedDrillHeader,
+  listDrills,
+} from "./queries";
 
 const userId = "11111111-1111-4111-8111-111111111111";
 const drillId = "22222222-2222-4222-8222-222222222222";
@@ -47,6 +52,137 @@ describe("getOwnedDrillHeader", () => {
     mocks.select.mockReturnValueOnce(queryReturning([]));
 
     await expect(getOwnedDrillHeader(userId, drillId)).resolves.toBeNull();
+  });
+});
+
+describe("getDrillById", () => {
+  it("selects only detail fields and excludes inactive method and status relations", async () => {
+    const now = new Date("2026-09-11T00:00:00Z");
+    let methodWhere: unknown;
+    let statusWhere: unknown;
+    mocks.select
+      .mockReturnValueOnce(queryReturning([{
+        id: drillId,
+        title: "Rear round kick",
+        summary: "Turn the hip over.",
+        notes: "Stay balanced.",
+        createdAt: now,
+        updatedAt: now,
+      }]))
+      .mockReturnValueOnce(fluentQueryReturning([], (query) => { methodWhere = query; }))
+      .mockReturnValueOnce(fluentQueryReturning([]))
+      .mockReturnValueOnce(fluentQueryReturning([], (query) => { statusWhere = query; }))
+      .mockReturnValueOnce(fluentQueryReturning([]));
+
+    const detail = await getDrillById(userId, drillId);
+
+    expect(detail).toMatchObject({
+      id: drillId,
+      title: "Rear round kick",
+      notes: "Stay balanced.",
+      trainingMethods: [],
+      statusTags: [],
+    });
+    expect(Object.keys(mocks.select.mock.calls[0]?.[0] ?? {})).toEqual([
+      "id",
+      "title",
+      "summary",
+      "notes",
+      "createdAt",
+      "updatedAt",
+    ]);
+
+    const dialect = new PgDialect();
+    const methodQuery = dialect.sqlToQuery(methodWhere as never);
+    expect(methodQuery.sql.replace(/\s+/g, " ").trim()).toBe(
+      '("drill_training_methods"."drill_id" = $1 and "training_methods"."active" = $2)',
+    );
+    expect(methodQuery.params).toEqual([drillId, true]);
+    const statusQuery = dialect.sqlToQuery(statusWhere as never);
+    expect(statusQuery.sql.replace(/\s+/g, " ").trim()).toBe(
+      '("drill_status_tags"."drill_id" = $1 and "status_tags"."active" = $2)',
+    );
+    expect(statusQuery.params).toEqual([drillId, true]);
+  });
+});
+
+describe("listDrills", () => {
+  it("can hydrate the default graph with only drills and training methods", async () => {
+    const now = new Date("2026-09-11T00:00:00Z");
+    mocks.select
+      .mockReturnValueOnce(fluentQueryReturning([{
+        id: drillId,
+        title: "Rear round kick",
+        summary: "Turn the hip over.",
+        createdAt: now,
+        updatedAt: now,
+      }]))
+      .mockReturnValueOnce(fluentQueryReturning([{
+        drillId,
+        id: "33333333-3333-4333-8333-333333333333",
+        name: "Pad work",
+        slug: "pad-work",
+        iconKey: "pad-work",
+        sortOrder: 1,
+      }]));
+
+    const response = await listDrills(userId, {}, {
+      includeTags: false,
+      includeStatusTags: false,
+    });
+
+    expect(mocks.select).toHaveBeenCalledTimes(2);
+    expect(Object.keys(mocks.select.mock.calls[0]?.[0] ?? {})).toEqual([
+      "id",
+      "title",
+      "summary",
+      "createdAt",
+      "updatedAt",
+    ]);
+    expect(response.drills[0]).toMatchObject({
+      id: drillId,
+      tags: [],
+      customTags: [],
+      statusTags: [],
+      trainingMethods: [{ slug: "pad-work" }],
+    });
+  });
+
+  it("still hydrates every searchable label when keyword filtering is requested", async () => {
+    const now = new Date("2026-09-11T00:00:00Z");
+    mocks.select
+      .mockReturnValueOnce(fluentQueryReturning([{
+        id: drillId,
+        title: "Rear round kick",
+        summary: "Turn the hip over.",
+        createdAt: now,
+        updatedAt: now,
+      }]))
+      .mockReturnValueOnce(fluentQueryReturning([]))
+      .mockReturnValueOnce(fluentQueryReturning([{
+        drillId,
+        id: "44444444-4444-4444-8444-444444444444",
+        name: "Counter timing",
+        slug: "counter-timing",
+        kind: "custom",
+        sortOrder: 1,
+        categoryId: null,
+        categoryName: null,
+        categorySlug: null,
+      }]))
+      .mockReturnValueOnce(fluentQueryReturning([]));
+
+    const response = await listDrills(
+      userId,
+      { keywords: ["counter"] },
+      { includeTags: false, includeStatusTags: false },
+    );
+
+    expect(mocks.select).toHaveBeenCalledTimes(4);
+    expect(response.drills.map((drill) => drill.id)).toEqual([drillId]);
+    expect(response.drills[0]?.customTags.map((tag) => tag.slug)).toEqual([
+      "counter-timing",
+    ]);
   });
 });
 

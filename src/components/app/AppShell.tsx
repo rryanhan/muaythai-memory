@@ -5,7 +5,7 @@ import dynamic from "next/dynamic";
 import { useSearchParams } from "next/navigation";
 import { BottomNav, type AppView } from "@/components/navigation/BottomNav";
 import { NetworkView } from "@/features/network/NetworkView";
-import type { GraphResponse } from "@/data";
+import type { GraphResponse, TaxonomyResponse } from "@/data";
 import type { CurrentAppUser } from "@/modules/auth";
 import styles from "./AppShell.module.css";
 
@@ -27,10 +27,16 @@ const viewLabels: Record<AppView, string> = {
 type AppShellProps = {
   currentUser: CurrentAppUser;
   initialGraph?: GraphResponse;
+  initialTaxonomy?: TaxonomyResponse;
   initialView?: AppView;
 };
 
-export function AppShell({ currentUser, initialGraph, initialView = "network" }: AppShellProps) {
+export function AppShell({
+  currentUser,
+  initialGraph,
+  initialTaxonomy,
+  initialView = "network",
+}: AppShellProps) {
   const searchParams = useSearchParams();
   const activeView = parseView(searchParams.get("view"));
   const [mountedViews, setMountedViews] = useState<ReadonlySet<AppView>>(
@@ -51,7 +57,11 @@ export function AppShell({ currentUser, initialGraph, initialView = "network" }:
         {/* Keep mounted views alive so returning to Network does not refetch or reset local graph state. */}
         {(mountedViews.has("network") || activeView === "network") && (
           <div className="app-view-pane" hidden={activeView !== "network"}>
-            <NetworkView active={activeView === "network"} initialGraph={initialGraph} />
+            <NetworkView
+              active={activeView === "network"}
+              initialGraph={initialGraph}
+              initialTaxonomy={initialTaxonomy}
+            />
           </div>
         )}
         {(mountedViews.has("library") || activeView === "library") && (

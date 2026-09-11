@@ -21,8 +21,12 @@ export async function generateCaptureDraft(
   transcript: string,
   options: GenerateCaptureDraftOptions = {},
 ): Promise<CaptureDraftResponse> {
-  const taxonomy = await getTaxonomy(userId);
   const provider = getCaptureDraftProvider();
+  const taxonomy = await getTaxonomy(userId, {
+    includeTagCategories: false,
+    includeCustomTags: false,
+    includeStatusTags: false,
+  });
   const modelSchema = createModelCaptureDraftSchema(
     taxonomy.trainingMethods.map((method) => method.slug),
     taxonomy.standardTags.map((tag) => tag.slug),

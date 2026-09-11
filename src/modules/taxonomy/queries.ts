@@ -3,9 +3,19 @@ import { db } from "@/db/client";
 import { statusTags, tagCategories, tags, trainingMethods } from "@/db/schema";
 import type { TagCategoryDto, TagDto, TaxonomyResponse } from "./contracts";
 
+export type TaxonomyQueryOptions = {
+  includeTagCategories?: boolean;
+  includeStandardTags?: boolean;
+  includeCustomTags?: boolean;
+  includeStatusTags?: boolean;
+};
+
 // Single read model for taxonomy screens, filter sheets, capture review, and
 // graph controls. The database remains the source of truth for tag changes.
-export async function getTaxonomy(userId: string): Promise<TaxonomyResponse> {
+export async function getTaxonomy(
+  userId: string,
+  options: TaxonomyQueryOptions = {},
+): Promise<TaxonomyResponse> {
   const [methodRows, categoryRows, standardTagRows, customTagRows, statusRows] = await Promise.all([
     db
       .select({
@@ -18,56 +28,64 @@ export async function getTaxonomy(userId: string): Promise<TaxonomyResponse> {
       .from(trainingMethods)
       .where(eq(trainingMethods.active, true))
       .orderBy(asc(trainingMethods.sortOrder), asc(trainingMethods.name)),
-    db
-      .select({
-        id: tagCategories.id,
-        name: tagCategories.name,
-        slug: tagCategories.slug,
-        sortOrder: tagCategories.sortOrder,
-      })
-      .from(tagCategories)
-      .where(eq(tagCategories.active, true))
-      .orderBy(asc(tagCategories.sortOrder), asc(tagCategories.name)),
-    db
-      .select({
-        id: tags.id,
-        name: tags.name,
-        slug: tags.slug,
-        kind: tags.kind,
-        sortOrder: tags.sortOrder,
-        categoryId: tagCategories.id,
-        categoryName: tagCategories.name,
-        categorySlug: tagCategories.slug,
-      })
-      .from(tags)
-      .leftJoin(tagCategories, eq(tags.categoryId, tagCategories.id))
-      .where(and(eq(tags.kind, "standard"), isNull(tags.userId), eq(tags.active, true)))
-      .orderBy(asc(tagCategories.sortOrder), asc(tags.sortOrder), asc(tags.name)),
-    db
-      .select({
-        id: tags.id,
-        name: tags.name,
-        slug: tags.slug,
-        kind: tags.kind,
-        sortOrder: tags.sortOrder,
-        categoryId: tagCategories.id,
-        categoryName: tagCategories.name,
-        categorySlug: tagCategories.slug,
-      })
-      .from(tags)
-      .leftJoin(tagCategories, eq(tags.categoryId, tagCategories.id))
-      .where(and(eq(tags.kind, "custom"), eq(tags.userId, userId), eq(tags.active, true)))
-      .orderBy(asc(tags.name)),
-    db
-      .select({
-        id: statusTags.id,
-        name: statusTags.name,
-        slug: statusTags.slug,
-        sortOrder: statusTags.sortOrder,
-      })
-      .from(statusTags)
-      .where(eq(statusTags.active, true))
-      .orderBy(asc(statusTags.sortOrder), asc(statusTags.name)),
+    options.includeTagCategories === false
+      ? Promise.resolve([])
+      : db
+          .select({
+            id: tagCategories.id,
+            name: tagCategories.name,
+            slug: tagCategories.slug,
+            sortOrder: tagCategories.sortOrder,
+          })
+          .from(tagCategories)
+          .where(eq(tagCategories.active, true))
+          .orderBy(asc(tagCategories.sortOrder), asc(tagCategories.name)),
+    options.includeStandardTags === false
+      ? Promise.resolve([])
+      : db
+          .select({
+            id: tags.id,
+            name: tags.name,
+            slug: tags.slug,
+            kind: tags.kind,
+            sortOrder: tags.sortOrder,
+            categoryId: tagCategories.id,
+            categoryName: tagCategories.name,
+            categorySlug: tagCategories.slug,
+          })
+          .from(tags)
+          .leftJoin(tagCategories, eq(tags.categoryId, tagCategories.id))
+          .where(and(eq(tags.kind, "standard"), isNull(tags.userId), eq(tags.active, true)))
+          .orderBy(asc(tagCategories.sortOrder), asc(tags.sortOrder), asc(tags.name)),
+    options.includeCustomTags === false
+      ? Promise.resolve([])
+      : db
+          .select({
+            id: tags.id,
+            name: tags.name,
+            slug: tags.slug,
+            kind: tags.kind,
+            sortOrder: tags.sortOrder,
+            categoryId: tagCategories.id,
+            categoryName: tagCategories.name,
+            categorySlug: tagCategories.slug,
+          })
+          .from(tags)
+          .leftJoin(tagCategories, eq(tags.categoryId, tagCategories.id))
+          .where(and(eq(tags.kind, "custom"), eq(tags.userId, userId), eq(tags.active, true)))
+          .orderBy(asc(tags.name)),
+    options.includeStatusTags === false
+      ? Promise.resolve([])
+      : db
+          .select({
+            id: statusTags.id,
+            name: statusTags.name,
+            slug: statusTags.slug,
+            sortOrder: statusTags.sortOrder,
+          })
+          .from(statusTags)
+          .where(eq(statusTags.active, true))
+          .orderBy(asc(statusTags.sortOrder), asc(statusTags.name)),
   ]);
 
   const standardTags = standardTagRows.map(toTagDto);

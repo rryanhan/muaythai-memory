@@ -1,7 +1,7 @@
 import { getTaxonomy } from "@/modules/taxonomy/queries";
 import { drillMatchesFilters, listDrills, normalizeDrillFilters } from "@/modules/drills/queries";
-import type { DrillFilters } from "@/modules/drills/contracts";
-import type { DrillSummary } from "@/modules/drills/contracts";
+import type { DrillFilters, DrillListResponse, DrillSummary } from "@/modules/drills/contracts";
+import type { TaxonomyResponse } from "@/modules/taxonomy/contracts";
 import type { GraphEdge, GraphNode, GraphOptions, GraphResponse } from "./contracts";
 
 // Builds the current Muay Thai network read model. Training Method -> Drill is
@@ -18,8 +18,64 @@ export async function getMuayThaiGraph(
     showCustomTags: options.showCustomTags ?? false,
     showStatusTags: options.showStatusTags ?? false,
   };
+  const keywordSearchNeedsAllLabels = normalizedFilters.keywords.length > 0;
 
-  const [taxonomy, drillList] = await Promise.all([getTaxonomy(userId), listDrills(userId)]);
+  const [taxonomy, drillList] = await Promise.all([
+    getTaxonomy(userId, {
+      includeTagCategories: false,
+      includeStandardTags: normalizedOptions.showTags,
+      includeCustomTags: normalizedOptions.showCustomTags,
+      includeStatusTags: normalizedOptions.showStatusTags,
+    }),
+    // Keep the full drill population so filtering only changes visual state;
+    // selectively hydrate the relations needed to evaluate the requested filter.
+    listDrills(userId, {}, {
+      includeTags:
+        normalizedOptions.showTags ||
+        normalizedOptions.showCustomTags ||
+        keywordSearchNeedsAllLabels ||
+        normalizedFilters.tagSlugs.length > 0,
+      includeStatusTags:
+        normalizedOptions.showStatusTags ||
+        keywordSearchNeedsAllLabels ||
+        normalizedFilters.statusTagSlugs.length > 0,
+    }),
+  ]);
+
+  return buildMuayThaiGraph(taxonomy, drillList, normalizedFilters, normalizedOptions);
+}
+
+export async function getInitialNetworkData(
+  userId: string,
+): Promise<{ graph: GraphResponse; taxonomy: TaxonomyResponse }> {
+  const filters = normalizeDrillFilters();
+  const options: GraphOptions = {
+    showTags: false,
+    showCustomTags: false,
+    showStatusTags: false,
+  };
+  const [taxonomy, drillList] = await Promise.all([
+    // The controls need the complete taxonomy, so provide it with the initial
+    // page instead of making the browser repeat these reference-data queries.
+    getTaxonomy(userId),
+    listDrills(userId, filters, {
+      includeTags: false,
+      includeStatusTags: false,
+    }),
+  ]);
+
+  return {
+    graph: buildMuayThaiGraph(taxonomy, drillList, filters, options),
+    taxonomy,
+  };
+}
+
+function buildMuayThaiGraph(
+  taxonomy: TaxonomyResponse,
+  drillList: DrillListResponse,
+  normalizedFilters: DrillFilters,
+  normalizedOptions: GraphOptions,
+): GraphResponse {
   const allDrills = drillList.drills;
   const matchedDrills = allDrills.filter((drill) => drillMatchesFilters(drill, normalizedFilters));
   const hasActiveFilters = hasFilters(normalizedFilters);

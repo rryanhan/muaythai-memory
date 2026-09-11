@@ -1,7 +1,6 @@
 import { AppShell } from "@/components/app/AppShell";
 import type { AppView } from "@/components/navigation/BottomNav";
-import { getMuayThaiGraph } from "@/modules/graph";
-import type { GraphResponse } from "@/data";
+import { getInitialNetworkData } from "@/modules/graph";
 import { requireCurrentPageUser } from "@/modules/auth";
 
 export const dynamic = "force-dynamic";
@@ -13,22 +12,25 @@ type HomePageProps = {
 export default async function HomePage({ searchParams }: HomePageProps) {
   const initialView = getInitialView(searchParams ? await searchParams : undefined);
   const user = await requireCurrentPageUser(initialView === "network" ? "/" : `/?view=${initialView}`);
-  const initialGraph = initialView === "network" ? await getInitialGraph(user.id) : undefined;
+  const initialNetworkData = initialView === "network"
+    ? await getSafeInitialNetworkData(user.id)
+    : undefined;
 
-  return <AppShell currentUser={user} initialGraph={initialGraph} initialView={initialView} />;
+  return (
+    <AppShell
+      currentUser={user}
+      initialGraph={initialNetworkData?.graph}
+      initialTaxonomy={initialNetworkData?.taxonomy}
+      initialView={initialView}
+    />
+  );
 }
 
-async function getInitialGraph(userId: string): Promise<GraphResponse | undefined> {
+async function getSafeInitialNetworkData(
+  userId: string,
+): Promise<Awaited<ReturnType<typeof getInitialNetworkData>> | undefined> {
   try {
-    return await getMuayThaiGraph(
-      userId,
-      {},
-      {
-        showTags: false,
-        showCustomTags: false,
-        showStatusTags: false,
-      },
-    );
+    return await getInitialNetworkData(userId);
   } catch {
     return undefined;
   }
