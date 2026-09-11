@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, isNull, or } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   drillStatusTags,
@@ -14,16 +14,21 @@ import {
 import type { StatusTagDto, TagDto, TrainingMethodDto } from "@/modules/taxonomy/contracts";
 import type { DrillDetail, DrillFilters, DrillListResponse, DrillSummary, FilterMode } from "./contracts";
 
-type DrillStepDto = DrillDetail["steps"][number];
 type DrillSummaryRow = Pick<
   typeof drills.$inferSelect,
   "id" | "title" | "summary" | "createdAt" | "updatedAt"
 >;
+type DrillDetailQueryRow = Omit<DrillDetail, "createdAt" | "updatedAt"> & {
+  createdAt: Date | string;
+  updatedAt: Date | string;
+};
 
 export type DrillListLoadOptions = {
   includeTags?: boolean;
   includeStatusTags?: boolean;
 };
+
+type DrillQueryDatabase = Pick<typeof db, "execute">;
 
 // Returns list-ready drill summaries. Full steps are intentionally left out so
 // library/profile/network screens can load quickly on mobile.
@@ -55,42 +60,128 @@ export async function listDrills(
 
 // Detail loading is separate from list loading because graph nodes should open
 // the full drill only after the user taps one.
-export async function getDrillById(userId: string, id: string): Promise<DrillDetail | null> {
-  const [drillRow] = await db
-    .select({
-      id: drills.id,
-      title: drills.title,
-      summary: drills.summary,
-      notes: drills.notes,
-      createdAt: drills.createdAt,
-      updatedAt: drills.updatedAt,
-    })
-    .from(drills)
-    .where(and(eq(drills.id, id), eq(drills.userId, userId)))
-    .limit(1);
+export async function getDrillById(
+  userId: string,
+  id: string,
+  options: { database?: DrillQueryDatabase } = {},
+): Promise<DrillDetail | null> {
+  const database = options.database ?? db;
+  const [detail] = await database.execute<DrillDetailQueryRow>(sql`
+    select
+      ${drills.id} as "id",
+      ${drills.title} as "title",
+      ${drills.summary} as "summary",
+      ${drills.notes} as "notes",
+      coalesce((
+        select jsonb_agg(
+          jsonb_build_object(
+            'id', ${trainingMethods.id},
+            'name', ${trainingMethods.name},
+            'slug', ${trainingMethods.slug},
+            'iconKey', ${trainingMethods.iconKey},
+            'sortOrder', ${trainingMethods.sortOrder}
+          )
+          order by ${trainingMethods.sortOrder}, ${trainingMethods.name}
+        )
+        from ${drillTrainingMethods}
+        inner join ${trainingMethods}
+          on ${trainingMethods.id} = ${drillTrainingMethods.trainingMethodId}
+        where ${drillTrainingMethods.drillId} = ${drills.id}
+          and ${trainingMethods.active} = true
+      ), '[]'::jsonb) as "trainingMethods",
+      tag_payload."tags" as "tags",
+      tag_payload."customTags" as "customTags",
+      coalesce((
+        select jsonb_agg(
+          jsonb_build_object(
+            'id', ${statusTags.id},
+            'name', ${statusTags.name},
+            'slug', ${statusTags.slug},
+            'sortOrder', ${statusTags.sortOrder}
+          )
+          order by ${statusTags.sortOrder}, ${statusTags.name}
+        )
+        from ${drillStatusTags}
+        inner join ${statusTags}
+          on ${statusTags.id} = ${drillStatusTags.statusTagId}
+        where ${drillStatusTags.drillId} = ${drills.id}
+          and ${statusTags.active} = true
+      ), '[]'::jsonb) as "statusTags",
+      ${drills.createdAt} as "createdAt",
+      ${drills.updatedAt} as "updatedAt",
+      coalesce((
+        select jsonb_agg(
+          jsonb_build_object(
+            'id', ${drillSteps.id},
+            'position', ${drillSteps.position},
+            'body', ${drillSteps.body}
+          )
+          order by ${drillSteps.position}
+        )
+        from ${drillSteps}
+        where ${drillSteps.drillId} = ${drills.id}
+      ), '[]'::jsonb) as "steps"
+    from ${drills}
+    cross join lateral (
+      select
+        coalesce(
+          jsonb_agg(
+            tag_row."tag"
+            order by tag_row."categorySortOrder", tag_row."sortOrder", tag_row."name"
+          ) filter (where tag_row."kind" = 'standard'),
+          '[]'::jsonb
+        ) as "tags",
+        coalesce(
+          jsonb_agg(
+            tag_row."tag"
+            order by tag_row."categorySortOrder", tag_row."sortOrder", tag_row."name"
+          ) filter (where tag_row."kind" = 'custom'),
+          '[]'::jsonb
+        ) as "customTags"
+      from (
+        select
+          case when ${tags.kind} = 'custom' then 'custom' else 'standard' end as "kind",
+          jsonb_build_object(
+            'id', ${tags.id},
+            'name', ${tags.name},
+            'slug', ${tags.slug},
+            'kind', case when ${tags.kind} = 'custom' then 'custom' else 'standard' end,
+            'sortOrder', ${tags.sortOrder},
+            'category', case
+              when ${tagCategories.id} is not null
+                and ${tagCategories.name} <> ''
+                and ${tagCategories.slug} <> ''
+              then jsonb_build_object(
+                'id', ${tagCategories.id},
+                'name', ${tagCategories.name},
+                'slug', ${tagCategories.slug}
+              )
+              else null
+            end
+          ) as "tag",
+          ${tagCategories.sortOrder} as "categorySortOrder",
+          ${tags.sortOrder} as "sortOrder",
+          ${tags.name} as "name"
+        from ${drillTags}
+        inner join ${tags} on ${tags.id} = ${drillTags.tagId}
+        left join ${tagCategories} on ${tagCategories.id} = ${tags.categoryId}
+        where ${drillTags.drillId} = ${drills.id}
+          and ${tags.active} = true
+          and (${tags.userId} is null or ${tags.userId} = ${drills.userId})
+      ) as tag_row
+    ) as tag_payload
+    where ${drills.id} = ${id}
+      and ${drills.userId} = ${userId}
+    limit 1
+  `);
 
-  if (!drillRow) return null;
-
-  const [trainingMethodRows, tagRows, statusRows, stepRows] = await Promise.all([
-    loadTrainingMethodsForDrill(id),
-    loadTagsForDrill(userId, id),
-    loadStatusTagsForDrill(id),
-    loadStepsForDrill(id),
-  ]);
-
-  return {
-    id: drillRow.id,
-    title: drillRow.title,
-    summary: drillRow.summary,
-    notes: drillRow.notes,
-    trainingMethods: trainingMethodRows,
-    tags: tagRows.filter((tag) => tag.kind === "standard"),
-    customTags: tagRows.filter((tag) => tag.kind === "custom"),
-    statusTags: statusRows,
-    createdAt: drillRow.createdAt,
-    updatedAt: drillRow.updatedAt,
-    steps: stepRows,
-  };
+  return detail
+    ? {
+        ...detail,
+        createdAt: toDate(detail.createdAt),
+        updatedAt: toDate(detail.updatedAt),
+      }
+    : null;
 }
 
 export async function getOwnedDrillHeader(
@@ -325,26 +416,6 @@ function groupTagRows(rows: Array<{
   }));
 }
 
-async function loadTrainingMethodsForDrill(drillId: string): Promise<TrainingMethodDto[]> {
-  const rows = await db
-    .select({
-      id: trainingMethods.id,
-      name: trainingMethods.name,
-      slug: trainingMethods.slug,
-      iconKey: trainingMethods.iconKey,
-      sortOrder: trainingMethods.sortOrder,
-    })
-    .from(drillTrainingMethods)
-    .innerJoin(trainingMethods, eq(drillTrainingMethods.trainingMethodId, trainingMethods.id))
-    .where(and(
-      eq(drillTrainingMethods.drillId, drillId),
-      eq(trainingMethods.active, true),
-    ))
-    .orderBy(asc(trainingMethods.sortOrder), asc(trainingMethods.name));
-
-  return rows;
-}
-
 async function loadTagsByDrillId(userId: string, drillIds: string[]): Promise<Map<string, TagDto[]>> {
   if (drillIds.length === 0) return new Map();
 
@@ -375,47 +446,6 @@ async function loadTagsByDrillId(userId: string, drillIds: string[]): Promise<Ma
   return groupTagRows(rows);
 }
 
-async function loadTagsForDrill(userId: string, drillId: string): Promise<TagDto[]> {
-  const rows = await db
-    .select({
-      id: tags.id,
-      name: tags.name,
-      slug: tags.slug,
-      kind: tags.kind,
-      sortOrder: tags.sortOrder,
-      categoryId: tagCategories.id,
-      categoryName: tagCategories.name,
-      categorySlug: tagCategories.slug,
-    })
-    .from(drillTags)
-    .innerJoin(tags, eq(drillTags.tagId, tags.id))
-    .leftJoin(tagCategories, eq(tags.categoryId, tagCategories.id))
-    .where(
-      and(
-        eq(drillTags.drillId, drillId),
-        eq(tags.active, true),
-        or(isNull(tags.userId), eq(tags.userId, userId)),
-      ),
-    )
-    .orderBy(asc(tagCategories.sortOrder), asc(tags.sortOrder), asc(tags.name));
-
-  return rows.map((row) => ({
-    id: row.id,
-    name: row.name,
-    slug: row.slug,
-    kind: row.kind === "custom" ? "custom" : "standard",
-    sortOrder: row.sortOrder,
-    category:
-      row.categoryId && row.categoryName && row.categorySlug
-        ? {
-            id: row.categoryId,
-            name: row.categoryName,
-            slug: row.categorySlug,
-          }
-        : null,
-  }));
-}
-
 async function loadStatusTagsByDrillId(drillIds: string[]): Promise<Map<string, StatusTagDto[]>> {
   if (drillIds.length === 0) return new Map();
 
@@ -438,39 +468,6 @@ async function loadStatusTagsByDrillId(drillIds: string[]): Promise<Map<string, 
     slug: row.slug,
     sortOrder: row.sortOrder,
   }));
-}
-
-async function loadStatusTagsForDrill(drillId: string): Promise<StatusTagDto[]> {
-  const rows = await db
-    .select({
-      id: statusTags.id,
-      name: statusTags.name,
-      slug: statusTags.slug,
-      sortOrder: statusTags.sortOrder,
-    })
-    .from(drillStatusTags)
-    .innerJoin(statusTags, eq(drillStatusTags.statusTagId, statusTags.id))
-    .where(and(
-      eq(drillStatusTags.drillId, drillId),
-      eq(statusTags.active, true),
-    ))
-    .orderBy(asc(statusTags.sortOrder), asc(statusTags.name));
-
-  return rows;
-}
-
-async function loadStepsForDrill(drillId: string): Promise<DrillStepDto[]> {
-  const rows = await db
-    .select({
-      id: drillSteps.id,
-      position: drillSteps.position,
-      body: drillSteps.body,
-    })
-    .from(drillSteps)
-    .where(eq(drillSteps.drillId, drillId))
-    .orderBy(asc(drillSteps.position));
-
-  return rows;
 }
 
 function groupByDrillId<TItem, TRow extends { drillId: string }>(
@@ -509,6 +506,10 @@ function matchesListFilter(values: string[], selectedValues: string[], mode: Fil
 
 function hasAny(values: string[], selectedValues: string[]): boolean {
   return selectedValues.some((selectedValue) => values.includes(selectedValue));
+}
+
+function toDate(value: Date | string): Date {
+  return value instanceof Date ? value : new Date(value);
 }
 
 function normalizeStringList(values: string[]): string[] {
