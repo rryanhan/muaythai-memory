@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   authenticationErrorResponse,
-  invalidateOnboardingState,
   requireCurrentAppUser,
 } from "@/modules/auth";
 import {
@@ -9,6 +8,7 @@ import {
   OnboardingValidationError,
 } from "@/modules/onboarding/mutations";
 import { onboardingProfileResponseSchema } from "@/modules/onboarding/contracts";
+import { finalizeOnboardingMutationResponse } from "@/modules/onboarding/http";
 
 export const runtime = "nodejs";
 
@@ -30,13 +30,14 @@ export async function POST(request: NextRequest) {
     response = profileErrorResponse(error);
   }
 
-  const invalidated = invalidateAfterMutation(mutationUserId, mutationAttempted, "profile");
-  if (mutationSucceeded && response.ok && !invalidated) {
-    return retryableInvalidationResponse(
-      "Your profile was saved, but onboarding could not be refreshed. Try again.",
-    );
-  }
-  return response;
+  return finalizeOnboardingMutationResponse({
+    userId: mutationUserId,
+    attempted: mutationAttempted,
+    succeeded: mutationSucceeded,
+    response,
+    invalidationLogMessage: "Onboarding state invalidation failed after profile.",
+    retryMessage: "Your profile was saved, but onboarding could not be refreshed. Try again.",
+  });
 }
 
 function profileErrorResponse(error: unknown): NextResponse {
@@ -50,25 +51,4 @@ function profileErrorResponse(error: unknown): NextResponse {
   }
   console.error("Profile onboarding failed.", error instanceof Error ? error.message : error);
   return NextResponse.json({ error: "Profile could not be saved. Try again." }, { status: 500 });
-}
-
-function invalidateAfterMutation(userId: string | null, attempted: boolean, mutation: string): boolean {
-  if (!userId || !attempted) return true;
-  try {
-    invalidateOnboardingState(userId);
-    return true;
-  } catch (error) {
-    console.error(
-      `Onboarding state invalidation failed after ${mutation}.`,
-      error instanceof Error ? error.message : error,
-    );
-    return false;
-  }
-}
-
-function retryableInvalidationResponse(message: string): NextResponse {
-  return NextResponse.json(
-    { error: message },
-    { status: 503, headers: { "retry-after": "1" } },
-  );
 }
