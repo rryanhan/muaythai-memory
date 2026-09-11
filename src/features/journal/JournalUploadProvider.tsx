@@ -13,14 +13,7 @@ import {
 import { usePathname, useRouter } from "next/navigation";
 import { X } from "@phosphor-icons/react/X";
 import { useQueryClient } from "@tanstack/react-query";
-import {
-  completeJournalEntryUpload,
-  createJournalUpload,
-  deleteJournalEntry,
-  JournalApiError,
-  refreshJournalUpload,
-  uploadJournalEntryPoster,
-} from "@/data/journal";
+import { JournalApiError } from "@/data/journal-error";
 import type { JournalUploadIntentResponse } from "@/data/types";
 import type { GeneratedVideoPoster } from "./create-video-poster";
 import { uploadJournalVideo, validateJournalVideoFile } from "./upload-journal-video";
@@ -146,6 +139,7 @@ export function JournalUploadProvider({ children }: { children: ReactNode }) {
     const stagedEntryId = intentRef.current?.entryId;
     if (stagedEntryId) {
       try {
+        const { deleteJournalEntry } = await loadJournalApiModule();
         await deleteJournalEntry(stagedEntryId);
       } catch (deleteError) {
         if (!(deleteError instanceof JournalApiError && deleteError.status === 404)) {
@@ -179,12 +173,23 @@ export function JournalUploadProvider({ children }: { children: ReactNode }) {
     setCompletedEntryId(null);
     const controller = new AbortController();
     abortRef.current = controller;
+    setPhase("creating");
     let currentStage: Exclude<FailedStage, null> = "intent";
     let retryStage = failedStage;
     let nextIntent = intent;
     let recreatedMissingIntent = false;
 
     try {
+      const {
+        completeJournalEntryUpload,
+        createJournalUpload,
+        refreshJournalUpload,
+        uploadJournalEntryPoster,
+      } = await loadJournalApiModule();
+      if (controller.signal.aborted) {
+        throw new DOMException("Upload cancelled.", "AbortError");
+      }
+
       while (true) {
         try {
           if (nextIntent && retryStage === "upload") {
@@ -517,4 +522,16 @@ function loadPosterModule() {
     });
   }
   return posterModulePromise;
+}
+
+let journalApiModulePromise: Promise<typeof import("@/data/journal")> | null = null;
+
+function loadJournalApiModule() {
+  if (!journalApiModulePromise) {
+    journalApiModulePromise = import("@/data/journal").catch((error) => {
+      journalApiModulePromise = null;
+      throw error;
+    });
+  }
+  return journalApiModulePromise;
 }

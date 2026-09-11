@@ -16,7 +16,10 @@ import {
   type UpdateJournalEntryInput,
 } from "@/modules/journal/contracts";
 import { ApiError, fetchJson, isApiErrorBody } from "./api-core";
+import { JournalApiError } from "./journal-error";
 import type { ApiClientOptions } from "./types";
+
+export { JournalApiError } from "./journal-error";
 
 export async function getJournalEntries(
   input: { cursor?: string | null; limit?: number; drillId?: string | null } = {},
@@ -135,15 +138,5 @@ async function requestWithReadableError<T>(request: () => Promise<T>): Promise<T
       throw new JournalApiError(error.responseBody.error, error.status);
     }
     throw error;
-  }
-}
-
-export class JournalApiError extends Error {
-  readonly status: number;
-
-  constructor(message: string, status: number) {
-    super(message);
-    this.name = "JournalApiError";
-    this.status = status;
   }
 }

@@ -56,7 +56,7 @@ vi.mock("./upload-journal-video", () => ({
   validateJournalVideoFile: uploadMocks.validateJournalVideoFile,
 }));
 
-import { JournalApiError } from "@/data/journal";
+import { JournalApiError } from "@/data/journal-error";
 import { JournalUploadProvider, useJournalUpload } from "./JournalUploadProvider";
 
 beforeEach(() => {
