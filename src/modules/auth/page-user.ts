@@ -11,10 +11,10 @@ import {
 
 export async function requireCurrentPageUser(nextPath = "/") {
   try {
-    const state = await requireCurrentOnboardingState();
-    const onboardingPath = getOnboardingPath(state, safeInternalPath(nextPath));
+    const user = await requireCurrentAppUser();
+    const onboardingPath = getOnboardingPath(user, safeInternalPath(nextPath));
     if (onboardingPath) redirect(onboardingPath);
-    return requireCurrentAppUser();
+    return user;
   } catch (error) {
     if (!(error instanceof AuthenticationRequiredError)) throw error;
     redirect(`/auth/sign-in?next=${encodeURIComponent(safeInternalPath(nextPath))}`);

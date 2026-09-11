@@ -27,8 +27,61 @@ vi.mock("./current-user", async (importOriginal) => {
 import { AuthenticationRequiredError } from "./current-user";
 import {
   requireCurrentPageOnboardingState,
+  requireCurrentPageUser,
   requireCurrentPageUserId,
 } from "./page-user";
+
+describe("full page-user authorization", () => {
+  const userId = "00000000-0000-4000-8000-000000000001";
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("returns a synchronized completed user without loading onboarding state separately", async () => {
+    const user = completeAppUser(userId);
+    mocks.requireCurrentAppUser.mockResolvedValue(user);
+
+    await expect(requireCurrentPageUser("/?view=profile")).resolves.toBe(user);
+
+    expect(mocks.requireCurrentOnboardingState).not.toHaveBeenCalled();
+  });
+
+  it("redirects a profile-incomplete user from the synchronized user object", async () => {
+    mocks.requireCurrentAppUser.mockResolvedValue({
+      ...completeAppUser(userId),
+      username: null,
+      profileOnboardedAt: null,
+    });
+
+    await expect(requireCurrentPageUser("/profile/edit"))
+      .rejects.toMatchObject({
+        destination: "/onboarding/profile?next=%2Fprofile%2Fedit",
+      });
+    expect(mocks.requireCurrentOnboardingState).not.toHaveBeenCalled();
+  });
+
+  it("redirects a guide-incomplete user from the synchronized user object", async () => {
+    mocks.requireCurrentAppUser.mockResolvedValue({
+      ...completeAppUser(userId),
+      firstDrillGuideCompletedAt: null,
+    });
+
+    await expect(requireCurrentPageUser("/profile/edit"))
+      .rejects.toMatchObject({
+        destination: "/onboarding/first-drill?next=%2Fprofile%2Fedit",
+      });
+    expect(mocks.requireCurrentOnboardingState).not.toHaveBeenCalled();
+  });
+
+  it("redirects an authentication failure without loading onboarding state", async () => {
+    mocks.requireCurrentAppUser.mockRejectedValue(new AuthenticationRequiredError());
+
+    await expect(requireCurrentPageUser("//attacker.example/path"))
+      .rejects.toMatchObject({ destination: "/auth/sign-in?next=%2F" });
+    expect(mocks.requireCurrentOnboardingState).not.toHaveBeenCalled();
+  });
+});
 
 describe("page onboarding-state authorization", () => {
   const userId = "00000000-0000-4000-8000-000000000001";
@@ -87,5 +140,17 @@ function completeOnboardingState(id: string) {
     profileOnboardedAt: new Date("2026-01-01T00:00:00.000Z"),
     firstDrillGuideCompletedAt: new Date("2026-01-02T00:00:00.000Z"),
     firstDrillGuideSkippedAt: null,
+  };
+}
+
+function completeAppUser(id: string) {
+  return {
+    ...completeOnboardingState(id),
+    avatarUrl: null,
+    displayName: "Nak Muay",
+    email: "fighter@example.com",
+    firstName: "Nak",
+    lastName: "Muay",
+    location: "Bangkok",
   };
 }
