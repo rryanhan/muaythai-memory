@@ -22,11 +22,7 @@ import {
   uploadJournalEntryPoster,
   type JournalUploadIntentResponse,
 } from "@/data";
-import {
-  createPosterFromImage,
-  createVideoPoster,
-  type GeneratedVideoPoster,
-} from "./create-video-poster";
+import type { GeneratedVideoPoster } from "./create-video-poster";
 import { uploadJournalVideo, validateJournalVideoFile } from "./upload-journal-video";
 import styles from "./JournalMedia.module.css";
 
@@ -317,7 +313,8 @@ export function JournalUploadProvider({ children }: { children: ReactNode }) {
       previewUrlRef.current = previewUrl;
       const posterController = new AbortController();
       posterAbortRef.current = posterController;
-      const posterPromise = createVideoPoster(file, { signal: posterController.signal })
+      const posterPromise = loadPosterModule()
+        .then(({ createVideoPoster }) => createVideoPoster(file, { signal: posterController.signal }))
         .then((poster) => {
           if (poster) {
             commitPoster(poster, generation);
@@ -389,7 +386,8 @@ export function JournalUploadProvider({ children }: { children: ReactNode }) {
       posterAbortRef.current = posterController;
       const hadPoster = Boolean(posterFileRef.current);
       setDraft((current) => ({ ...current, posterStatus: "generating" }));
-      const posterPromise = createPosterFromImage(file, { signal: posterController.signal })
+      const posterPromise = loadPosterModule()
+        .then(({ createPosterFromImage }) => createPosterFromImage(file, { signal: posterController.signal }))
         .then((poster) => {
           commitPoster({ file: poster, timeSeconds: 0 }, generation);
           setDraft((current) => ({ ...current, posterTimeSeconds: null }));
@@ -507,4 +505,16 @@ function localToday(): string {
 
 function isAbortError(error: unknown): boolean {
   return error instanceof DOMException && error.name === "AbortError";
+}
+
+let posterModulePromise: Promise<typeof import("./create-video-poster")> | null = null;
+
+function loadPosterModule() {
+  if (!posterModulePromise) {
+    posterModulePromise = import("./create-video-poster").catch((error) => {
+      posterModulePromise = null;
+      throw error;
+    });
+  }
+  return posterModulePromise;
 }

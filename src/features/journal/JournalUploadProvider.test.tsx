@@ -103,6 +103,9 @@ describe("JournalUploadProvider poster replacement", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Choose first" }));
     fireEvent.click(screen.getByRole("button", { name: "Choose second" }));
+    await waitFor(() => expect(
+      posterMocks.createVideoPoster.mock.calls.map(([file]) => file.name),
+    ).toEqual(["first.mp4", "second.mp4"]));
     expect(posterMocks.pending).toHaveLength(2);
     expect(posterMocks.pending[0].signal.aborted).toBe(true);
 
@@ -370,7 +373,7 @@ function renderProvider(children: React.ReactNode) {
 
 async function chooseReadyFile(): Promise<void> {
   fireEvent.click(screen.getByRole("button", { name: "Choose video" }));
-  expect(posterMocks.pending).toHaveLength(1);
+  await waitFor(() => expect(posterMocks.pending).toHaveLength(1));
   act(() => {
     posterMocks.pending[0].resolve({
       file: new File(["poster"], "poster.webp", { type: "image/webp" }),

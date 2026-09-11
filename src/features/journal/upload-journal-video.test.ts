@@ -89,6 +89,20 @@ describe("uploadJournalVideo resumptions", () => {
     expect(instance?.start).toHaveBeenCalledOnce();
   });
 
+  it("does not construct an upload when cancellation wins the module-load race", async () => {
+    const controller = new AbortController();
+    controller.abort();
+
+    await expect(uploadJournalVideo({
+      file: new File(["same bytes"], "round.mp4", { type: "video/mp4" }),
+      intent: intent("user/current/video.mp4", "current-token"),
+      signal: controller.signal,
+      onProgress: vi.fn(),
+    })).rejects.toMatchObject({ name: "AbortError" });
+
+    expect(mocks.instances).toHaveLength(0);
+  });
+
   it.each([
     {
       label: "another bucket",

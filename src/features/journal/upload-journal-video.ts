@@ -1,4 +1,4 @@
-import { Upload, type PreviousUpload } from "tus-js-client";
+import type { PreviousUpload } from "tus-js-client";
 import {
   JOURNAL_MEDIA_BUCKET,
   JOURNAL_UPLOAD_CHUNK_BYTES,
@@ -20,7 +20,7 @@ export function validateJournalVideoFile(file: File): void {
   if (!isJournalVideoMime(file.type)) throw new JournalFileError("Use an MP4, WebM, or QuickTime video.");
 }
 
-export function uploadJournalVideo({
+export async function uploadJournalVideo({
   file,
   intent,
   signal,
@@ -32,6 +32,8 @@ export function uploadJournalVideo({
   onProgress: (percent: number) => void;
 }): Promise<void> {
   validateJournalVideoFile(file);
+  const { Upload } = await import("tus-js-client");
+  if (signal.aborted) throw new DOMException("Upload cancelled.", "AbortError");
 
   return new Promise((resolve, reject) => {
     let settled = false;
