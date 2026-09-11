@@ -112,6 +112,7 @@ export function AddDrillForm({
         queryClient.invalidateQueries({ queryKey: ["drills"] }),
         queryClient.invalidateQueries({ queryKey: ["graph"] }),
         queryClient.invalidateQueries({ queryKey: ["drill", drill.id] }),
+        queryClient.invalidateQueries({ queryKey: ["profile", "overview"] }),
       ]);
       onDirtyChange?.(false);
       if (onSaveSuccess) {

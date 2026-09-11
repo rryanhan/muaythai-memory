@@ -12,32 +12,22 @@ import Image from "next/image";
 import { badgeByIconKey } from "@/components/shared/context-badges";
 import { DecodedImage } from "@/components/shared/DecodedImage";
 import { getConnectionsSummary } from "@/data/connections";
-import { getDrills } from "@/data/drills";
 import { getJournalEntries } from "@/data/journal";
-import type { DrillFilterInput, JournalEntrySummary } from "@/data/types";
+import { getProfileOverview } from "@/data/profile";
+import type { JournalEntrySummary } from "@/data/types";
 import { SignOutButton } from "@/features/auth/SignOutButton";
 import type { CurrentAppUser } from "@/modules/auth";
 import { ProfileAvatar } from "./ProfileAvatar";
-import { countDrillsByTrainingMethod, filterDrillsByStatus } from "./profile-helpers";
 import styles from "./Profile.module.css";
-
-const allDrillFilters: DrillFilterInput = {
-  keywords: [],
-  methodSlugs: [],
-  tagSlugs: [],
-  statusTagSlugs: [],
-  tagMode: "all",
-  statusMode: "all",
-};
 
 type ProfileViewProps = {
   currentUser: CurrentAppUser;
 };
 
 export function ProfileView({ currentUser }: ProfileViewProps) {
-  const drillsQuery = useQuery({
-    queryKey: ["drills", allDrillFilters],
-    queryFn: ({ signal }) => getDrills(allDrillFilters, { requestInit: { signal } }),
+  const overviewQuery = useQuery({
+    queryKey: ["profile", "overview"],
+    queryFn: ({ signal }) => getProfileOverview({ requestInit: { signal } }),
     staleTime: 60 * 1000,
   });
   const journalQuery = useInfiniteQuery({
@@ -55,10 +45,7 @@ export function ProfileView({ currentUser }: ProfileViewProps) {
     queryFn: ({ signal }) => getConnectionsSummary({ requestInit: { signal } }),
     staleTime: 30 * 1000,
   });
-  const drills = drillsQuery.data?.drills ?? [];
-  const favourites = filterDrillsByStatus(drills, "starred");
-  const drillBackIn = filterDrillsByStatus(drills, "drill-back-in");
-  const methodCounts = countDrillsByTrainingMethod(drills);
+  const overview = overviewQuery.data;
   const journalEntries = journalQuery.data?.pages.flatMap((page) => page.entries) ?? [];
 
   return (
@@ -74,7 +61,7 @@ export function ProfileView({ currentUser }: ProfileViewProps) {
         </Link>
         <div className={styles.profileStats} aria-label="Profile counts">
           <span>
-            <strong>{drillsQuery.isPending ? "–" : drills.length}</strong>
+            <strong>{overviewQuery.isPending ? "–" : overview?.drillCount ?? 0}</strong>
             Drills
           </span>
           <Link href="/connections?tab=followers" prefetch>
@@ -93,8 +80,8 @@ export function ProfileView({ currentUser }: ProfileViewProps) {
         </div>
       </header>
 
-      {drillsQuery.isError && (
-        <button className={styles.loadError} type="button" onClick={() => void drillsQuery.refetch()}>
+      {overviewQuery.isError && (
+        <button className={styles.loadError} type="button" onClick={() => void overviewQuery.refetch()}>
           Couldn’t load profile entries. Retry
         </button>
       )}
@@ -103,28 +90,28 @@ export function ProfileView({ currentUser }: ProfileViewProps) {
         <SavedListLink
           title="Favourites"
           href="/profile/favourites"
-          count={drillsQuery.isPending ? null : favourites.length}
+          count={overviewQuery.isPending ? null : overview?.favouriteCount ?? 0}
           icon={<Star size={18} weight="regular" aria-hidden="true" />}
         />
         <SavedListLink
           title="Drill Back In"
           href="/profile/drill-back-in"
-          count={drillsQuery.isPending ? null : drillBackIn.length}
+          count={overviewQuery.isPending ? null : overview?.drillBackInCount ?? 0}
           icon={<Target size={18} weight="regular" aria-hidden="true" />}
         />
       </nav>
 
       <section className={styles.methodBreakdown} aria-labelledby="training-methods-title">
         <p className="eyebrow" id="training-methods-title">Training Methods</p>
-        {drillsQuery.isPending ? (
+        {overviewQuery.isPending ? (
           <div className={styles.methodStripLoading} aria-label="Loading Training Method counts">
             {Array.from({ length: 5 }).map((_, index) => <span key={index} />)}
           </div>
-        ) : methodCounts.length > 0 ? (
+        ) : (overview?.trainingMethods.length ?? 0) > 0 ? (
           <div className={styles.methodStrip}>
-            {methodCounts.map(({ method, count }) => (
-              <div key={method.id} className={styles.methodStat} aria-label={`${method.name}: ${count} drills`}>
-                {method.iconKey && badgeByIconKey[method.iconKey] ? (
+            {overview?.trainingMethods.map((method) => (
+              <div key={method.id} className={styles.methodStat} aria-label={`${method.name}: ${method.count} drills`}>
+                {badgeByIconKey[method.iconKey] ? (
                   <Image
                     src={badgeByIconKey[method.iconKey]}
                     width={30}
@@ -133,7 +120,7 @@ export function ProfileView({ currentUser }: ProfileViewProps) {
                     aria-hidden="true"
                   />
                 ) : <span className={styles.methodFallback} aria-hidden="true" />}
-                <strong>{count}</strong>
+                <strong>{method.count}</strong>
               </div>
             ))}
           </div>

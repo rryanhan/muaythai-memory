@@ -7,6 +7,7 @@ import { ProfileView } from "./ProfileView";
 
 const mocks = vi.hoisted(() => ({
   getDrills: vi.fn(),
+  getProfileOverview: vi.fn(),
   getConnectionsSummary: vi.fn(),
   getJournalEntries: vi.fn(),
   linkProps: vi.fn(),
@@ -14,6 +15,9 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("@/data/drills", () => ({
   getDrills: mocks.getDrills,
+}));
+vi.mock("@/data/profile", () => ({
+  getProfileOverview: mocks.getProfileOverview,
 }));
 vi.mock("@/data/journal", () => ({
   getJournalEntries: mocks.getJournalEntries,
@@ -39,7 +43,18 @@ vi.mock("./ProfileAvatar", () => ({
 describe("ProfileView", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.getDrills.mockResolvedValue({ drills: [] });
+    mocks.getProfileOverview.mockResolvedValue({
+      drillCount: 7,
+      favouriteCount: 3,
+      drillBackInCount: 2,
+      trainingMethods: [{
+        id: "00000000-0000-4000-8000-000000000301",
+        name: "Pad Work",
+        slug: "pad-work",
+        iconKey: "pad-work",
+        count: 4,
+      }],
+    });
     mocks.getJournalEntries.mockResolvedValue({
       entries: [],
       nextCursor: null,
@@ -59,6 +74,7 @@ describe("ProfileView", () => {
     renderProfile();
 
     expect(await screen.findByLabelText("3 pending follow requests")).toHaveTextContent("3");
+    expect(screen.getByText("Drills").closest("span")).toHaveTextContent("7Drills");
     expect(screen.getByText("Followers").closest("a")).toHaveAttribute(
       "href",
       "/connections?tab=followers",
@@ -67,6 +83,16 @@ describe("ProfileView", () => {
       "href",
       "/connections?tab=following",
     );
+  });
+
+  it("uses the profile aggregate without hydrating the full drill list", async () => {
+    renderProfile();
+
+    expect(await screen.findByLabelText("Pad Work: 4 drills")).toBeInTheDocument();
+    expect(mocks.getProfileOverview).toHaveBeenCalledOnce();
+    expect(mocks.getDrills).not.toHaveBeenCalled();
+    expect(screen.getByRole("link", { name: /favourites/i })).toHaveTextContent("3");
+    expect(screen.getByRole("link", { name: /drill back in/i })).toHaveTextContent("2");
   });
 
   it("links journal rows without forcing or manually triggering full-route prefetches", async () => {

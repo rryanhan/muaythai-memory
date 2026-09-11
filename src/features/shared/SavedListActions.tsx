@@ -87,7 +87,7 @@ function SavedListActionsState({
         return next;
       });
       void queryClient.invalidateQueries({ queryKey: ["drills"] });
-      void queryClient.invalidateQueries({ queryKey: ["profile"] });
+      void queryClient.invalidateQueries({ queryKey: ["profile", "overview"] });
       void queryClient.invalidateQueries({ queryKey: ["graph"] });
     }
   }

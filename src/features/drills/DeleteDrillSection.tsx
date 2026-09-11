@@ -26,6 +26,7 @@ export function DeleteDrillSection({ drillId, drillTitle }: DeleteDrillSectionPr
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["drills"] }),
         queryClient.invalidateQueries({ queryKey: ["graph"] }),
+        queryClient.invalidateQueries({ queryKey: ["profile", "overview"] }),
       ]);
       router.replace("/?view=library");
       router.refresh();

@@ -15,6 +15,25 @@ export const profileResponseSchema = z.object({
   profile: profileDtoSchema,
 });
 
+export const profileOverviewTrainingMethodSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string(),
+  slug: z.string(),
+  iconKey: z.string(),
+  count: z.number().int().nonnegative(),
+});
+
+export const profileOverviewSchema = z.object({
+  drillCount: z.number().int().nonnegative(),
+  favouriteCount: z.number().int().nonnegative(),
+  drillBackInCount: z.number().int().nonnegative(),
+  trainingMethods: z.array(profileOverviewTrainingMethodSchema),
+});
+
+export const profileOverviewResponseSchema = z.object({
+  overview: profileOverviewSchema,
+});
+
 export const profileUsernameSchema = z
   .string()
   .trim()
@@ -29,6 +48,8 @@ export const profileLocationSchema = optionalProfileField(120, "Location");
 
 export type ProfileDto = z.infer<typeof profileDtoSchema>;
 export type ProfileResponse = z.infer<typeof profileResponseSchema>;
+export type ProfileOverview = z.infer<typeof profileOverviewSchema>;
+export type ProfileOverviewResponse = z.infer<typeof profileOverviewResponseSchema>;
 
 function optionalProfileField(max: number, label: string) {
   return z

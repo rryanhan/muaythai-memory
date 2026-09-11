@@ -45,7 +45,12 @@ import type {
   JournalUploadIntentResponse,
   UpdateJournalEntryInput,
 } from "@/modules/journal/contracts";
-import type { ProfileDto, ProfileResponse } from "@/modules/profile/contracts";
+import type {
+  ProfileDto,
+  ProfileOverview,
+  ProfileOverviewResponse,
+  ProfileResponse,
+} from "@/modules/profile/contracts";
 import type { StatusTagDto, TagCategoryDto, TagDto, TaxonomyResponse, TrainingMethodDto } from "@/modules/taxonomy/contracts";
 
 // This file is the frontend import surface for API data types. It reuses the
@@ -89,6 +94,8 @@ export type {
   JournalPreviewResponse,
   JournalUploadIntentResponse,
   ProfileDto,
+  ProfileOverview,
+  ProfileOverviewResponse,
   ProfileResponse,
   StatusTagDto,
   SavedListSlug,

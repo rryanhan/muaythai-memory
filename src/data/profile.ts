@@ -1,4 +1,9 @@
-import { profileResponseSchema, type ProfileDto } from "@/modules/profile/contracts";
+import {
+  profileOverviewResponseSchema,
+  profileResponseSchema,
+  type ProfileDto,
+  type ProfileOverview,
+} from "@/modules/profile/contracts";
 import { ApiError, fetchJson, isApiErrorBody } from "./api-core";
 import type { ApiClientOptions } from "./types";
 
@@ -10,6 +15,17 @@ export type UpdateProfileInput = {
   avatar?: File | null;
   removeAvatar?: boolean;
 };
+
+export async function getProfileOverview(
+  options: ApiClientOptions = {},
+): Promise<ProfileOverview> {
+  const response = await fetchJson(
+    "/api/profile/overview",
+    profileOverviewResponseSchema,
+    options,
+  );
+  return response.overview;
+}
 
 export async function updateProfile(
   input: UpdateProfileInput,
