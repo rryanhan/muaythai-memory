@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireOnboardedAppUser } from "@/modules/auth";
+import { requireOnboardedUserId } from "@/modules/auth";
 import {
   createJournalUploadInputSchema,
   journalUploadIntentResponseSchema,
@@ -12,10 +12,10 @@ export const runtime = "nodejs";
 
 export async function POST(request: NextRequest) {
   try {
-    const user = await requireOnboardedAppUser();
+    const userId = await requireOnboardedUserId();
     const input = createJournalUploadInputSchema.parse(await request.json());
     return NextResponse.json(
-      journalUploadIntentResponseSchema.parse(await createJournalUploadIntent(user.id, input)),
+      journalUploadIntentResponseSchema.parse(await createJournalUploadIntent(userId, input)),
       { status: 201 },
     );
   } catch (error) {

@@ -79,11 +79,6 @@ export const requireCurrentAppUser = cache(async (): Promise<CurrentAppUser> => 
   return toCurrentAppUser(racedUser, email, metadata);
 });
 
-export const requireOnboardedAppUser = cache(async (): Promise<CurrentAppUser> => {
-  await requireOnboardedUserId();
-  return requireCurrentAppUser();
-});
-
 export const requireProfileOnboardedUserId = cache(async (): Promise<string> => {
   const state = await requireCurrentOnboardingState();
   if (!isProfileOnboarded(state)) throw new OnboardingRequiredError();

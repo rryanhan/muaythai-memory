@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { requireOnboardedAppUser, requireOnboardedUserId } from "@/modules/auth";
+import { requireOnboardedUserId } from "@/modules/auth";
 import {
   deleteJournalEntryResponseSchema,
   journalDetailResponseSchema,
@@ -29,10 +29,10 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ id
 
 export async function PATCH(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
-    const user = await requireOnboardedAppUser();
+    const userId = await requireOnboardedUserId();
     const { id } = paramsSchema.parse(await context.params);
     const input = updateJournalEntryInputSchema.parse(await request.json());
-    const entry = await updateJournalEntry(user.id, id, input);
+    const entry = await updateJournalEntry(userId, id, input);
     return NextResponse.json(journalDetailResponseSchema.parse({ entry }));
   } catch (error) {
     return journalErrorResponse(error, "Journal entry could not be updated.");
@@ -41,10 +41,10 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
 
 export async function DELETE(_request: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
-    const user = await requireOnboardedAppUser();
+    const userId = await requireOnboardedUserId();
     const { id } = paramsSchema.parse(await context.params);
     return NextResponse.json(
-      deleteJournalEntryResponseSchema.parse({ deletedId: await deleteJournalEntry(user.id, id) }),
+      deleteJournalEntryResponseSchema.parse({ deletedId: await deleteJournalEntry(userId, id) }),
     );
   } catch (error) {
     return journalErrorResponse(error, "Journal entry could not be deleted.");

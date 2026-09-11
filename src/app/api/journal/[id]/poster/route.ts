@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { requireOnboardedAppUser } from "@/modules/auth";
+import { requireOnboardedUserId } from "@/modules/auth";
 import { journalPosterUploadResponseSchema } from "@/modules/journal/contracts";
 import { journalErrorResponse } from "@/modules/journal/http";
 import { saveJournalPoster } from "@/modules/journal/mutations";
@@ -13,7 +13,7 @@ const paramsSchema = z.object({ id: z.string().uuid() });
 
 export async function POST(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
-    const user = await requireOnboardedAppUser();
+    const userId = await requireOnboardedUserId();
     const { id } = paramsSchema.parse(await context.params);
     const formData = await request.formData();
     const poster = formData.get("poster");
@@ -21,7 +21,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
       return NextResponse.json({ error: "Journal poster must be an uploaded image." }, { status: 400 });
     }
 
-    await saveJournalPoster(user.id, id, poster);
+    await saveJournalPoster(userId, id, poster);
     return NextResponse.json(journalPosterUploadResponseSchema.parse({ uploaded: true }));
   } catch (error) {
     if (error instanceof JournalPosterError) {
