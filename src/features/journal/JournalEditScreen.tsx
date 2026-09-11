@@ -44,7 +44,6 @@ export function JournalEditScreen({
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["journal"] }),
         queryClient.invalidateQueries({ queryKey: ["drill-journal"] }),
-        queryClient.invalidateQueries({ queryKey: ["drills"] }),
       ]);
       queryClient.setQueryData(["journal", entry.id], updatedEntry);
       router.replace(detailHref);

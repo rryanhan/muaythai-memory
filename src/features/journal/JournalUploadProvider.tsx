@@ -260,7 +260,6 @@ export function JournalUploadProvider({ children }: { children: ReactNode }) {
           resetDraft();
           await Promise.all([
             queryClient.invalidateQueries({ queryKey: ["journal"] }),
-            queryClient.invalidateQueries({ queryKey: ["drills"] }),
             queryClient.invalidateQueries({ queryKey: ["drill-journal"] }),
           ]);
           if (pathnameRef.current === "/journal/new") router.replace(`/journal/${entry.id}`);

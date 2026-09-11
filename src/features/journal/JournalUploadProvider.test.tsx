@@ -145,7 +145,8 @@ describe("JournalUploadProvider intent recovery", () => {
       .mockResolvedValueOnce(undefined);
     dataMocks.completeJournalEntryUpload.mockResolvedValue({ id: oldIntent.entryId });
 
-    renderProvider(<UploadHarness />);
+    const queryClient = renderProvider(<UploadHarness />);
+    const invalidateQueries = vi.spyOn(queryClient, "invalidateQueries");
     await chooseReadyFile();
 
     fireEvent.click(screen.getByRole("button", { name: "Start upload" }));
@@ -165,6 +166,10 @@ describe("JournalUploadProvider intent recovery", () => {
       oldIntent.entryId,
       expect.any(Object),
     );
+    expect(invalidateQueries.mock.calls.map(([filters]) => filters?.queryKey)).toEqual([
+      ["journal"],
+      ["drill-journal"],
+    ]);
   });
 
   it("retries a transient token refresh with the existing entry and a fresh token", async () => {
@@ -360,15 +365,16 @@ function UploadHarness() {
   );
 }
 
-function renderProvider(children: React.ReactNode) {
+function renderProvider(children: React.ReactNode): QueryClient {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
-  return render(
+  render(
     <QueryClientProvider client={queryClient}>
       <JournalUploadProvider>{children}</JournalUploadProvider>
     </QueryClientProvider>,
   );
+  return queryClient;
 }
 
 async function chooseReadyFile(): Promise<void> {
