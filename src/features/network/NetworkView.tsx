@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { getGraph } from "@/data/graph";
 import { getTaxonomy } from "@/data/taxonomy";
 import type { GraphResponse, TaxonomyResponse } from "@/data/types";
+import { useDebouncedValue } from "@/features/shared/use-debounced-value";
 import {
   addPreviewKeyword,
   getNetworkErrorMessage,
@@ -41,10 +42,28 @@ export function NetworkView({ active, initialGraph, initialTaxonomy }: NetworkVi
   const [loadState, setLoadState] = useState<NetworkLoadState>(() =>
     initialGraph ? { status: "loaded", graph: initialGraph, refreshing: false } : { status: "loading" },
   );
+  const {
+    debouncedValue: debouncedPreviewKeyword,
+    deferValue: deferPreviewKeyword,
+    setValueImmediately: setPreviewKeywordImmediately,
+  } = useDebouncedValue("");
   const previewKeyword = searchOpen ? normalizeKeyword(searchDraft) : "";
+  const requestPreviewKeyword = searchOpen && previewKeyword ? debouncedPreviewKeyword : "";
   const effectiveFilters = useMemo(
     () => addPreviewKeyword(filters, previewKeyword),
     [filters, previewKeyword],
+  );
+  const requestFilters = useMemo(
+    () => addPreviewKeyword(filters, requestPreviewKeyword),
+    [filters, requestPreviewKeyword],
+  );
+  const serializedRequestFilters = JSON.stringify(requestFilters);
+  const stableRequestFilters = useMemo(
+    // Submitting a settled preview moves the same keyword into committed filters.
+    // Preserve the request object in that value-equivalent transition so it does
+    // not abort and repeat an identical graph request.
+    () => JSON.parse(serializedRequestFilters) as NetworkFilters,
+    [serializedRequestFilters],
   );
   const taxonomyQuery = useQuery({
     queryKey: ["taxonomy"],
@@ -61,10 +80,20 @@ export function NetworkView({ active, initialGraph, initialTaxonomy }: NetworkVi
     setFilters((current) => normalizeNetworkFilters(updater(current)));
   }, []);
 
+  const updateSearchDraft = useCallback((value: string) => {
+    setSearchDraft(value);
+    const normalizedKeyword = normalizeKeyword(value);
+    if (normalizedKeyword) {
+      deferPreviewKeyword(normalizedKeyword);
+    } else {
+      setPreviewKeywordImmediately("");
+    }
+  }, [deferPreviewKeyword, setPreviewKeywordImmediately]);
+
   useEffect(() => {
     let cancelled = false;
 
-    if (isEmptyFilterSet(effectiveFilters) && isDefaultLayerSet(layerOptions) && initialGraph) {
+    if (isEmptyFilterSet(stableRequestFilters) && isDefaultLayerSet(layerOptions) && initialGraph) {
       queueMicrotask(() => {
         if (!cancelled) {
           setLoadState({ status: "loaded", graph: initialGraph, refreshing: false });
@@ -88,7 +117,7 @@ export function NetworkView({ active, initialGraph, initialTaxonomy }: NetworkVi
       });
     });
 
-    getGraph(toDrillFilters(effectiveFilters), layerOptions, { requestInit: { signal: controller.signal } })
+    getGraph(toDrillFilters(stableRequestFilters), layerOptions, { requestInit: { signal: controller.signal } })
       .then((graph) => {
         if (!cancelled && !controller.signal.aborted) {
           setLoadState({ status: "loaded", graph, refreshing: false });
@@ -110,7 +139,7 @@ export function NetworkView({ active, initialGraph, initialTaxonomy }: NetworkVi
       cancelled = true;
       controller.abort();
     };
-  }, [effectiveFilters, initialGraph, layerOptions, retryNonce]);
+  }, [initialGraph, layerOptions, retryNonce, stableRequestFilters]);
 
   return (
     <section className={styles.view} aria-label="Network view">
@@ -141,7 +170,7 @@ export function NetworkView({ active, initialGraph, initialTaxonomy }: NetworkVi
           errorMessage={loadState.errorMessage}
           onRetry={retryGraph}
           onSearchOpenChange={setSearchOpen}
-          onSearchDraftChange={setSearchDraft}
+          onSearchDraftChange={updateSearchDraft}
           onUpdateFilters={updateFilters}
           onLayerOptionsChange={setLayerOptions}
           onRetryTaxonomy={() => void taxonomyQuery.refetch()}

@@ -10,6 +10,7 @@ import { badgeByIconKey } from "@/components/shared/context-badges";
 import { getDrills } from "@/data/drills";
 import { getTaxonomy } from "@/data/taxonomy";
 import type { TagDto } from "@/data/types";
+import { useDebouncedValue } from "@/features/shared/use-debounced-value";
 import { LibraryDrillRow, LibraryLoadingList, LibraryStatePanel } from "./LibraryDrillList";
 import { LibraryFilterSheet } from "./LibraryFilterSheet";
 import { LibraryIndexPanel } from "./LibraryIndexPanel";
@@ -34,10 +35,23 @@ export function LibraryView() {
   const [draftTagSlugs, setDraftTagSlugs] = useState<string[]>([]);
   const [draftStatusTagSlugs, setDraftStatusTagSlugs] = useState<string[]>([]);
   const [tagSearch, setTagSearch] = useState("");
-  const drillFilters = useMemo(() => toDrillFilters(filters), [filters]);
+  const {
+    debouncedValue: requestKeyword,
+    deferValue: deferRequestKeyword,
+    setValueImmediately: setRequestKeywordImmediately,
+  } = useDebouncedValue("");
+  const drillFilters = useMemo(
+    () => toDrillFilters({ ...filters, keyword: requestKeyword }),
+    [filters, requestKeyword],
+  );
   const previewFilters = useMemo(
-    () => toDrillFilters({ ...filters, tagSlugs: draftTagSlugs, statusTagSlugs: draftStatusTagSlugs }),
-    [draftStatusTagSlugs, draftTagSlugs, filters],
+    () => toDrillFilters({
+      ...filters,
+      keyword: requestKeyword,
+      tagSlugs: draftTagSlugs,
+      statusTagSlugs: draftStatusTagSlugs,
+    }),
+    [draftStatusTagSlugs, draftTagSlugs, filters, requestKeyword],
   );
 
   const taxonomyQuery = useQuery({
@@ -52,7 +66,7 @@ export function LibraryView() {
     staleTime: 60 * 1000,
   });
   const previewQuery = useQuery({
-    queryKey: ["drills", "preview", previewFilters],
+    queryKey: ["drills", previewFilters],
     queryFn: ({ signal }) => getDrills(previewFilters, { requestInit: { signal } }),
     enabled: tagPanelOpen,
     staleTime: 60 * 1000,
@@ -114,6 +128,12 @@ export function LibraryView() {
 
   function setKeyword(keyword: string) {
     setFilters((current) => ({ ...current, keyword }));
+    const normalizedKeyword = normalizeKeyword(keyword);
+    if (normalizedKeyword) {
+      deferRequestKeyword(normalizedKeyword);
+    } else {
+      setRequestKeywordImmediately("");
+    }
   }
 
   function setMethod(methodSlug: string | null) {
@@ -156,6 +176,7 @@ export function LibraryView() {
 
   function clearAllFilters() {
     setFilters(emptyLibraryFilters);
+    setRequestKeywordImmediately("");
     setTagSearch("");
     setTagPanelOpen(false);
   }
