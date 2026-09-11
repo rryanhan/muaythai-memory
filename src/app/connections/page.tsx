@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { ConnectionsScreen, type ConnectionsTab } from "@/features/connections/ConnectionsScreen";
-import { requireCurrentPageUser } from "@/modules/auth";
+import { requireCurrentPageOnboardingState } from "@/modules/auth";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -20,11 +20,11 @@ export default async function ConnectionsPage({
 }: {
   searchParams: Promise<{ tab?: string }>;
 }) {
-  const user = await requireCurrentPageUser("/connections");
-  if (!user.username) throw new Error("Onboarded user is missing a username.");
+  const onboardingState = await requireCurrentPageOnboardingState("/connections");
+  if (!onboardingState.username) throw new Error("Onboarded user is missing a username.");
   const requestedTab = (await searchParams).tab;
   const initialTab = requestedTab && validTabs.has(requestedTab as ConnectionsTab)
     ? requestedTab as ConnectionsTab
     : "followers";
-  return <ConnectionsScreen currentUsername={user.username} initialTab={initialTab} />;
+  return <ConnectionsScreen currentUsername={onboardingState.username} initialTab={initialTab} />;
 }

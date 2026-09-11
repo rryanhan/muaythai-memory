@@ -21,16 +21,20 @@ export async function requireCurrentPageUser(nextPath = "/") {
   }
 }
 
-export async function requireCurrentPageUserId(nextPath = "/") {
+export async function requireCurrentPageOnboardingState(nextPath = "/") {
   try {
     const state = await requireCurrentOnboardingState();
     const onboardingPath = getOnboardingPath(state, safeInternalPath(nextPath));
     if (onboardingPath) redirect(onboardingPath);
-    return state.id;
+    return state;
   } catch (error) {
     if (!(error instanceof AuthenticationRequiredError)) throw error;
     redirect(`/auth/sign-in?next=${encodeURIComponent(safeInternalPath(nextPath))}`);
   }
+}
+
+export async function requireCurrentPageUserId(nextPath = "/") {
+  return (await requireCurrentPageOnboardingState(nextPath)).id;
 }
 
 export async function requireProfileOnboardedPageUserId(nextPath = "/") {

@@ -2,7 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { AvatarValidationError } from "@/modules/profile/avatar";
 import { profileResponseSchema } from "@/modules/profile/contracts";
 import { ProfileUpdateError, updateProfile } from "@/modules/profile/mutations";
-import { authenticationErrorResponse, requireCurrentAppUser } from "@/modules/auth";
+import {
+  authenticationErrorResponse,
+  invalidateOnboardingState,
+  requireCurrentAppUser,
+} from "@/modules/auth";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -41,6 +45,18 @@ export async function PATCH(request: NextRequest) {
       avatar: avatarEntry,
       removeAvatar: removeAvatarEntry === "true",
     });
+    try {
+      invalidateOnboardingState(currentUser.id);
+    } catch (error) {
+      console.error(
+        "Profile state invalidation failed after update.",
+        error instanceof Error ? error.message : error,
+      );
+      return NextResponse.json(
+        { error: "Your profile was saved, but the app could not refresh it. Try again." },
+        { status: 503, headers: { "retry-after": "1" } },
+      );
+    }
     return NextResponse.json(profileResponseSchema.parse({ profile }));
   } catch (error) {
     const authResponse = authenticationErrorResponse(error);
