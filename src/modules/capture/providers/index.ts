@@ -3,8 +3,6 @@ import { createOllamaCaptureProvider } from "./ollama";
 import { createOpenAiCaptureProvider } from "./openai";
 import type { CaptureDraftProvider } from "./types";
 
-export type CaptureDraftProviderName = "ollama" | "openai";
-
 export function getCaptureDraftProvider(): CaptureDraftProvider {
   const provider = (process.env.CAPTURE_DRAFT_PROVIDER?.trim().toLowerCase() || "ollama") as string;
 

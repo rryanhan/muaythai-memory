@@ -105,18 +105,6 @@ export async function getOwnedDrillHeader(
   return row ?? null;
 }
 
-export async function getDrillSummariesByIds(
-  userId: string,
-  drillIds: string[],
-): Promise<DrillSummary[]> {
-  if (drillIds.length === 0) return [];
-  const summaries = await loadDrillSummaries(userId, drillIds);
-  const summaryById = new Map(summaries.map((drill) => [drill.id, drill]));
-  return drillIds
-    .map((id) => summaryById.get(id))
-    .filter((drill): drill is DrillSummary => Boolean(drill));
-}
-
 export async function getDrillSummariesByOwnerPairs(
   pairs: Array<{ ownerId: string; drillId: string }>,
   options: { includeStatusTags?: boolean } = {},
