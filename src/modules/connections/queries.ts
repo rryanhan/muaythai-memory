@@ -63,31 +63,36 @@ const emptyDirection = (): FollowDirection => ({
 export async function getConnectionsSummary(
   currentUserId: string,
 ): Promise<{ counts: ConnectionCounts }> {
-  const [followers, following, incoming, outgoing, blocked] = await Promise.all([
-    countFollowRows(and(
-      eq(follows.followingId, currentUserId),
-      eq(follows.status, "accepted"),
-    )),
-    countFollowRows(and(
-      eq(follows.followerId, currentUserId),
-      eq(follows.status, "accepted"),
-    )),
-    countFollowRows(and(
-      eq(follows.followingId, currentUserId),
-      eq(follows.status, "pending"),
-    )),
-    countFollowRows(and(
-      eq(follows.followerId, currentUserId),
-      eq(follows.status, "pending"),
-    )),
-    db
-      .select({ count: count() })
-      .from(userBlocks)
-      .where(eq(userBlocks.blockerId, currentUserId))
-      .then((rows) => rows[0]?.count ?? 0),
-  ]);
+  const [counts] = await db.execute<ConnectionCounts>(sql`
+    select
+      inbound."followers",
+      outbound."following",
+      inbound."incoming",
+      outbound."outgoing",
+      block_counts."blocked"
+    from (
+      select
+        count(*) filter (where ${follows.status} = 'accepted')::integer as "followers",
+        count(*) filter (where ${follows.status} = 'pending')::integer as "incoming"
+      from ${follows}
+      where ${follows.followingId} = ${currentUserId}
+    ) as inbound
+    cross join (
+      select
+        count(*) filter (where ${follows.status} = 'accepted')::integer as "following",
+        count(*) filter (where ${follows.status} = 'pending')::integer as "outgoing"
+      from ${follows}
+      where ${follows.followerId} = ${currentUserId}
+    ) as outbound
+    cross join (
+      select count(*)::integer as "blocked"
+      from ${userBlocks}
+      where ${userBlocks.blockerId} = ${currentUserId}
+    ) as block_counts
+  `);
 
-  return { counts: { followers, following, incoming, outgoing, blocked } };
+  if (!counts) throw new Error("Connection counts could not be loaded.");
+  return { counts };
 }
 
 export async function getConnectionSectionPage(
