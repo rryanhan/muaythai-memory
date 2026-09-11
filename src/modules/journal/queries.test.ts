@@ -1,0 +1,173 @@
+import { PgDialect } from "drizzle-orm/pg-core";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+import { JOURNAL_PLAYBACK_URL_SECONDS } from "./constants";
+
+const mocks = vi.hoisted(() => ({
+  createSignedUrl: vi.fn(),
+  createSupabaseAdminClient: vi.fn(),
+  execute: vi.fn(),
+  from: vi.fn(),
+}));
+
+vi.mock("@/db/client", () => ({
+  db: { execute: mocks.execute },
+}));
+
+vi.mock("@/lib/supabase/admin", () => ({
+  createSupabaseAdminClient: mocks.createSupabaseAdminClient,
+}));
+
+import { getJournalPreviewForDrill } from "./queries";
+
+const userId = "11111111-1111-4111-8111-111111111111";
+const drillId = "22222222-2222-4222-8222-222222222222";
+const entryId = "33333333-3333-4333-8333-333333333333";
+
+describe("getJournalPreviewForDrill", () => {
+  beforeEach(() => {
+    mocks.execute.mockReset();
+    mocks.createSignedUrl.mockReset();
+    mocks.from.mockReset().mockReturnValue({ createSignedUrl: mocks.createSignedUrl });
+    mocks.createSupabaseAdminClient.mockReset().mockReturnValue({
+      storage: { from: mocks.from },
+    });
+  });
+
+  it("returns undefined for a drill the user does not own without signing", async () => {
+    mocks.execute.mockResolvedValueOnce([]);
+
+    await expect(getJournalPreviewForDrill(userId, drillId)).resolves.toBeUndefined();
+    expect(mocks.execute).toHaveBeenCalledOnce();
+    expect(mocks.createSupabaseAdminClient).not.toHaveBeenCalled();
+  });
+
+  it("returns an empty owned preview without signing", async () => {
+    mocks.execute.mockResolvedValueOnce([emptySnapshot(0)]);
+
+    await expect(getJournalPreviewForDrill(userId, drillId)).resolves.toEqual({
+      entry: null,
+      total: 0,
+    });
+    expect(mocks.createSupabaseAdminClient).not.toHaveBeenCalled();
+  });
+
+  it("loads ownership, total, and latest media-backed entry in one statement", async () => {
+    const createdAt = new Date("2026-08-10T12:00:00.000Z");
+    mocks.execute.mockImplementationOnce(async (query) => {
+      const compiled = new PgDialect().sqlToQuery(query);
+      const normalizedSql = compiled.sql.replace(/\s+/g, " ").trim();
+
+      expect(normalizedSql).toContain(
+        `with owned_drill as ( select "drills"."id" as "id", "drills"."user_id" as "userId" ` +
+          `from "drills" where "drills"."id" = $1 and "drills"."user_id" = $2 limit 1 )`,
+      );
+      expect(normalizedSql).toContain(
+        `select count(*)::integer as "total" from "journal_entries" ` +
+          `where "journal_entries"."user_id" = owned_drill."userId" ` +
+          `and "journal_entries"."drill_id" = owned_drill."id" ` +
+          `and "journal_entries"."status" = 'ready'`,
+      );
+      expect(normalizedSql).toContain(
+        `from "journal_entries" inner join "journal_media" ` +
+          `on "journal_media"."journal_entry_id" = "journal_entries"."id"`,
+      );
+      expect(normalizedSql).toContain(
+        `"journal_entries"."occurred_on"::text as "occurredOn"`,
+      );
+      expect(normalizedSql).toContain(
+        `order by "journal_entries"."occurred_on" desc, ` +
+          `"journal_entries"."created_at" desc, "journal_entries"."id" desc limit 1`,
+      );
+      expect(compiled.params).toEqual([drillId, userId]);
+      return [readySnapshot({ createdAt, total: 2 })];
+    });
+    mocks.createSignedUrl.mockResolvedValueOnce({
+      data: { signedUrl: "https://storage.test/playback" },
+      error: null,
+    });
+
+    const preview = await getJournalPreviewForDrill(userId, drillId);
+
+    expect(preview).toEqual({
+      entry: {
+        id: entryId,
+        occurredOn: "2026-08-10",
+        caption: "Latest round",
+        drill: { id: drillId, title: "Teep timing" },
+        durationMs: 42_000,
+        mimeType: "video/mp4",
+        posterUrl: null,
+        createdAt,
+        playbackUrl: "https://storage.test/playback",
+      },
+      total: 2,
+    });
+    expect(mocks.execute).toHaveBeenCalledOnce();
+    expect(mocks.createSignedUrl).toHaveBeenCalledWith(
+      `${userId}/${entryId}/clip.mp4`,
+      JOURNAL_PLAYBACK_URL_SECONDS,
+    );
+  });
+
+  it("keeps the total independent of media-backed latest-row selection", async () => {
+    const mediaBackedCreatedAt = new Date("2026-08-09T12:00:00.000Z");
+    mocks.execute.mockResolvedValueOnce([
+      readySnapshot({
+        createdAt: mediaBackedCreatedAt,
+        occurredOn: "2026-08-09",
+        total: 2,
+      }),
+    ]);
+    mocks.createSignedUrl.mockResolvedValueOnce({
+      data: { signedUrl: "https://storage.test/older-media-backed-entry" },
+      error: null,
+    });
+
+    const preview = await getJournalPreviewForDrill(userId, drillId);
+
+    expect(preview?.total).toBe(2);
+    expect(preview?.entry?.occurredOn).toBe("2026-08-09");
+    expect(preview?.entry?.createdAt).toEqual(mediaBackedCreatedAt);
+  });
+});
+
+function emptySnapshot(total: number) {
+  return {
+    total,
+    id: null,
+    occurredOn: null,
+    caption: null,
+    createdAt: null,
+    drillId: null,
+    drillTitle: null,
+    durationMs: null,
+    mimeType: null,
+    storagePath: null,
+    posterPath: null,
+  };
+}
+
+function readySnapshot({
+  createdAt,
+  occurredOn = "2026-08-10",
+  total,
+}: {
+  createdAt: Date;
+  occurredOn?: string;
+  total: number;
+}) {
+  return {
+    total,
+    id: entryId,
+    occurredOn,
+    caption: "Latest round",
+    createdAt,
+    drillId,
+    drillTitle: "Teep timing",
+    durationMs: 42_000,
+    mimeType: "video/mp4",
+    storagePath: `${userId}/${entryId}/clip.mp4`,
+    posterPath: null,
+  };
+}

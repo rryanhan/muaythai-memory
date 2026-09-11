@@ -1,4 +1,4 @@
-import { and, count, desc, eq, lt, or } from "drizzle-orm";
+import { and, desc, eq, lt, or, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { drills, journalEntries, journalMedia } from "@/db/schema";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
@@ -14,6 +14,20 @@ type JournalCursor = {
   occurredOn: string;
   createdAt: Date;
   id: string;
+};
+
+type JournalPreviewQueryRow = {
+  total: number;
+  id: string | null;
+  occurredOn: string | null;
+  caption: string | null;
+  createdAt: Date | null;
+  drillId: string | null;
+  drillTitle: string | null;
+  durationMs: number | null;
+  mimeType: string | null;
+  storagePath: string | null;
+  posterPath: string | null;
 };
 
 export class JournalCursorError extends Error {
@@ -87,54 +101,85 @@ export async function getJournalPreviewForDrill(
   userId: string,
   drillId: string,
 ): Promise<JournalPreviewResponse | undefined> {
-  const [ownedDrill] = await db
-    .select({ id: drills.id })
-    .from(drills)
-    .where(and(eq(drills.id, drillId), eq(drills.userId, userId)))
-    .limit(1);
-  if (!ownedDrill) return undefined;
+  const [snapshot] = await db.execute<JournalPreviewQueryRow>(sql`
+    with owned_drill as (
+      select ${drills.id} as "id", ${drills.userId} as "userId"
+      from ${drills}
+      where ${drills.id} = ${drillId}
+        and ${drills.userId} = ${userId}
+      limit 1
+    )
+    select
+      total_counts."total",
+      latest."id",
+      latest."occurredOn",
+      latest."caption",
+      latest."createdAt",
+      latest."drillId",
+      latest."drillTitle",
+      latest."durationMs",
+      latest."mimeType",
+      latest."storagePath",
+      latest."posterPath"
+    from owned_drill
+    cross join lateral (
+      select count(*)::integer as "total"
+      from ${journalEntries}
+      where ${journalEntries.userId} = owned_drill."userId"
+        and ${journalEntries.drillId} = owned_drill."id"
+        and ${journalEntries.status} = 'ready'
+    ) as total_counts
+    left join lateral (
+      select
+        ${journalEntries.id} as "id",
+        ${journalEntries.occurredOn}::text as "occurredOn",
+        ${journalEntries.caption} as "caption",
+        ${journalEntries.createdAt} as "createdAt",
+        ${drills.id} as "drillId",
+        ${drills.title} as "drillTitle",
+        ${journalMedia.durationMs} as "durationMs",
+        ${journalMedia.mimeType} as "mimeType",
+        ${journalMedia.storagePath} as "storagePath",
+        ${journalMedia.posterPath} as "posterPath"
+      from ${journalEntries}
+      inner join ${journalMedia}
+        on ${journalMedia.journalEntryId} = ${journalEntries.id}
+      left join ${drills}
+        on ${journalEntries.drillId} = ${drills.id}
+      where ${journalEntries.userId} = owned_drill."userId"
+        and ${journalEntries.drillId} = owned_drill."id"
+        and ${journalEntries.status} = 'ready'
+      order by
+        ${journalEntries.occurredOn} desc,
+        ${journalEntries.createdAt} desc,
+        ${journalEntries.id} desc
+      limit 1
+    ) as latest on true
+  `);
 
-  const [latestRows, totalRows] = await Promise.all([
-    db
-      .select({
-        id: journalEntries.id,
-        occurredOn: journalEntries.occurredOn,
-        caption: journalEntries.caption,
-        createdAt: journalEntries.createdAt,
-        drillId: drills.id,
-        drillTitle: drills.title,
-        durationMs: journalMedia.durationMs,
-        mimeType: journalMedia.mimeType,
-        storagePath: journalMedia.storagePath,
-        posterPath: journalMedia.posterPath,
-      })
-      .from(journalEntries)
-      .innerJoin(journalMedia, eq(journalMedia.journalEntryId, journalEntries.id))
-      .leftJoin(drills, eq(journalEntries.drillId, drills.id))
-      .where(
-        and(
-          eq(journalEntries.userId, userId),
-          eq(journalEntries.drillId, drillId),
-          eq(journalEntries.status, "ready"),
-        ),
-      )
-      .orderBy(desc(journalEntries.occurredOn), desc(journalEntries.createdAt), desc(journalEntries.id))
-      .limit(1),
-    db
-      .select({ value: count() })
-      .from(journalEntries)
-      .where(
-        and(
-          eq(journalEntries.userId, userId),
-          eq(journalEntries.drillId, drillId),
-          eq(journalEntries.status, "ready"),
-        ),
-      ),
-  ]);
+  if (!snapshot) return undefined;
+  if (!snapshot.id) return { entry: null, total: snapshot.total };
+  if (
+    !snapshot.occurredOn
+    || !snapshot.createdAt
+    || !snapshot.mimeType
+    || !snapshot.storagePath
+  ) {
+    throw new Error("Journal preview query returned an incomplete entry.");
+  }
 
-  const latest = latestRows[0];
-  const total = totalRows[0]?.value ?? 0;
-  if (!latest) return { entry: null, total };
+  const latest = {
+    id: snapshot.id,
+    occurredOn: snapshot.occurredOn,
+    caption: snapshot.caption,
+    createdAt: snapshot.createdAt,
+    drillId: snapshot.drillId,
+    drillTitle: snapshot.drillTitle,
+    durationMs: snapshot.durationMs,
+    mimeType: snapshot.mimeType,
+    storagePath: snapshot.storagePath,
+    posterPath: snapshot.posterPath,
+  };
 
   const bucket = createSupabaseAdminClient().storage.from(JOURNAL_MEDIA_BUCKET);
   const [{ data, error }, posterUrl] = await Promise.all([
@@ -150,7 +195,7 @@ export async function getJournalPreviewForDrill(
       ...toSummary(latest, posterUrl),
       playbackUrl: data.signedUrl,
     },
-    total,
+    total: snapshot.total,
   };
 }
 
