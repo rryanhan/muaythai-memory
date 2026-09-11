@@ -42,8 +42,8 @@ vi.mock("./create-video-poster", () => ({
   createVideoPoster: posterMocks.createVideoPoster,
 }));
 
-vi.mock("@/data", async (importOriginal) => ({
-  ...await importOriginal<typeof import("@/data")>(),
+vi.mock("@/data/journal", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/data/journal")>(),
   completeJournalEntryUpload: dataMocks.completeJournalEntryUpload,
   createJournalUpload: dataMocks.createJournalUpload,
   deleteJournalEntry: dataMocks.deleteJournalEntry,
@@ -56,7 +56,7 @@ vi.mock("./upload-journal-video", () => ({
   validateJournalVideoFile: uploadMocks.validateJournalVideoFile,
 }));
 
-import { JournalApiError } from "@/data";
+import { JournalApiError } from "@/data/journal";
 import { JournalUploadProvider, useJournalUpload } from "./JournalUploadProvider";
 
 beforeEach(() => {

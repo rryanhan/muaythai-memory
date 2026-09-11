@@ -1,4 +1,4 @@
-// Public data-layer barrel. Future React views should import API helpers and
-// DTO types from "@/data" instead of reaching into individual files.
+// Default public data-layer barrel. App-wide client boundaries may use a
+// focused module to avoid shipping unrelated API clients in every route.
 export * from "./api";
 export * from "./types";

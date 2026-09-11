@@ -20,8 +20,8 @@ import {
   JournalApiError,
   refreshJournalUpload,
   uploadJournalEntryPoster,
-  type JournalUploadIntentResponse,
-} from "@/data";
+} from "@/data/journal";
+import type { JournalUploadIntentResponse } from "@/data/types";
 import type { GeneratedVideoPoster } from "./create-video-poster";
 import { uploadJournalVideo, validateJournalVideoFile } from "./upload-journal-video";
 import styles from "./JournalMedia.module.css";
