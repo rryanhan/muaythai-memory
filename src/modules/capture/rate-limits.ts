@@ -43,40 +43,59 @@ export async function consumeCaptureRateLimit(
   const policies = getPolicies(action);
 
   await database.transaction(async (tx) => {
-    for (const policy of policies) {
-      const windowStart = startOfFixedWindow(now, policy.windowMs);
-      const rows = await tx
-        .insert(captureRateLimits)
-        .values({
-          userId,
-          action,
-          windowKind: policy.kind,
-          windowStart,
-          requestCount: 1,
-          updatedAt: now,
-        })
-        .onConflictDoUpdate({
-          target: [
-            captureRateLimits.userId,
-            captureRateLimits.action,
-            captureRateLimits.windowKind,
-            captureRateLimits.windowStart,
-          ],
-          set: {
-            requestCount: sql`${captureRateLimits.requestCount} + 1`,
-            updatedAt: now,
-          },
-          setWhere: sql`${captureRateLimits.requestCount} < ${policy.limit}`,
-        })
-        .returning({ requestCount: captureRateLimits.requestCount });
+    const windows = policies.map((policy) => ({
+      policy,
+      windowStart: startOfFixedWindow(now, policy.windowMs),
+    }));
+    const burstPolicy = policies.find((policy) => policy.kind === "burst");
+    const dailyPolicy = policies.find((policy) => policy.kind === "daily");
 
-      if (!rows[0]) {
-        throw new CaptureRateLimitError({
-          action,
-          windowKind: policy.kind,
-          retryAfterSeconds: retryAfterSeconds(now, windowStart, policy.windowMs),
-        });
-      }
+    if (!burstPolicy || !dailyPolicy) {
+      throw new Error(`Capture rate-limit policy is incomplete for ${action}.`);
+    }
+
+    const rows = await tx
+      .insert(captureRateLimits)
+      .values(windows.map(({ policy, windowStart }) => ({
+        userId,
+        action,
+        windowKind: policy.kind,
+        windowStart,
+        requestCount: 1,
+        updatedAt: now,
+      })))
+      .onConflictDoUpdate({
+        target: [
+          captureRateLimits.userId,
+          captureRateLimits.action,
+          captureRateLimits.windowKind,
+          captureRateLimits.windowStart,
+        ],
+        set: {
+          requestCount: sql`${captureRateLimits.requestCount} + 1`,
+          updatedAt: now,
+        },
+        setWhere: sql`${captureRateLimits.requestCount} < case ${captureRateLimits.windowKind}
+          when 'burst' then ${burstPolicy.limit}
+          when 'daily' then ${dailyPolicy.limit}
+          else 0
+        end`,
+      })
+      .returning({ windowKind: captureRateLimits.windowKind });
+
+    const consumedWindowKinds = new Set(rows.map((row) => row.windowKind));
+    const failedWindow = windows.find(({ policy }) => !consumedWindowKinds.has(policy.kind));
+
+    if (failedWindow) {
+      throw new CaptureRateLimitError({
+        action,
+        windowKind: failedWindow.policy.kind,
+        retryAfterSeconds: retryAfterSeconds(
+          now,
+          failedWindow.windowStart,
+          failedWindow.policy.windowMs,
+        ),
+      });
     }
   });
 }
