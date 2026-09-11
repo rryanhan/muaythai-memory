@@ -1,4 +1,5 @@
-import { Star, Target } from "@phosphor-icons/react";
+import { Star } from "@phosphor-icons/react/Star";
+import { Target } from "@phosphor-icons/react/Target";
 import type { BuiltInStatusFilter } from "./tag-filter-helpers";
 
 type SavedListTokenProps = {

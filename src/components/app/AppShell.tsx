@@ -4,11 +4,14 @@ import { useState } from "react";
 import dynamic from "next/dynamic";
 import { useSearchParams } from "next/navigation";
 import { BottomNav, type AppView } from "@/components/navigation/BottomNav";
-import { NetworkView } from "@/features/network/NetworkView";
 import type { GraphResponse, TaxonomyResponse } from "@/data";
 import type { CurrentAppUser } from "@/modules/auth";
 import styles from "./AppShell.module.css";
 
+const NetworkView = dynamic(
+  () => import("@/features/network/NetworkView").then((module) => module.NetworkView),
+  { loading: () => <ViewLoading label="Network" /> },
+);
 const LibraryView = dynamic(
   () => import("@/features/library/LibraryView").then((module) => module.LibraryView),
   { loading: () => <ViewLoading label="Training Log" /> },

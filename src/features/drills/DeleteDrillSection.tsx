@@ -1,6 +1,6 @@
 "use client";
 
-import { Trash } from "@phosphor-icons/react";
+import { Trash } from "@phosphor-icons/react/Trash";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useState } from "react";

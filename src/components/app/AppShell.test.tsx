@@ -3,6 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CurrentAppUser } from "@/modules/auth";
 import { AppShell } from "./AppShell";
 
+const moduleLoads = vi.hoisted(() => ({ network: 0 }));
+
 vi.mock("next/navigation", async () => {
   const { useSyncExternalStore } = await import("react");
 
@@ -23,6 +25,7 @@ vi.mock("next/navigation", async () => {
 
 vi.mock("@/features/network/NetworkView", async () => {
   const { useState } = await import("react");
+  moduleLoads.network += 1;
 
   return {
     NetworkView: () => {
@@ -57,6 +60,19 @@ describe("AppShell view lifecycle", () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+  });
+
+  it("loads the network bundle only after the Network view is opened", async () => {
+    nativeReplaceState({}, "", "/?view=library");
+    render(<AppShell currentUser={currentUser} initialView="library" />);
+
+    expect(await screen.findByText("Training Log content")).toBeVisible();
+    expect(moduleLoads.network).toBe(0);
+
+    fireEvent.click(screen.getByRole("button", { name: "Network" }));
+
+    expect(await screen.findByRole("button", { name: "Network state 0" })).toBeVisible();
+    expect(moduleLoads.network).toBe(1);
   });
 
   it("keeps every visited view mounted across bottom-nav and URL-driven navigation", async () => {
