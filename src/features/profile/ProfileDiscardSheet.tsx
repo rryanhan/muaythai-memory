@@ -4,15 +4,17 @@ import { Drawer } from "vaul";
 import { useDrawerFocus } from "@/features/media/use-drawer-focus";
 import styles from "./ProfileEdit.module.css";
 
+export type ProfileDiscardSheetProps = {
+  open: boolean;
+  onStay: () => void;
+  onDiscard: () => void;
+};
+
 export function ProfileDiscardSheet({
   open,
   onStay,
   onDiscard,
-}: {
-  open: boolean;
-  onStay: () => void;
-  onDiscard: () => void;
-}) {
+}: ProfileDiscardSheetProps) {
   const contentRef = useDrawerFocus(open);
 
   return (

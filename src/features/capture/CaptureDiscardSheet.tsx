@@ -4,7 +4,7 @@ import { Drawer } from "vaul";
 import { useDrawerFocus } from "@/features/media/use-drawer-focus";
 import styles from "./Capture.module.css";
 
-type CaptureDiscardSheetProps = {
+export type CaptureDiscardSheetProps = {
   open: boolean;
   onStay: () => void;
   onDiscard: () => void;

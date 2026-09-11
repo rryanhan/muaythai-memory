@@ -1,10 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { ComponentType } from "react";
 import { useRouter } from "next/navigation";
 import { createOnboardingFirstDrill } from "@/data/onboarding";
-import { CaptureDiscardSheet } from "@/features/capture/CaptureDiscardSheet";
+import captureStyles from "@/features/capture/Capture.module.css";
+import type { CaptureDiscardSheetProps } from "@/features/capture/CaptureDiscardSheet";
 import { useJournalUpload } from "@/features/journal/JournalUploadProvider";
+import { DiscardSheetFallback } from "@/features/media/DiscardSheetFallback";
 import { useFirstDrillCommit } from "@/features/onboarding/FirstDrillCommitContext";
 import {
   isHistoryGuardState,
@@ -13,6 +16,45 @@ import {
   type HistoryGuardEntry,
 } from "@/features/onboarding/history-guard";
 import { AddDrillForm } from "./AddDrillForm";
+
+let captureDiscardSheetPromise: Promise<ComponentType<CaptureDiscardSheetProps>> | undefined;
+
+function loadCaptureDiscardSheet(): Promise<ComponentType<CaptureDiscardSheetProps>> {
+  captureDiscardSheetPromise ??= import("@/features/capture/CaptureDiscardSheet")
+    .then((module) => module.CaptureDiscardSheet)
+    .catch((error: unknown) => {
+      console.error("Could not load the enhanced drill discard confirmation.", error);
+      return CaptureDiscardSheetUnavailable;
+    });
+  return captureDiscardSheetPromise;
+}
+
+function CaptureDiscardSheetUnavailable({
+  open,
+  onStay,
+  onDiscard,
+  title = "Discard capture?",
+  description = "Your recording, transcript, and unsaved drill changes will be lost.",
+  stayLabel = "Keep editing",
+  discardLabel = "Discard capture",
+}: CaptureDiscardSheetProps) {
+  if (!open) return null;
+
+  return (
+    <DiscardSheetFallback
+      backdropClassName={captureStyles.discardBackdrop}
+      sheetClassName={captureStyles.discardSheet}
+      actionsClassName={captureStyles.discardActions}
+      title={title}
+      description={description}
+      statusMessage="Enhanced confirmation could not load. Standard confirmation remains available."
+      stayLabel={stayLabel}
+      discardLabel={discardLabel}
+      onStay={onStay}
+      onDiscard={onDiscard}
+    />
+  );
+}
 
 const manualDrillGuardMarker = "__manualDrillGuard";
 
@@ -32,7 +74,9 @@ export function AddDrillPageForm({
   const firstDrillCommit = useFirstDrillCommit();
   const [dirty, setDirty] = useState(false);
   const [creationCommitting, setCreationCommitting] = useState(false);
+  const [discardMounted, setDiscardMounted] = useState(false);
   const [discardOpen, setDiscardOpen] = useState(false);
+  const [DiscardSheetForOpen, setDiscardSheetForOpen] = useState<ComponentType<CaptureDiscardSheetProps> | null>(null);
   const [pendingExit, setPendingExit] = useState<"cancel" | "history" | null>(null);
   const dirtyRef = useRef(false);
   const creationCommittingRef = useRef(false);
@@ -41,6 +85,17 @@ export function AddDrillPageForm({
   const atGuardEntryRef = useRef(false);
   const ignoreNextPopRef = useRef(false);
   const navigationReleasedRef = useRef(false);
+  const enhancedDiscardSheetRef = useRef<ComponentType<CaptureDiscardSheetProps> | null>(null);
+
+  const openDiscardConfirmation = useCallback(() => {
+    const discardSheetForOpen = enhancedDiscardSheetRef.current;
+    setDiscardSheetForOpen(() => discardSheetForOpen);
+    setDiscardMounted(true);
+    setDiscardOpen(true);
+    void loadCaptureDiscardSheet().then((DiscardSheet) => {
+      enhancedDiscardSheetRef.current = DiscardSheet;
+    });
+  }, []);
 
   useEffect(() => {
     if (!onboarding) return;
@@ -112,7 +167,7 @@ export function AddDrillPageForm({
 
       atGuardEntryRef.current = false;
       setPendingExit("history");
-      setDiscardOpen(true);
+      openDiscardConfirmation();
     }
 
     window.addEventListener("beforeunload", beforeUnload);
@@ -121,7 +176,7 @@ export function AddDrillPageForm({
       window.removeEventListener("beforeunload", beforeUnload);
       window.removeEventListener("popstate", handlePopState, { capture: true });
     };
-  }, [onboarding]);
+  }, [onboarding, openDiscardConfirmation]);
 
   const runWithoutPrompt = useCallback((action: () => void) => {
     dirtyRef.current = false;
@@ -210,7 +265,7 @@ export function AddDrillPageForm({
               return;
             }
             setPendingExit("cancel");
-            setDiscardOpen(true);
+            openDiscardConfirmation();
           }}
           onSaveSuccess={(drillId) => {
             runWithoutPrompt(() => {
@@ -219,15 +274,31 @@ export function AddDrillPageForm({
             });
           }}
         />
-        <CaptureDiscardSheet
-          open={discardOpen}
-          onStay={keepEditing}
-          onDiscard={discardManualDrill}
-          title="Discard this drill?"
-          description="Your unsaved manual drill will be lost. You will return to the first-drill guide."
-          stayLabel="Keep editing"
-          discardLabel="Discard drill"
-        />
+        {discardMounted && (
+          DiscardSheetForOpen ? (
+            <DiscardSheetForOpen
+              open={discardOpen}
+              onStay={keepEditing}
+              onDiscard={discardManualDrill}
+              title="Discard this drill?"
+              description="Your unsaved manual drill will be lost. You will return to the first-drill guide."
+              stayLabel="Keep editing"
+              discardLabel="Discard drill"
+            />
+          ) : discardOpen ? (
+            <DiscardSheetFallback
+              backdropClassName={captureStyles.discardBackdrop}
+              sheetClassName={captureStyles.discardSheet}
+              actionsClassName={captureStyles.discardActions}
+              title="Discard this drill?"
+              description="Your unsaved manual drill will be lost. You will return to the first-drill guide."
+              stayLabel="Keep editing"
+              discardLabel="Discard drill"
+              onStay={keepEditing}
+              onDiscard={discardManualDrill}
+            />
+          ) : null
+        )}
       </>
     );
   }

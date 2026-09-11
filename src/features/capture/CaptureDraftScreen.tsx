@@ -1,25 +1,66 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { ComponentType } from "react";
 import { useRouter } from "next/navigation";
 import { RoutedBottomNav } from "@/components/navigation/RoutedBottomNav";
 import type { AppView } from "@/components/navigation/BottomNav";
 import type { CreateDrillInput, DrillDetail } from "@/data/types";
 import routeStyles from "@/features/drills/DrillRouteShell.module.css";
+import { DiscardSheetFallback } from "@/features/media/DiscardSheetFallback";
 import {
   isHistoryGuardState,
   pushHistoryGuard,
   restoreHistoryGuard,
   type HistoryGuardEntry,
 } from "@/features/onboarding/history-guard";
-import { CaptureDiscardSheet } from "./CaptureDiscardSheet";
 import {
   CaptureDraftForm,
   type CaptureMode,
   type CaptureWorkflowState,
 } from "./CaptureDraftForm";
+import type { CaptureDiscardSheetProps } from "./CaptureDiscardSheet";
 import type { CaptureMethodCoach } from "./VoiceCapturePanel";
 import styles from "./Capture.module.css";
+
+let captureDiscardSheetPromise: Promise<ComponentType<CaptureDiscardSheetProps>> | undefined;
+
+function loadCaptureDiscardSheet(): Promise<ComponentType<CaptureDiscardSheetProps>> {
+  captureDiscardSheetPromise ??= import("./CaptureDiscardSheet")
+    .then((module) => module.CaptureDiscardSheet)
+    .catch((error: unknown) => {
+      console.error("Could not load the enhanced capture discard confirmation.", error);
+      return CaptureDiscardSheetUnavailable;
+    });
+  return captureDiscardSheetPromise;
+}
+
+function CaptureDiscardSheetUnavailable({
+  open,
+  onStay,
+  onDiscard,
+  title = "Discard capture?",
+  description = "Your recording, transcript, and unsaved drill changes will be lost.",
+  stayLabel = "Keep editing",
+  discardLabel = "Discard capture",
+}: CaptureDiscardSheetProps) {
+  if (!open) return null;
+
+  return (
+    <DiscardSheetFallback
+      backdropClassName={styles.discardBackdrop}
+      sheetClassName={styles.discardSheet}
+      actionsClassName={styles.discardActions}
+      title={title}
+      description={description}
+      statusMessage="Enhanced confirmation could not load. Standard confirmation remains available."
+      stayLabel={stayLabel}
+      discardLabel={discardLabel}
+      onStay={onStay}
+      onDiscard={onDiscard}
+    />
+  );
+}
 
 export type CaptureOrigin = "network" | "library";
 
@@ -58,7 +99,9 @@ export function CaptureDraftScreen({ initialMode, origin, onboarding }: CaptureD
     phase: "input",
     hasUnsavedWork: false,
   });
+  const [discardMounted, setDiscardMounted] = useState(false);
   const [discardOpen, setDiscardOpen] = useState(false);
+  const [DiscardSheetForOpen, setDiscardSheetForOpen] = useState<ComponentType<CaptureDiscardSheetProps> | null>(null);
   const [pendingNavigation, setPendingNavigation] = useState<PendingNavigation>(null);
   const [creationCommitting, setCreationCommitting] = useState(false);
   const [skipCommitting, setSkipCommitting] = useState(false);
@@ -70,6 +113,17 @@ export function CaptureDraftScreen({ initialMode, origin, onboarding }: CaptureD
   const atGuardEntryRef = useRef(false);
   const ignoreNextPopRef = useRef(false);
   const navigationReleasedRef = useRef(false);
+  const enhancedDiscardSheetRef = useRef<ComponentType<CaptureDiscardSheetProps> | null>(null);
+
+  const openDiscardConfirmation = useCallback(() => {
+    const discardSheetForOpen = enhancedDiscardSheetRef.current;
+    setDiscardSheetForOpen(() => discardSheetForOpen);
+    setDiscardMounted(true);
+    setDiscardOpen(true);
+    void loadCaptureDiscardSheet().then((DiscardSheet) => {
+      enhancedDiscardSheetRef.current = DiscardSheet;
+    });
+  }, []);
 
   useEffect(() => {
     dirtyRef.current = workflow.hasUnsavedWork;
@@ -143,7 +197,7 @@ export function CaptureDraftScreen({ initialMode, origin, onboarding }: CaptureD
 
       atGuardEntryRef.current = false;
       setPendingNavigation({ kind: "history" });
-      setDiscardOpen(true);
+      openDiscardConfirmation();
     }
 
     window.addEventListener("beforeunload", handleBeforeUnload);
@@ -152,7 +206,7 @@ export function CaptureDraftScreen({ initialMode, origin, onboarding }: CaptureD
       window.removeEventListener("beforeunload", handleBeforeUnload);
       window.removeEventListener("popstate", handlePopState, { capture: true });
     };
-  }, []);
+  }, [openDiscardConfirmation]);
 
   const runWithoutPrompt = useCallback(
     (action: () => void) => {
@@ -200,9 +254,9 @@ export function CaptureDraftScreen({ initialMode, origin, onboarding }: CaptureD
       }
 
       setPendingNavigation({ kind: "route", destination });
-      setDiscardOpen(true);
+      openDiscardConfirmation();
     },
-    [navigateWithoutPrompt],
+    [navigateWithoutPrompt, openDiscardConfirmation],
   );
 
   function keepCapture() {
@@ -256,8 +310,15 @@ export function CaptureDraftScreen({ initialMode, origin, onboarding }: CaptureD
   function requestSkipFirstDrill() {
     if (creationCommittingRef.current || skipCommittingRef.current) return;
     setPendingNavigation({ kind: "skip" });
-    setDiscardOpen(true);
+    openDiscardConfirmation();
   }
+
+  const skippingFirstDrill = pendingNavigation?.kind === "skip";
+  const discardTitle = skippingFirstDrill ? "Skip your first drill?" : "Discard capture?";
+  const discardDescription = skippingFirstDrill
+    ? "You can reopen this guide later from Training Log. Any recording or unsaved drill will be discarded."
+    : "Your recording, transcript, and unsaved drill changes will be lost.";
+  const discardLabel = skippingFirstDrill ? "Skip for now" : "Discard capture";
 
   return (
     <main className={routeStyles.formPage}>
@@ -307,16 +368,30 @@ export function CaptureDraftScreen({ initialMode, origin, onboarding }: CaptureD
           onNavigate={(destination) => requestNavigation(destination)}
         />
       )}
-      <CaptureDiscardSheet
-        open={discardOpen}
-        onStay={keepCapture}
-        onDiscard={discardCapture}
-        title={pendingNavigation?.kind === "skip" ? "Skip your first drill?" : undefined}
-        description={pendingNavigation?.kind === "skip"
-          ? "You can reopen this guide later from Training Log. Any recording or unsaved drill will be discarded."
-          : undefined}
-        discardLabel={pendingNavigation?.kind === "skip" ? "Skip for now" : undefined}
-      />
+      {discardMounted && (
+        DiscardSheetForOpen ? (
+          <DiscardSheetForOpen
+            open={discardOpen}
+            onStay={keepCapture}
+            onDiscard={discardCapture}
+            title={discardTitle}
+            description={discardDescription}
+            discardLabel={discardLabel}
+          />
+        ) : discardOpen ? (
+          <DiscardSheetFallback
+            backdropClassName={styles.discardBackdrop}
+            sheetClassName={styles.discardSheet}
+            actionsClassName={styles.discardActions}
+            title={discardTitle}
+            description={discardDescription}
+            stayLabel="Keep editing"
+            discardLabel={discardLabel}
+            onStay={keepCapture}
+            onDiscard={discardCapture}
+          />
+        ) : null
+      )}
     </main>
   );
 }

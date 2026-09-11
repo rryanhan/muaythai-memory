@@ -1,25 +1,75 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { ComponentType } from "react";
 import { useRouter } from "next/navigation";
 import { RoutedBottomNav } from "@/components/navigation/RoutedBottomNav";
+import { DiscardSheetFallback } from "@/features/media/DiscardSheetFallback";
 import type { CurrentAppUser } from "@/modules/auth";
-import { ProfileDiscardSheet } from "./ProfileDiscardSheet";
+import type { ProfileDiscardSheetProps } from "./ProfileDiscardSheet";
 import { ProfileEditForm } from "./ProfileEditForm";
 import routeStyles from "./ProfileRouteShell.module.css";
 import editStyles from "./ProfileEdit.module.css";
+
+let profileDiscardSheetPromise: Promise<ComponentType<ProfileDiscardSheetProps>> | undefined;
+
+function loadProfileDiscardSheet(): Promise<ComponentType<ProfileDiscardSheetProps>> {
+  profileDiscardSheetPromise ??= import("./ProfileDiscardSheet")
+    .then((module) => module.ProfileDiscardSheet)
+    .catch((error: unknown) => {
+      console.error("Could not load the enhanced profile discard confirmation.", error);
+      return ProfileDiscardSheetUnavailable;
+    });
+  return profileDiscardSheetPromise;
+}
+
+function ProfileDiscardSheetUnavailable({
+  open,
+  onStay,
+  onDiscard,
+}: ProfileDiscardSheetProps) {
+  if (!open) return null;
+
+  return (
+    <DiscardSheetFallback
+      backdropClassName={editStyles.discardBackdrop}
+      sheetClassName={editStyles.discardSheet}
+      actionsClassName={editStyles.discardActions}
+      title="Discard profile changes?"
+      description="Your unsaved name and photo changes will be lost."
+      statusMessage="Enhanced confirmation could not load. Standard confirmation remains available."
+      stayLabel="Keep editing"
+      discardLabel="Discard changes"
+      onStay={onStay}
+      onDiscard={onDiscard}
+    />
+  );
+}
 
 type PendingNavigation = { kind: "route"; destination: string } | { kind: "history" } | null;
 
 export function ProfileEditScreen({ currentUser }: { currentUser: CurrentAppUser }) {
   const router = useRouter();
   const [dirty, setDirty] = useState(false);
+  const [discardMounted, setDiscardMounted] = useState(false);
   const [discardOpen, setDiscardOpen] = useState(false);
+  const [DiscardSheetForOpen, setDiscardSheetForOpen] = useState<ComponentType<ProfileDiscardSheetProps> | null>(null);
   const [pendingNavigation, setPendingNavigation] = useState<PendingNavigation>(null);
   const dirtyRef = useRef(false);
   const guardKeyRef = useRef<string | null>(null);
   const atGuardEntryRef = useRef(false);
   const ignoreNextPopRef = useRef(false);
+  const enhancedDiscardSheetRef = useRef<ComponentType<ProfileDiscardSheetProps> | null>(null);
+
+  const openDiscardConfirmation = useCallback(() => {
+    const discardSheetForOpen = enhancedDiscardSheetRef.current;
+    setDiscardSheetForOpen(() => discardSheetForOpen);
+    setDiscardMounted(true);
+    setDiscardOpen(true);
+    void loadProfileDiscardSheet().then((DiscardSheet) => {
+      enhancedDiscardSheetRef.current = DiscardSheet;
+    });
+  }, []);
 
   useEffect(() => {
     dirtyRef.current = dirty;
@@ -65,7 +115,7 @@ export function ProfileEditScreen({ currentUser }: { currentUser: CurrentAppUser
 
       atGuardEntryRef.current = false;
       setPendingNavigation({ kind: "history" });
-      setDiscardOpen(true);
+      openDiscardConfirmation();
     }
 
     window.addEventListener("beforeunload", handleBeforeUnload);
@@ -74,7 +124,7 @@ export function ProfileEditScreen({ currentUser }: { currentUser: CurrentAppUser
       window.removeEventListener("beforeunload", handleBeforeUnload);
       window.removeEventListener("popstate", handlePopState);
     };
-  }, []);
+  }, [openDiscardConfirmation]);
 
   const navigateWithoutPrompt = useCallback((destination: string) => {
     dirtyRef.current = false;
@@ -102,8 +152,8 @@ export function ProfileEditScreen({ currentUser }: { currentUser: CurrentAppUser
       return;
     }
     setPendingNavigation({ kind: "route", destination });
-    setDiscardOpen(true);
-  }, [navigateWithoutPrompt]);
+    openDiscardConfirmation();
+  }, [navigateWithoutPrompt, openDiscardConfirmation]);
 
   function stay() {
     if (pendingNavigation?.kind === "history" && !atGuardEntryRef.current) {
@@ -147,7 +197,23 @@ export function ProfileEditScreen({ currentUser }: { currentUser: CurrentAppUser
         onSaved={() => navigateWithoutPrompt("/?view=profile")}
       />
       <RoutedBottomNav activeView="profile" onNavigate={(destination) => requestNavigation(destination)} />
-      <ProfileDiscardSheet open={discardOpen} onStay={stay} onDiscard={discard} />
+      {discardMounted && (
+        DiscardSheetForOpen ? (
+          <DiscardSheetForOpen open={discardOpen} onStay={stay} onDiscard={discard} />
+        ) : discardOpen ? (
+          <DiscardSheetFallback
+            backdropClassName={editStyles.discardBackdrop}
+            sheetClassName={editStyles.discardSheet}
+            actionsClassName={editStyles.discardActions}
+            title="Discard profile changes?"
+            description="Your unsaved name and photo changes will be lost."
+            stayLabel="Keep editing"
+            discardLabel="Discard changes"
+            onStay={stay}
+            onDiscard={discard}
+          />
+        ) : null
+      )}
     </main>
   );
 }
