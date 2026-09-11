@@ -1,5 +1,5 @@
 import { profileResponseSchema, type ProfileDto } from "@/modules/profile/contracts";
-import { ApiError, fetchJson } from "./api-core";
+import { ApiError, fetchJson, isApiErrorBody } from "./api-core";
 import type { ApiClientOptions } from "./types";
 
 export type UpdateProfileInput = {
@@ -30,13 +30,9 @@ export async function updateProfile(
     });
     return response.profile;
   } catch (error) {
-    if (error instanceof ApiError && hasErrorMessage(error.responseBody)) {
+    if (error instanceof ApiError && isApiErrorBody(error.responseBody)) {
       throw new Error(error.responseBody.error);
     }
     throw error;
   }
-}
-
-function hasErrorMessage(value: unknown): value is { error: string } {
-  return typeof value === "object" && value !== null && "error" in value && typeof value.error === "string";
 }

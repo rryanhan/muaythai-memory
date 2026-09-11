@@ -6,7 +6,7 @@ import {
   type OnboardingFirstDrillInput,
   type OnboardingProfileInput,
 } from "@/modules/onboarding/contracts";
-import { ApiError, fetchJson } from "./api-core";
+import { ApiError, fetchJson, isApiErrorBody } from "./api-core";
 import type { ApiClientOptions } from "./types";
 
 const onboardingCreationKeyStorage = "muaythai:first-drill-creation-key";
@@ -52,14 +52,10 @@ export async function skipOnboardingFirstDrill(options: ApiClientOptions = {}) {
 }
 
 function rethrowProductError(error: unknown): never {
-  if (error instanceof ApiError && isErrorBody(error.responseBody)) {
+  if (error instanceof ApiError && isApiErrorBody(error.responseBody)) {
     throw new Error(error.responseBody.error);
   }
   throw error;
-}
-
-function isErrorBody(value: unknown): value is { error: string } {
-  return typeof value === "object" && value !== null && "error" in value && typeof value.error === "string";
 }
 
 function getOrCreateOnboardingCreationKey(): string {

@@ -24,7 +24,7 @@ import {
   type ReportFighterResponse,
   type RespondToFollowRequestInput,
 } from "@/modules/connections/contracts";
-import { ApiError, fetchJson } from "./api-core";
+import { ApiError, fetchJson, isApiErrorBody } from "./api-core";
 import type { ApiClientOptions } from "./types";
 
 export type {
@@ -206,7 +206,7 @@ async function withReadableError<T>(request: () => Promise<T>): Promise<T> {
   try {
     return await request();
   } catch (error) {
-    if (error instanceof ApiError && hasErrorMessage(error.responseBody)) {
+    if (error instanceof ApiError && isApiErrorBody(error.responseBody)) {
       throw new ConnectionsApiError(error.responseBody.error, error.status);
     }
     throw error;
@@ -221,11 +221,4 @@ export class ConnectionsApiError extends Error {
     this.name = "ConnectionsApiError";
     this.status = status;
   }
-}
-
-function hasErrorMessage(value: unknown): value is { error: string } {
-  return typeof value === "object"
-    && value !== null
-    && "error" in value
-    && typeof value.error === "string";
 }

@@ -19,6 +19,13 @@ export class ApiError extends Error {
   }
 }
 
+export function isApiErrorBody(value: unknown): value is { error: string } {
+  return typeof value === "object"
+    && value !== null
+    && "error" in value
+    && typeof value.error === "string";
+}
+
 export class ApiResponseValidationError extends Error {
   readonly url: string;
   readonly issues: ZodError["issues"];
