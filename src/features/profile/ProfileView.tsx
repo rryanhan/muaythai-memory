@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { PencilSimple } from "@phosphor-icons/react/PencilSimple";
 import { Play } from "@phosphor-icons/react/Play";
 import { Plus } from "@phosphor-icons/react/Plus";
@@ -224,18 +223,12 @@ function JournalEntryRow({
   eager: boolean;
   priority: boolean;
 }) {
-  const router = useRouter();
   const href = `/journal/${entry.id}`;
-  const prefetch = () => router.prefetch(href);
 
   return (
     <Link
       className={styles.journalRow}
       href={href}
-      prefetch
-      onFocus={prefetch}
-      onPointerEnter={prefetch}
-      onTouchStart={prefetch}
     >
       <span className={styles.videoTile} aria-hidden="true">
         <span className={styles.videoFallback}>

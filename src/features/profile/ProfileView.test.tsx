@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
+import type { ComponentProps } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { CurrentAppUser } from "@/modules/auth";
 import { ProfileView } from "./ProfileView";
@@ -8,7 +9,7 @@ const mocks = vi.hoisted(() => ({
   getDrills: vi.fn(),
   getConnectionsSummary: vi.fn(),
   getJournalEntries: vi.fn(),
-  prefetch: vi.fn(),
+  linkProps: vi.fn(),
 }));
 
 vi.mock("@/data/drills", () => ({
@@ -20,8 +21,11 @@ vi.mock("@/data/journal", () => ({
 vi.mock("@/data/connections", () => ({
   getConnectionsSummary: mocks.getConnectionsSummary,
 }));
-vi.mock("next/navigation", () => ({
-  useRouter: () => ({ prefetch: mocks.prefetch }),
+vi.mock("next/link", () => ({
+  default: ({ children, prefetch, ...props }: ComponentProps<"a"> & { prefetch?: boolean }) => {
+    mocks.linkProps(prefetch === undefined ? props : { ...props, prefetch });
+    return <a {...props}>{children}</a>;
+  },
 }));
 vi.mock("@/features/auth/SignOutButton", () => ({
   SignOutButton: () => <button type="button">Sign Out</button>,
@@ -63,6 +67,34 @@ describe("ProfileView", () => {
       "href",
       "/connections?tab=following",
     );
+  });
+
+  it("links journal rows without forcing or manually triggering full-route prefetches", async () => {
+    mocks.getJournalEntries.mockResolvedValue({
+      entries: [{
+        id: "00000000-0000-4000-8000-000000000201",
+        occurredOn: "2026-09-10",
+        caption: "Checked the rear-kick return",
+        drill: null,
+        durationMs: 12_000,
+        mimeType: "video/mp4",
+        posterUrl: null,
+        createdAt: new Date("2026-09-10T12:00:00Z"),
+      }],
+      nextCursor: null,
+    });
+    renderProfile();
+
+    const link = await screen.findByRole("link", { name: /checked the rear-kick return/i });
+    expect(link).toHaveAttribute("href", "/journal/00000000-0000-4000-8000-000000000201");
+    const props = mocks.linkProps.mock.calls
+      .map(([value]) => value)
+      .find((value) => value.href === "/journal/00000000-0000-4000-8000-000000000201");
+    expect(props).toBeDefined();
+    expect(props).not.toHaveProperty("prefetch");
+    expect(props).not.toHaveProperty("onFocus");
+    expect(props).not.toHaveProperty("onPointerEnter");
+    expect(props).not.toHaveProperty("onTouchStart");
   });
 });
 

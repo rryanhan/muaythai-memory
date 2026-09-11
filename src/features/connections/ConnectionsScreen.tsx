@@ -439,7 +439,7 @@ function ConnectionRow({
   return (
     <div className={styles.connectionRow}>
       {linked ? (
-        <Link className={styles.connectionIdentityLink} href={`/fighters/${encodeURIComponent(profile.username)}`} prefetch>
+        <Link className={styles.connectionIdentityLink} href={`/fighters/${encodeURIComponent(profile.username)}`}>
           <ConnectionIdentity profile={profile} />
         </Link>
       ) : <ConnectionIdentity profile={profile} />}

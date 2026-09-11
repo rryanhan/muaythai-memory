@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import type { ComponentProps } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type {
   ConnectionSection,
@@ -18,6 +19,7 @@ const mocks = vi.hoisted(() => ({
   searchFighter: vi.fn(),
   unblockFighter: vi.fn(),
   replace: vi.fn(),
+  linkProps: vi.fn(),
 }));
 
 vi.mock("@/data/connections", async (importOriginal) => ({
@@ -26,6 +28,12 @@ vi.mock("@/data/connections", async (importOriginal) => ({
 }));
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ replace: mocks.replace }),
+}));
+vi.mock("next/link", () => ({
+  default: ({ children, prefetch, ...props }: ComponentProps<"a"> & { prefetch?: boolean }) => {
+    mocks.linkProps(prefetch === undefined ? props : { ...props, prefetch });
+    return <a {...props}>{children}</a>;
+  },
 }));
 vi.mock("@/components/navigation/RoutedBottomNav", () => ({
   RoutedBottomNav: () => <nav aria-label="Bottom navigation" />,
@@ -141,6 +149,22 @@ describe("ConnectionsScreen", () => {
     await user.click(screen.getByRole("button", { name: "Load more followers" }));
     expect(await screen.findByText("@beta_fighter")).toBeInTheDocument();
     expect(screen.getByText("@alpha_fighter")).toBeInTheDocument();
+  });
+
+  it("links connection rows without forcing full-route prefetches", async () => {
+    sectionItems.followers = [requestItem("alpha_fighter")];
+    renderScreen("followers");
+
+    const href = "/fighters/alpha_fighter";
+    expect(await screen.findByRole("link", { name: /@alpha_fighter/ })).toHaveAttribute("href", href);
+    const props = mocks.linkProps.mock.calls
+      .map(([value]) => value)
+      .find((value) => value.href === href);
+    expect(props).toBeDefined();
+    expect(props).not.toHaveProperty("prefetch");
+    expect(props).not.toHaveProperty("onFocus");
+    expect(props).not.toHaveProperty("onPointerEnter");
+    expect(props).not.toHaveProperty("onTouchStart");
   });
 });
 

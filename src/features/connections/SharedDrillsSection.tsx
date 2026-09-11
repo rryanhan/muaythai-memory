@@ -56,7 +56,6 @@ export function SharedDrillsSection({
           <Link
             key={`${item.owner.id}:${item.drill.id}`}
             href={`/shared/drills/${item.drill.id}`}
-            prefetch
           >
             {!ownerUsername && (
               <ProfileAvatar

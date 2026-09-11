@@ -80,7 +80,7 @@ export function FighterConnectionsScreen({
           <div className={styles.rows}>
             {items.map(({ profile }) => (
               <div className={styles.connectionRow} key={profile.id}>
-                <Link className={styles.connectionIdentityLink} href={`/fighters/${encodeURIComponent(profile.username)}`} prefetch>
+                <Link className={styles.connectionIdentityLink} href={`/fighters/${encodeURIComponent(profile.username)}`}>
                   <span className={styles.connectionIdentity}>
                     <ProfileAvatar
                       profile={{ displayName: profile.username, avatarUrl: profile.avatarUrl }}
