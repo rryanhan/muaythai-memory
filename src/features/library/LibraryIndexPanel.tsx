@@ -45,12 +45,6 @@ export function LibraryIndexPanel({
   }
 
   useEffect(() => {
-    router.prefetch("/drills/new");
-    router.prefetch("/capture/new?mode=voice&from=library");
-    router.prefetch("/onboarding/first-drill?replay=1&next=%2F%3Fview%3Dlibrary");
-  }, [router]);
-
-  useEffect(() => {
     const panel = panelRef.current;
     if (!panel) return;
 
@@ -88,7 +82,7 @@ export function LibraryIndexPanel({
             <Link
               className="library-add-drill-link"
               href="/capture/new?mode=voice&from=library"
-              prefetch
+              prefetch={false}
               onFocus={prefetchCaptureDraft}
               onPointerEnter={prefetchCaptureDraft}
               onTouchStart={prefetchCaptureDraft}
@@ -101,7 +95,7 @@ export function LibraryIndexPanel({
             <Link
               className="library-add-drill-link"
               href="/drills/new"
-              prefetch
+              prefetch={false}
               onFocus={prefetchAddDrill}
               onPointerEnter={prefetchAddDrill}
               onTouchStart={prefetchAddDrill}
@@ -114,7 +108,7 @@ export function LibraryIndexPanel({
             <Link
               className="library-add-drill-link"
               href="/onboarding/first-drill?replay=1&next=%2F%3Fview%3Dlibrary"
-              prefetch
+              prefetch={false}
               onFocus={prefetchFirstDrillGuide}
               onPointerEnter={prefetchFirstDrillGuide}
               onTouchStart={prefetchFirstDrillGuide}
