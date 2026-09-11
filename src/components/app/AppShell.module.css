@@ -10,3 +10,10 @@
   min-height: 100dvh;
   padding-bottom: var(--nav-height);
 }
+
+.viewLoading {
+  margin: 0;
+  padding: 3rem 1.25rem;
+  color: var(--muted);
+  text-align: center;
+}

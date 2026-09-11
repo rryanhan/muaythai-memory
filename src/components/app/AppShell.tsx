@@ -1,14 +1,22 @@
 "use client";
 
 import { useState } from "react";
+import dynamic from "next/dynamic";
 import { useSearchParams } from "next/navigation";
 import { BottomNav, type AppView } from "@/components/navigation/BottomNav";
-import { LibraryView } from "@/features/library/LibraryView";
 import { NetworkView } from "@/features/network/NetworkView";
-import { ProfileView } from "@/features/profile/ProfileView";
 import type { GraphResponse } from "@/data";
 import type { CurrentAppUser } from "@/modules/auth";
 import styles from "./AppShell.module.css";
+
+const LibraryView = dynamic(
+  () => import("@/features/library/LibraryView").then((module) => module.LibraryView),
+  { loading: () => <ViewLoading label="Training Log" /> },
+);
+const ProfileView = dynamic(
+  () => import("@/features/profile/ProfileView").then((module) => module.ProfileView),
+  { loading: () => <ViewLoading label="Profile" /> },
+);
 
 const viewLabels: Record<AppView, string> = {
   network: "Network",
@@ -70,4 +78,12 @@ function writeViewToUrl(view: AppView) {
 function parseView(value: string | null): AppView {
   if (value === "library" || value === "profile") return value;
   return "network";
+}
+
+function ViewLoading({ label }: { label: string }) {
+  return (
+    <p className={styles.viewLoading} role="status">
+      Loading {label}…
+    </p>
+  );
 }

@@ -59,7 +59,7 @@ describe("AppShell view lifecycle", () => {
     vi.restoreAllMocks();
   });
 
-  it("keeps every visited view mounted across bottom-nav and URL-driven navigation", () => {
+  it("keeps every visited view mounted across bottom-nav and URL-driven navigation", async () => {
     render(<AppShell currentUser={currentUser} initialView="network" />);
 
     fireEvent.click(screen.getByRole("button", { name: "Network state 0" }));
@@ -67,13 +67,14 @@ describe("AppShell view lifecycle", () => {
 
     expect(window.location.search).toBe("?view=library");
     expect(screen.getByLabelText("Training Log view")).toBeVisible();
+    expect(await screen.findByText("Training Log content")).toBeVisible();
     expect(screen.getByRole("button", { name: "Network state 1", hidden: true }))
       .toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Network state 1", hidden: true }).closest(".app-view-pane"))
       .toHaveAttribute("hidden");
 
     act(() => window.history.replaceState({}, "", "/?view=profile"));
-    expect(screen.getByText("Profile content")).toBeVisible();
+    expect(await screen.findByText("Profile content")).toBeVisible();
 
     act(() => window.history.replaceState({}, "", "/?view=library"));
     expect(screen.getByText("Profile content").closest(".app-view-pane"))
