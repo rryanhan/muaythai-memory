@@ -23,7 +23,7 @@ import {
   updateDrill,
 } from "@/modules/drills/mutations";
 import type { UpdateSavedListInput } from "@/modules/drills/contracts";
-import { getDrillById, listDrills } from "@/modules/drills/queries";
+import { getDrillById, getOwnedDrillHeader, listDrills } from "@/modules/drills/queries";
 import { getMuayThaiGraph } from "@/modules/graph/queries";
 import { getTaxonomy } from "@/modules/taxonomy/queries";
 import { safeInternalPath } from "@/lib/safe-internal-path";
@@ -100,9 +100,11 @@ async function main() {
       { drillId: drillB.id, tagId: customTagB.id },
     ]);
 
-    const [listA, listB, detailLeak, taxonomyA, taxonomyB, graphA] = await Promise.all([
+    const [listA, listB, headerA, headerLeak, detailLeak, taxonomyA, taxonomyB, graphA] = await Promise.all([
       listDrills(userA.id),
       listDrills(userB.id),
+      getOwnedDrillHeader(userA.id, drillA.id),
+      getOwnedDrillHeader(userA.id, drillB.id),
       getDrillById(userA.id, drillB.id),
       getTaxonomy(userA.id),
       getTaxonomy(userB.id),
@@ -115,6 +117,11 @@ async function main() {
       "A malformed relationship leaked User B's custom tag into User A's drill.",
     );
     expect(listB.total === 1 && listB.drills[0]?.id === drillB.id, "User B list leaked or omitted drills.");
+    expect(
+      headerA?.id === drillA.id && headerA.title === drillA.title,
+      "Owned drill header should return only the requested drill identity.",
+    );
+    expect(headerLeak === null, "Cross-user drill header must return null.");
     expect(detailLeak === null, "Cross-user drill detail must return null.");
     expect(taxonomyA.customTags.some((tag) => tag.id === customTagA.id), "User A custom tag missing.");
     expect(!taxonomyA.customTags.some((tag) => tag.id === customTagB.id), "User B custom tag leaked to A.");

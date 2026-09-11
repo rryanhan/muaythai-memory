@@ -63,6 +63,18 @@ export async function getDrillById(userId: string, id: string): Promise<DrillDet
   };
 }
 
+export async function getOwnedDrillHeader(
+  userId: string,
+  id: string,
+): Promise<Pick<DrillDetail, "id" | "title"> | null> {
+  const [row] = await db
+    .select({ id: drills.id, title: drills.title })
+    .from(drills)
+    .where(and(eq(drills.id, id), eq(drills.userId, userId)))
+    .limit(1);
+  return row ?? null;
+}
+
 export async function getDrillSummariesByIds(
   userId: string,
   drillIds: string[],

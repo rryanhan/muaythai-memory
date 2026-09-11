@@ -6,7 +6,7 @@ import journalStyles from "@/features/journal/Journal.module.css";
 import mediaStyles from "@/features/journal/JournalMedia.module.css";
 import routeStyles from "@/features/drills/DrillRouteShell.module.css";
 import { requireCurrentPageUserId } from "@/modules/auth";
-import { getDrillById } from "@/modules/drills/queries";
+import { getOwnedDrillHeader } from "@/modules/drills/queries";
 import { listJournalEntries } from "@/modules/journal/queries";
 
 export const dynamic = "force-dynamic";
@@ -24,7 +24,7 @@ export default async function DrillJournalPage({
   const parsed = paramsSchema.safeParse(await params);
   if (!parsed.success) notFound();
   const userId = await requireCurrentPageUserId(`/drills/${parsed.data.id}/journal`);
-  const drill = await getDrillById(userId, parsed.data.id);
+  const drill = await getOwnedDrillHeader(userId, parsed.data.id);
   if (!drill) notFound();
   const { cursor } = await searchParams;
   const result = await listJournalEntries(userId, { drillId: drill.id, cursor, limit: 25 });
