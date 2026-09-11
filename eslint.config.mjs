@@ -17,11 +17,6 @@ export default defineConfig([
               message: "Import runtime API clients from their focused @/data/<domain> entrypoint.",
             },
             {
-              name: "@/data/api",
-              allowTypeImports: true,
-              message: "Import runtime API clients from their focused @/data/<domain> entrypoint.",
-            },
-            {
               name: "@phosphor-icons/react",
               message: "Import icons from their focused @phosphor-icons/react/<Icon> entrypoint.",
             },

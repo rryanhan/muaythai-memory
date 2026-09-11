@@ -43,20 +43,6 @@
   margin-bottom: 12px;
 }
 
-.skeleton :global(.add-drill-skeleton-heading) {
-  width: min(230px, 58vw);
-  height: 40px;
-  border-radius: 8px;
-}
-
-.skeleton :global(.add-drill-skeleton-subheading) {
-  display: block;
-  width: min(320px, 76vw);
-  height: 18px;
-  margin-top: 10px;
-  border-radius: 7px;
-}
-
 .skeleton :global(.add-drill-skeleton-fields),
 .skeleton :global(.add-drill-skeleton-steps) {
   display: grid;

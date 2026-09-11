@@ -1,16 +1,10 @@
 import { config } from "dotenv";
 import { createClient } from "@supabase/supabase-js";
 import { getEnvironmentFilePath } from "@/config/environment-file";
-import {
-  ApiError,
-  buildDrillsApiPath,
-  buildGraphApiPath,
-  getDrill,
-  getDrills,
-  getGraph,
-  getTaxonomy,
-  updateDrillSavedList,
-} from "./api";
+import { ApiError } from "./api-core";
+import { buildDrillsApiPath, getDrill, getDrills, updateDrillSavedList } from "./drills";
+import { buildGraphApiPath, getGraph } from "./graph";
+import { getTaxonomy } from "./taxonomy";
 import type { ApiClientOptions } from "./types";
 
 config({ path: getEnvironmentFilePath() });

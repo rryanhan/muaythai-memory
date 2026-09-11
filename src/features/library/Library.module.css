@@ -275,8 +275,7 @@
   box-shadow: 18px 0 44px rgba(23, 23, 23, 0.12);
 }
 
-.view :global(.library-index-panel) header,
-.filterSheet :global(.library-tag-panel-header) {
+.view :global(.library-index-panel) header {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -284,9 +283,7 @@
   margin-bottom: 14px;
 }
 
-.view :global(.library-index-panel) header p,
-.filterSheet :global(.library-tag-panel-header) p,
-.filterSheet :global(.library-tag-panel-header) span {
+.view :global(.library-index-panel) header p {
   margin: 0;
 }
 
