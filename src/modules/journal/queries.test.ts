@@ -18,11 +18,60 @@ vi.mock("@/lib/supabase/admin", () => ({
   createSupabaseAdminClient: mocks.createSupabaseAdminClient,
 }));
 
-import { getJournalPreviewForDrill } from "./queries";
+import {
+  decodeJournalCursor,
+  encodeJournalCursor,
+  getJournalPreviewForDrill,
+  JournalCursorError,
+} from "./queries";
 
 const userId = "11111111-1111-4111-8111-111111111111";
 const drillId = "22222222-2222-4222-8222-222222222222";
 const entryId = "33333333-3333-4333-8333-333333333333";
+
+describe("journal cursors", () => {
+  it("round-trips the canonical encoded cursor", () => {
+    const cursor = {
+      occurredOn: "2026-08-10",
+      createdAt: new Date("2026-08-10T12:00:00.000Z"),
+      id: entryId,
+    };
+
+    expect(decodeJournalCursor(encodeJournalCursor(cursor))).toEqual(cursor);
+  });
+
+  it.each([
+    ["an impossible calendar date", {
+      occurredOn: "2026-99-99",
+      createdAt: "2026-08-10T12:00:00.000Z",
+      id: entryId,
+    }],
+    ["a non-UUID identifier", {
+      occurredOn: "2026-08-10",
+      createdAt: "2026-08-10T12:00:00.000Z",
+      id: "------------------------------------",
+    }],
+    ["a non-ISO timestamp", {
+      occurredOn: "2026-08-10",
+      createdAt: "Thu, 10 Sep 2026 00:00:00 GMT",
+      id: entryId,
+    }],
+    ["a year-zero date", {
+      occurredOn: "0000-01-01",
+      createdAt: "2026-08-10T12:00:00.000Z",
+      id: entryId,
+    }],
+    ["a year-zero timestamp", {
+      occurredOn: "2026-08-10",
+      createdAt: "0000-01-01T00:00:00.000Z",
+      id: entryId,
+    }],
+  ])("rejects %s before it reaches PostgreSQL", (_label, payload) => {
+    const encoded = Buffer.from(JSON.stringify(payload)).toString("base64url");
+
+    expect(() => decodeJournalCursor(encoded)).toThrow(JournalCursorError);
+  });
+});
 
 describe("getJournalPreviewForDrill", () => {
   beforeEach(() => {

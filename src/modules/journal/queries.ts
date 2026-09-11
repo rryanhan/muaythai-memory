@@ -1,4 +1,5 @@
 import { and, desc, eq, lt, or, sql } from "drizzle-orm";
+import { z } from "zod";
 import { db } from "@/db/client";
 import { drills, journalEntries, journalMedia } from "@/db/schema";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
@@ -15,6 +16,19 @@ type JournalCursor = {
   createdAt: Date;
   id: string;
 };
+
+const postgresIsoDateSchema = z.iso.date().refine(hasPositiveIsoYear);
+const postgresIsoDateTimeSchema = z.iso.datetime().refine(hasPositiveIsoYear);
+
+const journalCursorPayloadSchema = z.object({
+  occurredOn: postgresIsoDateSchema,
+  createdAt: postgresIsoDateTimeSchema,
+  id: z.string().uuid(),
+});
+
+function hasPositiveIsoYear(value: string): boolean {
+  return !value.startsWith("0000-");
+}
 
 type JournalPreviewQueryRow = {
   total: number;
@@ -319,18 +333,14 @@ export function encodeJournalCursor(cursor: JournalCursor): string {
 
 export function decodeJournalCursor(value: string): JournalCursor {
   try {
-    const parsed = JSON.parse(Buffer.from(value, "base64url").toString("utf8")) as Record<string, unknown>;
-    const createdAt = new Date(String(parsed.createdAt));
-    if (
-      typeof parsed.occurredOn !== "string" ||
-      !/^\d{4}-\d{2}-\d{2}$/.test(parsed.occurredOn) ||
-      Number.isNaN(createdAt.valueOf()) ||
-      typeof parsed.id !== "string" ||
-      !/^[0-9a-f-]{36}$/i.test(parsed.id)
-    ) {
-      throw new Error("Malformed cursor.");
-    }
-    return { occurredOn: parsed.occurredOn, createdAt, id: parsed.id };
+    const parsed = journalCursorPayloadSchema.parse(
+      JSON.parse(Buffer.from(value, "base64url").toString("utf8")),
+    );
+    return {
+      occurredOn: parsed.occurredOn,
+      createdAt: new Date(parsed.createdAt),
+      id: parsed.id,
+    };
   } catch {
     throw new JournalCursorError();
   }
