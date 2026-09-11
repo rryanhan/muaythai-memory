@@ -4,6 +4,7 @@ import { useState } from "react";
 import { CalendarBlank } from "@phosphor-icons/react/CalendarBlank";
 import dynamic from "next/dynamic";
 import { Drawer } from "vaul";
+import "@daypicker/react/style.css";
 import journalStyles from "./Journal.module.css";
 import styles from "./JournalPickers.module.css";
 

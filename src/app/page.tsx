@@ -1,5 +1,7 @@
+import { preload } from "react-dom";
 import { AppShell } from "@/components/app/AppShell";
 import type { AppView } from "@/components/navigation/BottomNav";
+import { contextBadgeUrls } from "@/components/shared/context-badges";
 import { getInitialNetworkData } from "@/modules/graph";
 import { requireCurrentPageUser } from "@/modules/auth";
 
@@ -12,6 +14,7 @@ type HomePageProps = {
 export default async function HomePage({ searchParams }: HomePageProps) {
   const initialView = getInitialView(searchParams ? await searchParams : undefined);
   const user = await requireCurrentPageUser(initialView === "network" ? "/" : `/?view=${initialView}`);
+  preloadContextBadges();
   const initialNetworkData = initialView === "network"
     ? await getSafeInitialNetworkData(user.id)
     : undefined;
@@ -24,6 +27,12 @@ export default async function HomePage({ searchParams }: HomePageProps) {
       initialView={initialView}
     />
   );
+}
+
+function preloadContextBadges() {
+  for (const href of contextBadgeUrls) {
+    preload(href, { as: "image", type: "image/svg+xml" });
+  }
 }
 
 async function getSafeInitialNetworkData(

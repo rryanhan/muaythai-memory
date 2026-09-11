@@ -5,6 +5,7 @@ import { Microphone } from "@phosphor-icons/react/Microphone";
 import { PencilSimple } from "@phosphor-icons/react/PencilSimple";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
+import "@fontsource/dseg7/classic-400.css";
 import type { ApiError } from "@/data/api-core";
 import { CAPTURE_LIMITS } from "@/config/domain-limits";
 import { createCaptureDraft } from "@/data/capture";

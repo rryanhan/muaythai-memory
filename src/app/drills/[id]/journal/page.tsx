@@ -41,7 +41,7 @@ export default async function DrillJournalPage({
         <p>{result.entries.length === 0 ? "No linked journal entries yet." : "Journal entries linked to this drill."}</p>
         <div className={mediaStyles.relatedJournalRows}>
           {result.entries.map((entry) => (
-            <Link key={entry.id} href={`/journal/${entry.id}?fromDrill=${drill.id}`} prefetch>
+            <Link key={entry.id} href={`/journal/${entry.id}?fromDrill=${drill.id}`}>
               <span aria-hidden="true">▶</span>
               <div>
                 <time dateTime={entry.occurredOn}>{formatJournalDate(entry.occurredOn)}</time>
