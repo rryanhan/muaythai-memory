@@ -1,12 +1,15 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { updateProfile } from "@/data/profile";
 import { prepareImageForClientDecode } from "@/features/media/prepare-image-for-decode";
 import type { CurrentAppUser } from "@/modules/auth";
-import { AvatarCropSheet } from "./AvatarCropSheet";
 import { ProfileAvatar } from "./ProfileAvatar";
 import styles from "./ProfileEdit.module.css";
+
+const AvatarCropSheet = lazy(
+  () => import("./AvatarCropSheet").then((module) => ({ default: module.AvatarCropSheet })),
+);
 
 const acceptedAvatarTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
 const maxAvatarBytes = 5 * 1024 * 1024;
@@ -145,6 +148,12 @@ export function ProfileEditForm({ initialProfile, onDirtyChange, onCancel, onSav
     if (previousUrl) URL.revokeObjectURL(previousUrl);
   }
 
+  function cancelCrop() {
+    replaceCropSourceUrl(null);
+    resetFileInput();
+    fileInputRef.current?.focus();
+  }
+
   return (
     <form className={styles.form} onSubmit={(event) => void submit(event)}>
       <section className={styles.photoSection} aria-labelledby="profile-photo-heading">
@@ -207,22 +216,62 @@ export function ProfileEditForm({ initialProfile, onDirtyChange, onCancel, onSav
       </div>
 
       {cropSourceUrl && (
-        <AvatarCropSheet
-          key={cropSourceUrl}
-          imageUrl={cropSourceUrl}
-          onCancel={() => {
-            replaceCropSourceUrl(null);
-            resetFileInput();
-          }}
-          onUsePhoto={(croppedAvatar) => {
-            setAvatar(croppedAvatar);
-            replacePreviewUrl(croppedAvatar);
-            setRemoveAvatar(false);
-            replaceCropSourceUrl(null);
-            resetFileInput();
-          }}
-        />
+        <Suspense fallback={<AvatarCropSheetLoading onCancel={cancelCrop} />}>
+          <AvatarCropSheet
+            key={cropSourceUrl}
+            imageUrl={cropSourceUrl}
+            onCancel={cancelCrop}
+            onUsePhoto={(croppedAvatar) => {
+              setAvatar(croppedAvatar);
+              replacePreviewUrl(croppedAvatar);
+              setRemoveAvatar(false);
+              replaceCropSourceUrl(null);
+              resetFileInput();
+            }}
+          />
+        </Suspense>
       )}
     </form>
+  );
+}
+
+function AvatarCropSheetLoading({ onCancel }: { onCancel: () => void }) {
+  const cancelButtonRef = useRef<HTMLButtonElement>(null);
+
+  return (
+    <>
+      <div className={styles.cropBackdrop} aria-hidden="true" />
+      <div
+        className={`${styles.cropSheet} ${styles.cropLoading}`}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="avatar-crop-loading-title"
+        aria-describedby="avatar-crop-loading-description"
+        onKeyDown={(event) => {
+          if (event.key === "Escape") {
+            event.preventDefault();
+            onCancel();
+          } else if (event.key === "Tab") {
+            event.preventDefault();
+            cancelButtonRef.current?.focus();
+          }
+        }}
+      >
+        <header className={styles.cropHeader}>
+          <div>
+            <p className="eyebrow">Profile Photo</p>
+            <h2 id="avatar-crop-loading-title">Preparing editor</h2>
+          </div>
+          <p id="avatar-crop-loading-description" role="status" aria-live="polite">
+            Loading photo editor…
+          </p>
+        </header>
+        <div className={styles.cropActions}>
+          <button ref={cancelButtonRef} type="button" autoFocus onClick={onCancel}>
+            Cancel
+          </button>
+        </div>
+      </div>
+    </>
   );
 }

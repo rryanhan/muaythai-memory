@@ -260,6 +260,16 @@
   background: var(--surface);
 }
 
+.cropLoading {
+  min-height: 180px;
+  align-content: center;
+  color: var(--muted);
+}
+
+.cropLoading .cropActions {
+  grid-template-columns: 1fr;
+}
+
 .cropHeader {
   display: grid;
   gap: 8px;
