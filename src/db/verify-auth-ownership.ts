@@ -100,16 +100,17 @@ async function main() {
       { drillId: drillB.id, tagId: customTagB.id },
     ]);
 
-    const [listA, listB, headerA, headerLeak, detailLeak, taxonomyA, taxonomyB, graphA] = await Promise.all([
-      listDrills(userA.id),
-      listDrills(userB.id),
-      getOwnedDrillHeader(userA.id, drillA.id),
-      getOwnedDrillHeader(userA.id, drillB.id),
-      getDrillById(userA.id, drillB.id),
-      getTaxonomy(userA.id),
-      getTaxonomy(userB.id),
-      getMuayThaiGraph(userA.id),
-    ]);
+    // These composite read models fan out into their own queries. Keep the
+    // verifier within the same deliberately small connection budget as the
+    // application instead of manufacturing an eight-request traffic spike.
+    const listA = await listDrills(userA.id);
+    const listB = await listDrills(userB.id);
+    const headerA = await getOwnedDrillHeader(userA.id, drillA.id);
+    const headerLeak = await getOwnedDrillHeader(userA.id, drillB.id);
+    const detailLeak = await getDrillById(userA.id, drillB.id);
+    const taxonomyA = await getTaxonomy(userA.id);
+    const taxonomyB = await getTaxonomy(userB.id);
+    const graphA = await getMuayThaiGraph(userA.id);
 
     expect(listA.total === 1 && listA.drills[0]?.id === drillA.id, "User A list leaked or omitted drills.");
     expect(
