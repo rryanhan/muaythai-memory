@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { lazy, Suspense, useEffect, useId, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check } from "@phosphor-icons/react/Check";
 import { DotsThree } from "@phosphor-icons/react/DotsThree";
@@ -23,12 +24,22 @@ import {
   type ReportReason,
 } from "@/data/connections";
 import { ProfileAvatar } from "@/features/profile/ProfileAvatar";
-import { FighterActionConfirmationSheet } from "./FighterActionConfirmationSheet";
-import { FighterMoreActionsSheet } from "./FighterMoreActionsSheet";
-import { FighterReportSheet } from "./FighterReportSheet";
 import { drillShareQueryKeyPrefix } from "./query-keys";
 import { SharedDrillsSection } from "./SharedDrillsSection";
 import styles from "./Connections.module.css";
+
+const FighterActionConfirmationSheet = lazy(
+  () => import("./FighterActionConfirmationSheet")
+    .then((module) => ({ default: module.FighterActionConfirmationSheet })),
+);
+const FighterMoreActionsSheet = lazy(
+  () => import("./FighterMoreActionsSheet")
+    .then((module) => ({ default: module.FighterMoreActionsSheet })),
+);
+const FighterReportSheet = lazy(
+  () => import("./FighterReportSheet")
+    .then((module) => ({ default: module.FighterReportSheet })),
+);
 
 type ProfileAction =
   | "follow"
@@ -45,8 +56,11 @@ export function FighterProfileScreen({
 }) {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const [confirmationMounted, setConfirmationMounted] = useState(false);
   const [confirmation, setConfirmation] = useState<"unfollow" | "block" | null>(null);
+  const [moreMounted, setMoreMounted] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
+  const [reportMounted, setReportMounted] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [reportCycle, setReportCycle] = useState(0);
   const [profileStatus, setProfileStatus] = useState<string | null>(null);
@@ -152,10 +166,14 @@ export function FighterProfileScreen({
       <ProfileActions
         fighter={fighter}
         pending={actionMutation.isPending}
-        onMore={() => setMoreOpen(true)}
+        onMore={() => {
+          setMoreMounted(true);
+          setMoreOpen(true);
+        }}
         onAction={(action) => {
           actionMutation.reset();
           if (action === "unfollow" || action === "block") {
+            setConfirmationMounted(true);
             setConfirmation(action);
           } else {
             actionMutation.mutate(action);
@@ -219,51 +237,161 @@ export function FighterProfileScreen({
 
       {fighter.mutual && <SharedDrillsSection ownerUsername={fighter.profile.username} />}
 
-      <FighterActionConfirmationSheet
-        action={confirmation ?? "unfollow"}
-        fighter={fighter.profile}
-        open={confirmation !== null}
-        pending={actionMutation.isPending}
-        error={actionMutation.isError ? readError(actionMutation.error) : null}
-        onClose={() => {
-          actionMutation.reset();
-          setConfirmation(null);
-        }}
-        onConfirm={() => confirmation && actionMutation.mutate(confirmation)}
-      />
-      <FighterMoreActionsSheet
-        fighter={fighter.profile}
-        open={moreOpen}
-        allowBlock
-        onClose={() => setMoreOpen(false)}
-        onShare={() => void shareProfile()}
-        onReport={() => {
-          setMoreOpen(false);
-          reportMutation.reset();
-          setReportCycle((cycle) => cycle + 1);
-          setReportOpen(true);
-        }}
-        onBlock={() => {
-          setMoreOpen(false);
-          setConfirmation("block");
-        }}
-      />
-      <FighterReportSheet
-        key={reportCycle}
-        fighter={fighter.profile}
-        open={reportOpen}
-        pending={reportMutation.isPending}
-        error={reportMutation.isError ? readError(reportMutation.error) : null}
-        onClose={() => {
-          reportMutation.reset();
-          setReportOpen(false);
-        }}
-        onSubmit={(reason, details) => reportMutation.mutate({ reason, details })}
-      />
+      {confirmationMounted && (
+        <Suspense
+          fallback={confirmation
+            ? (
+                <FighterSheetLoading
+                  title={confirmation === "unfollow" ? "Unfollow?" : "Block Fighter?"}
+                  message="Loading confirmation…"
+                  onCancel={() => {
+                    actionMutation.reset();
+                    setConfirmation(null);
+                  }}
+                />
+              )
+            : null}
+        >
+          <FighterActionConfirmationSheet
+            action={confirmation ?? "unfollow"}
+            fighter={fighter.profile}
+            open={confirmation !== null}
+            pending={actionMutation.isPending}
+            error={actionMutation.isError ? readError(actionMutation.error) : null}
+            onClose={() => {
+              actionMutation.reset();
+              setConfirmation(null);
+            }}
+            onConfirm={() => confirmation && actionMutation.mutate(confirmation)}
+          />
+        </Suspense>
+      )}
+      {moreMounted && (
+        <Suspense
+          fallback={moreOpen
+            ? (
+                <FighterSheetLoading
+                  title={`@${fighter.profile.username}`}
+                  message="Loading fighter actions…"
+                  onCancel={() => setMoreOpen(false)}
+                />
+              )
+            : null}
+        >
+          <FighterMoreActionsSheet
+            fighter={fighter.profile}
+            open={moreOpen}
+            allowBlock
+            onClose={() => setMoreOpen(false)}
+            onShare={() => void shareProfile()}
+            onReport={() => {
+              setMoreOpen(false);
+              reportMutation.reset();
+              setReportCycle((cycle) => cycle + 1);
+              setReportMounted(true);
+              setReportOpen(true);
+            }}
+            onBlock={() => {
+              setMoreOpen(false);
+              setConfirmationMounted(true);
+              setConfirmation("block");
+            }}
+          />
+        </Suspense>
+      )}
+      {reportMounted && (
+        <Suspense
+          fallback={reportOpen
+            ? (
+                <FighterSheetLoading
+                  title="Report Fighter"
+                  message="Loading report form…"
+                  onCancel={() => {
+                    reportMutation.reset();
+                    setReportOpen(false);
+                  }}
+                />
+              )
+            : null}
+        >
+          <FighterReportSheet
+            key={reportCycle}
+            fighter={fighter.profile}
+            open={reportOpen}
+            pending={reportMutation.isPending}
+            error={reportMutation.isError ? readError(reportMutation.error) : null}
+            onClose={() => {
+              reportMutation.reset();
+              setReportOpen(false);
+            }}
+            onSubmit={(reason, details) => reportMutation.mutate({ reason, details })}
+          />
+        </Suspense>
+      )}
       <RoutedBottomNav activeView="profile" />
     </main>
   );
 }
+
+function FighterSheetLoading({
+  title,
+  message,
+  onCancel,
+}: {
+  title: string;
+  message: string;
+  onCancel: () => void;
+}) {
+  const titleId = useId();
+  const messageId = useId();
+  const cancelButtonRef = useRef<HTMLButtonElement>(null);
+  const returnFocusRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    returnFocusRef.current = document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null;
+    cancelButtonRef.current?.focus();
+
+    return () => {
+      const returnFocus = returnFocusRef.current;
+      returnFocusRef.current = null;
+      if (returnFocus?.isConnected) returnFocus.focus();
+    };
+  }, []);
+
+  return createPortal(
+    <>
+      <div className={styles.drawerBackdrop} aria-hidden="true" />
+      <div
+        className={styles.confirmationSheet}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        aria-describedby={messageId}
+        onKeyDown={(event) => {
+          if (event.key === "Escape") {
+            event.preventDefault();
+            onCancel();
+          } else if (event.key === "Tab") {
+            event.preventDefault();
+            cancelButtonRef.current?.focus();
+          }
+        }}
+      >
+        <div className="sheet-handle" aria-hidden="true" />
+        <h2 id={titleId}>{title}</h2>
+        <p id={messageId} role="status" aria-live="polite">{message}</p>
+        <div className={styles.drawerActions}>
+          <button ref={cancelButtonRef} type="button" onClick={onCancel}>Cancel</button>
+          <button type="button" disabled>Loading…</button>
+        </div>
+      </div>
+    </>,
+    document.body,
+  );
+}
+
 function SocialCount({ count, label, href }: { count: number; label: string; href: string | null }) {
   const content = <><strong>{count}</strong><span>{label}</span></>;
   return href ? <Link href={href} prefetch>{content}</Link> : <span>{content}</span>;

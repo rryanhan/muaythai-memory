@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { FighterProfile } from "@/data/connections";
 import { FighterProfileScreen } from "./FighterProfileScreen";
+import { drillShareQueryKey } from "./query-keys";
 
 const mocks = vi.hoisted(() => ({
   getFighterProfile: vi.fn(),
@@ -85,11 +86,11 @@ describe("FighterProfileScreen", () => {
 
     expect(screen.queryByRole("button", { name: "Block Fighter" })).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "More fighter actions" }));
-    expect(screen.getByRole("button", { name: "Block Fighter" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Block Fighter" })).toBeInTheDocument();
   });
 
   it("invalidates cached drill-share recipients after a profile connection mutation", async () => {
-    const existingDrillShareKey = ["drill-shares", "cached-drill"] as const;
+    const existingDrillShareKey = drillShareQueryKey("cached-drill");
     mocks.getFighterProfile.mockResolvedValue(fighterProfile);
     mocks.respondToFollowRequest.mockResolvedValue({
       userId: fighterProfile.profile.id,

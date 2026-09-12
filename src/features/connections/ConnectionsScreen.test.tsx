@@ -9,6 +9,7 @@ import type {
   FighterConnection,
 } from "@/data/connections";
 import { ConnectionsScreen, type ConnectionsTab } from "./ConnectionsScreen";
+import { drillShareQueryKey } from "./query-keys";
 
 const mocks = vi.hoisted(() => ({
   cancelOrUnfollow: vi.fn(),
@@ -159,7 +160,7 @@ describe("ConnectionsScreen", () => {
   });
 
   it("invalidates cached drill-share recipients after a connection mutation", async () => {
-    const existingDrillShareKey = ["drill-shares", "cached-drill"] as const;
+    const existingDrillShareKey = drillShareQueryKey("cached-drill");
     sectionItems.outgoing = [requestItem("beta_fighter")];
     mocks.cancelOrUnfollow.mockResolvedValueOnce(mutationResult("beta_fighter"));
     const queryClient = renderScreen("requests");
