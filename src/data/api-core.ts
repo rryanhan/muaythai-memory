@@ -54,19 +54,29 @@ async function readResponseBody(response: Response): Promise<unknown> {
 function resolveApiUrl(path: string, baseUrl?: string): string {
   if (/^https?:\/\//.test(path)) return path;
 
-  const configuredBaseUrl = baseUrl ?? getEnvironmentBaseUrl();
+  if (baseUrl !== undefined) {
+    return new URL(path, ensureTrailingSlash(baseUrl)).toString();
+  }
+
+  // Browser requests must stay on the origin that served the page. Public
+  // environment variables are frozen at build time, so using one here would
+  // send preview/custom-domain traffic to a different host and omit its
+  // host-scoped authentication cookies.
+  if (typeof window !== "undefined") return path;
+
+  const configuredBaseUrl = getEnvironmentBaseUrl();
   if (configuredBaseUrl) {
     return new URL(path, ensureTrailingSlash(configuredBaseUrl)).toString();
   }
-
-  if (typeof window !== "undefined") return path;
 
   throw new Error("A baseUrl is required when calling API fetchers outside the browser.");
 }
 
 function getEnvironmentBaseUrl(): string | undefined {
   if (typeof process === "undefined") return undefined;
-  return process.env.API_BASE_URL ?? process.env.NEXT_PUBLIC_APP_URL;
+  return process.env.API_BASE_URL?.trim()
+    || process.env.NEXT_PUBLIC_APP_URL?.trim()
+    || undefined;
 }
 
 function ensureTrailingSlash(value: string): string {
