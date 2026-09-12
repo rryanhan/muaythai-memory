@@ -52,7 +52,7 @@ async function readResponseBody(response: Response): Promise<unknown> {
 }
 
 function resolveApiUrl(path: string, baseUrl?: string): string {
-  if (/^https?:\/\//.test(path)) return path;
+  if (/^https?:\/\//i.test(path)) return path;
 
   if (baseUrl !== undefined) {
     return new URL(path, ensureTrailingSlash(baseUrl)).toString();

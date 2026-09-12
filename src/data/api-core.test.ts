@@ -9,7 +9,8 @@ describe("API URL resolution in the browser", () => {
     vi.unstubAllEnvs();
   });
 
-  it("keeps relative requests on the page origin when a public app URL is configured", async () => {
+  it("keeps relative requests on the page origin when environment base URLs are configured", async () => {
+    vi.stubEnv("API_BASE_URL", "https://server.example");
     vi.stubEnv("NEXT_PUBLIC_APP_URL", "https://configured.example");
     const fetcher = vi.fn(async () => jsonResponse({ ok: true }));
 

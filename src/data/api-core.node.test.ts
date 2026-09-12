@@ -36,6 +36,19 @@ describe("API URL resolution outside the browser", () => {
     );
   });
 
+  it("accepts case-insensitive absolute HTTP URLs without a configured base URL", async () => {
+    vi.stubEnv("API_BASE_URL", "");
+    vi.stubEnv("NEXT_PUBLIC_APP_URL", "");
+    const fetcher = vi.fn(async () => jsonResponse({ ok: true }));
+
+    await fetchJson("HTTPS://api.example/resource", responseSchema, { fetcher });
+
+    expect(fetcher).toHaveBeenCalledWith(
+      "HTTPS://api.example/resource",
+      expect.objectContaining({ method: "GET" }),
+    );
+  });
+
   it("requires a base URL when none is configured", async () => {
     vi.stubEnv("API_BASE_URL", "");
     vi.stubEnv("NEXT_PUBLIC_APP_URL", "");
