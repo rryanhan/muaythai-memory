@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { string as zString } from "zod";
 import {
   deleteDrillResponseSchema,
   drillDetailResponseSchema,
@@ -26,7 +26,7 @@ export async function getDrills(
 }
 
 export async function getDrill(id: string, options: ApiClientOptions = {}): Promise<DrillDetail> {
-  const drillId = z.string().uuid().parse(id);
+  const drillId = zString().uuid().parse(id);
   const response = await fetchJson(
     `/api/drills/${encodeURIComponent(drillId)}`,
     drillDetailResponseSchema,
@@ -52,7 +52,7 @@ export async function updateDrill(
   input: UpdateDrillInput,
   options: ApiClientOptions = {},
 ): Promise<DrillDetail> {
-  const drillId = z.string().uuid().parse(id);
+  const drillId = zString().uuid().parse(id);
   const response = await fetchJson(
     `/api/drills/${encodeURIComponent(drillId)}`,
     drillDetailResponseSchema,
@@ -67,7 +67,7 @@ export async function updateDrill(
 }
 
 export async function deleteDrill(id: string, options: ApiClientOptions = {}): Promise<string> {
-  const drillId = z.string().uuid().parse(id);
+  const drillId = zString().uuid().parse(id);
   const response = await fetchJson(
     `/api/drills/${encodeURIComponent(drillId)}`,
     deleteDrillResponseSchema,
@@ -82,7 +82,7 @@ export async function updateDrillSavedList(
   input: UpdateSavedListInput,
   options: ApiClientOptions = {},
 ): Promise<UpdateSavedListResponse> {
-  const drillId = z.string().uuid().parse(id);
+  const drillId = zString().uuid().parse(id);
   return fetchJson(
     `/api/drills/${encodeURIComponent(drillId)}/saved-lists`,
     updateSavedListResponseSchema,

@@ -1,122 +1,128 @@
-import { z } from "zod";
+import {
+  array as zArray,
+  boolean as zBoolean,
+  coerce as zCoerce,
+  enum as zEnum,
+  number as zNumber,
+  object as zObject,
+  string as zString,
+  type infer as ZodInfer,
+  type input as ZodInput,
+} from "zod";
 import { DRILL_LIMITS } from "@/config/domain-limits";
 import { statusTagDtoSchema, tagDtoSchema, trainingMethodDtoSchema } from "@/modules/taxonomy/contracts";
 
-const slugSchema = z
-  .string()
+const slugSchema = zString()
   .trim()
   .min(1)
   .max(DRILL_LIMITS.slugCharacters)
   .regex(/^[a-z0-9-]+$/);
 
-const drillTitleSchema = z.string().trim().min(1).max(DRILL_LIMITS.titleCharacters);
-const drillSummaryTextSchema = z.string().max(DRILL_LIMITS.summaryCharacters);
-const drillNotesSchema = z.string().max(DRILL_LIMITS.notesCharacters);
-const drillStepBodySchema = z.string().trim().min(1).max(DRILL_LIMITS.stepCharacters);
+const drillTitleSchema = zString().trim().min(1).max(DRILL_LIMITS.titleCharacters);
+const drillSummaryTextSchema = zString().max(DRILL_LIMITS.summaryCharacters);
+const drillNotesSchema = zString().max(DRILL_LIMITS.notesCharacters);
+const drillStepBodySchema = zString().trim().min(1).max(DRILL_LIMITS.stepCharacters);
 
 // "all" means every selected tag/status must be present. "any" lets search
 // panels preview broader results without changing the underlying taxonomy.
-export const filterModeSchema = z.enum(["all", "any"]);
+export const filterModeSchema = zEnum(["all", "any"]);
 
-export const drillFiltersSchema = z.object({
-  keywords: z
-    .array(z.string().trim().min(1).max(DRILL_LIMITS.filterKeywordCharacters))
+export const drillFiltersSchema = zObject({
+  keywords: zArray(zString().trim().min(1).max(DRILL_LIMITS.filterKeywordCharacters))
     .max(DRILL_LIMITS.filterKeywords)
     .default([]),
-  methodSlugs: z.array(slugSchema).max(DRILL_LIMITS.trainingMethods).default([]),
-  tagSlugs: z.array(slugSchema).max(DRILL_LIMITS.tags).default([]),
-  statusTagSlugs: z.array(slugSchema).max(DRILL_LIMITS.savedLists).default([]),
+  methodSlugs: zArray(slugSchema).max(DRILL_LIMITS.trainingMethods).default([]),
+  tagSlugs: zArray(slugSchema).max(DRILL_LIMITS.tags).default([]),
+  statusTagSlugs: zArray(slugSchema).max(DRILL_LIMITS.savedLists).default([]),
   tagMode: filterModeSchema.default("all"),
   statusMode: filterModeSchema.default("all"),
 });
 
-export const drillSummarySchema = z.object({
-  id: z.string().uuid(),
+export const drillSummarySchema = zObject({
+  id: zString().uuid(),
   title: drillTitleSchema,
   summary: drillSummaryTextSchema,
-  trainingMethods: z.array(trainingMethodDtoSchema),
-  tags: z.array(tagDtoSchema),
-  customTags: z.array(tagDtoSchema),
-  statusTags: z.array(statusTagDtoSchema),
-  createdAt: z.coerce.date(),
-  updatedAt: z.coerce.date(),
+  trainingMethods: zArray(trainingMethodDtoSchema),
+  tags: zArray(tagDtoSchema),
+  customTags: zArray(tagDtoSchema),
+  statusTags: zArray(statusTagDtoSchema),
+  createdAt: zCoerce.date(),
+  updatedAt: zCoerce.date(),
 });
 
 export const drillDetailSchema = drillSummarySchema.extend({
   notes: drillNotesSchema.nullable(),
-  steps: z.array(
-    z.object({
-      id: z.string().uuid(),
-      position: z.number().int(),
+  steps: zArray(
+    zObject({
+      id: zString().uuid(),
+      position: zNumber().int(),
       body: drillStepBodySchema,
     }),
   ),
 });
 
-export const drillListResponseSchema = z.object({
-  drills: z.array(drillSummarySchema),
-  total: z.number().int().nonnegative(),
+export const drillListResponseSchema = zObject({
+  drills: zArray(drillSummarySchema),
+  total: zNumber().int().nonnegative(),
   filters: drillFiltersSchema,
 });
 
-export const drillDetailResponseSchema = z.object({
+export const drillDetailResponseSchema = zObject({
   drill: drillDetailSchema,
 });
 
-export const deleteDrillResponseSchema = z.object({
-  deletedId: z.string().uuid(),
+export const deleteDrillResponseSchema = zObject({
+  deletedId: zString().uuid(),
 });
 
-export const savedListSlugSchema = z.enum(["starred", "drill-back-in"]);
+export const savedListSlugSchema = zEnum(["starred", "drill-back-in"]);
 
-export const updateSavedListInputSchema = z.object({
+export const updateSavedListInputSchema = zObject({
   slug: savedListSlugSchema,
-  selected: z.boolean(),
+  selected: zBoolean(),
 });
 
-export const updateSavedListResponseSchema = z.object({
-  drillId: z.string().uuid(),
+export const updateSavedListResponseSchema = zObject({
+  drillId: zString().uuid(),
   status: statusTagDtoSchema,
-  selected: z.boolean(),
+  selected: zBoolean(),
 });
 
-export const createDrillInputSchema = z.object({
+export const createDrillInputSchema = zObject({
   title: drillTitleSchema,
-  summary: z
-    .string()
+  summary: zString()
     .trim()
     .max(DRILL_LIMITS.summaryCharacters)
     .optional()
     .nullable()
     .transform((value) => value ?? ""),
-  notes: z
-    .string()
+  notes: zString()
     .trim()
     .max(DRILL_LIMITS.notesCharacters)
     .optional()
     .nullable()
     .transform((value) => value || null),
-  steps: z.array(drillStepBodySchema).min(1).max(DRILL_LIMITS.steps),
-  trainingMethodSlugs: z.array(slugSchema).min(1).max(DRILL_LIMITS.trainingMethods),
-  tagSlugs: z.array(slugSchema).max(DRILL_LIMITS.tags).default([]),
-  statusTagSlugs: z.array(slugSchema).max(DRILL_LIMITS.savedLists).default([]),
+  steps: zArray(drillStepBodySchema).min(1).max(DRILL_LIMITS.steps),
+  trainingMethodSlugs: zArray(slugSchema).min(1).max(DRILL_LIMITS.trainingMethods),
+  tagSlugs: zArray(slugSchema).max(DRILL_LIMITS.tags).default([]),
+  statusTagSlugs: zArray(slugSchema).max(DRILL_LIMITS.savedLists).default([]),
 });
 
 // Edit Drill v1 uses the same editable fields as manual creation. The API
 // treats updates as a full replacement of relationships and ordered steps.
 export const updateDrillInputSchema = createDrillInputSchema;
 
-export type FilterMode = z.infer<typeof filterModeSchema>;
-export type DrillFilters = z.infer<typeof drillFiltersSchema>;
-export type DrillSummary = z.infer<typeof drillSummarySchema>;
-export type DrillDetail = z.infer<typeof drillDetailSchema>;
-export type DrillListResponse = z.infer<typeof drillListResponseSchema>;
-export type DeleteDrillResponse = z.infer<typeof deleteDrillResponseSchema>;
-export type SavedListSlug = z.infer<typeof savedListSlugSchema>;
-export type UpdateSavedListInput = z.infer<typeof updateSavedListInputSchema>;
-export type UpdateSavedListResponse = z.infer<typeof updateSavedListResponseSchema>;
-export type CreateDrillInput = z.input<typeof createDrillInputSchema>;
-export type UpdateDrillInput = z.input<typeof updateDrillInputSchema>;
+export type FilterMode = ZodInfer<typeof filterModeSchema>;
+export type DrillFilters = ZodInfer<typeof drillFiltersSchema>;
+export type DrillSummary = ZodInfer<typeof drillSummarySchema>;
+export type DrillDetail = ZodInfer<typeof drillDetailSchema>;
+export type DrillListResponse = ZodInfer<typeof drillListResponseSchema>;
+export type DeleteDrillResponse = ZodInfer<typeof deleteDrillResponseSchema>;
+export type SavedListSlug = ZodInfer<typeof savedListSlugSchema>;
+export type UpdateSavedListInput = ZodInfer<typeof updateSavedListInputSchema>;
+export type UpdateSavedListResponse = ZodInfer<typeof updateSavedListResponseSchema>;
+export type CreateDrillInput = ZodInput<typeof createDrillInputSchema>;
+export type UpdateDrillInput = ZodInput<typeof updateDrillInputSchema>;
 
 // Route handlers accept a few alias names so the frontend can evolve without
 // forcing a backend rewrite for every query-string naming change.

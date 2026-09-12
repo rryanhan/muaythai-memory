@@ -1,21 +1,31 @@
-import { z } from "zod";
+import {
+  array as zArray,
+  boolean as zBoolean,
+  coerce as zCoerce,
+  enum as zEnum,
+  number as zNumber,
+  object as zObject,
+  string as zString,
+  type infer as ZodInfer,
+  type input as ZodInput,
+} from "zod";
 import { profileUsernameSchema } from "@/modules/profile/contracts";
 
-export const followStatusSchema = z.enum(["none", "pending", "accepted"]);
+export const followStatusSchema = zEnum(["none", "pending", "accepted"]);
 
-export const followDirectionSchema = z.object({
+export const followDirectionSchema = zObject({
   status: followStatusSchema,
-  requestedAt: z.coerce.date().nullable(),
-  acceptedAt: z.coerce.date().nullable(),
+  requestedAt: zCoerce.date().nullable(),
+  acceptedAt: zCoerce.date().nullable(),
 });
 
-export const fighterSummarySchema = z.object({
-  id: z.string().uuid(),
+export const fighterSummarySchema = zObject({
+  id: zString().uuid(),
   username: profileUsernameSchema,
-  avatarUrl: z.string().url().nullable(),
+  avatarUrl: zString().url().nullable(),
 });
 
-export const connectionSectionSchema = z.enum([
+export const connectionSectionSchema = zEnum([
   "followers",
   "following",
   "incoming",
@@ -23,94 +33,94 @@ export const connectionSectionSchema = z.enum([
   "blocked",
 ]);
 
-export const publicConnectionSectionSchema = z.enum(["followers", "following"]);
+export const publicConnectionSectionSchema = zEnum(["followers", "following"]);
 
-export const connectionSectionItemSchema = z.object({
+export const connectionSectionItemSchema = zObject({
   profile: fighterSummarySchema,
-  occurredAt: z.coerce.date(),
+  occurredAt: zCoerce.date(),
 });
 
-export const connectionCountsSchema = z.object({
-  followers: z.number().int().nonnegative(),
-  following: z.number().int().nonnegative(),
-  incoming: z.number().int().nonnegative(),
-  outgoing: z.number().int().nonnegative(),
-  blocked: z.number().int().nonnegative(),
+export const connectionCountsSchema = zObject({
+  followers: zNumber().int().nonnegative(),
+  following: zNumber().int().nonnegative(),
+  incoming: zNumber().int().nonnegative(),
+  outgoing: zNumber().int().nonnegative(),
+  blocked: zNumber().int().nonnegative(),
 });
 
-export const connectionsSummaryResponseSchema = z.object({
+export const connectionsSummaryResponseSchema = zObject({
   counts: connectionCountsSchema,
 });
 
-export const connectionSectionPageResponseSchema = z.object({
+export const connectionSectionPageResponseSchema = zObject({
   section: connectionSectionSchema,
-  items: z.array(connectionSectionItemSchema),
-  nextCursor: z.string().nullable(),
+  items: zArray(connectionSectionItemSchema),
+  nextCursor: zString().nullable(),
 });
 
-export const fighterConnectionSchema = z.object({
+export const fighterConnectionSchema = zObject({
   profile: fighterSummarySchema,
-  isSelf: z.boolean(),
-  blockedByViewer: z.boolean(),
+  isSelf: zBoolean(),
+  blockedByViewer: zBoolean(),
   outgoing: followDirectionSchema,
   incoming: followDirectionSchema,
-  mutual: z.boolean(),
+  mutual: zBoolean(),
 });
 
-export const fighterSearchResponseSchema = z.object({
+export const fighterSearchResponseSchema = zObject({
   fighter: fighterConnectionSchema.nullable(),
 });
 
-export const trainingMethodStatSchema = z.object({
-  id: z.string().uuid(),
-  name: z.string(),
-  slug: z.string(),
-  iconKey: z.string().nullable(),
-  count: z.number().int().nonnegative(),
+export const trainingMethodStatSchema = zObject({
+  id: zString().uuid(),
+  name: zString(),
+  slug: zString(),
+  iconKey: zString().nullable(),
+  count: zNumber().int().nonnegative(),
 });
 
-export const publicSocialCountsSchema = z.object({
-  followers: z.number().int().nonnegative(),
-  following: z.number().int().nonnegative(),
+export const publicSocialCountsSchema = zObject({
+  followers: zNumber().int().nonnegative(),
+  following: zNumber().int().nonnegative(),
 });
 
 export const fighterProfileSchema = fighterConnectionSchema.extend({
   socialCounts: publicSocialCountsSchema,
-  canViewConnections: z.boolean(),
-  stats: z.object({
-    drillCount: z.number().int().nonnegative(),
-    trainingMethods: z.array(trainingMethodStatSchema),
+  canViewConnections: zBoolean(),
+  stats: zObject({
+    drillCount: zNumber().int().nonnegative(),
+    trainingMethods: zArray(trainingMethodStatSchema),
   }).nullable(),
 });
 
-export const fighterProfileResponseSchema = z.object({
+export const fighterProfileResponseSchema = zObject({
   fighter: fighterProfileSchema,
 });
 
-export const authorizedConnectionPageResponseSchema = z.object({
+export const authorizedConnectionPageResponseSchema = zObject({
   owner: fighterSummarySchema,
   section: publicConnectionSectionSchema,
-  items: z.array(connectionSectionItemSchema),
-  nextCursor: z.string().nullable(),
+  items: zArray(connectionSectionItemSchema),
+  nextCursor: zString().nullable(),
 });
 
-export const requestFollowInputSchema = z.object({
+export const requestFollowInputSchema = zObject({
   username: profileUsernameSchema,
 });
 
-export const respondToFollowRequestInputSchema = z.object({
-  action: z.enum(["accept", "decline"]),
+export const respondToFollowRequestInputSchema = zObject({
+  action: zEnum(["accept", "decline"]),
 });
 
-export const connectionMutationResponseSchema = z.object({
-  userId: z.string().uuid(),
-  blockedByViewer: z.boolean(),
+export const connectionMutationResponseSchema = zObject({
+  userId: zString().uuid(),
+  blockedByViewer: zBoolean(),
   outgoing: followDirectionSchema,
   incoming: followDirectionSchema,
-  mutual: z.boolean(),
+  mutual: zBoolean(),
 });
 
-export const reportReasonSchema = z.enum([
+export const reportReasonSchema = zEnum([
   "spam",
   "harassment",
   "impersonation",
@@ -118,36 +128,36 @@ export const reportReasonSchema = z.enum([
   "other",
 ]);
 
-export const reportFighterInputSchema = z.object({
-  userId: z.string().uuid(),
+export const reportFighterInputSchema = zObject({
+  userId: zString().uuid(),
   reason: reportReasonSchema,
-  details: z.string().trim().max(500).optional().nullable()
+  details: zString().trim().max(500).optional().nullable()
     .transform((value) => value || null),
 });
 
-export const reportFighterResponseSchema = z.object({
-  reportId: z.string().uuid(),
-  reportedUserId: z.string().uuid(),
+export const reportFighterResponseSchema = zObject({
+  reportId: zString().uuid(),
+  reportedUserId: zString().uuid(),
 });
 
-export const blockFighterInputSchema = z.object({
-  userId: z.string().uuid(),
+export const blockFighterInputSchema = zObject({
+  userId: zString().uuid(),
 });
 
-export type FollowStatus = z.infer<typeof followStatusSchema>;
-export type FollowDirection = z.infer<typeof followDirectionSchema>;
-export type FighterSummary = z.infer<typeof fighterSummarySchema>;
-export type ConnectionSection = z.infer<typeof connectionSectionSchema>;
-export type PublicConnectionSection = z.infer<typeof publicConnectionSectionSchema>;
-export type ConnectionSectionItem = z.infer<typeof connectionSectionItemSchema>;
-export type ConnectionCounts = z.infer<typeof connectionCountsSchema>;
-export type ConnectionsSummaryResponse = z.infer<typeof connectionsSummaryResponseSchema>;
-export type ConnectionSectionPageResponse = z.infer<typeof connectionSectionPageResponseSchema>;
-export type FighterConnection = z.infer<typeof fighterConnectionSchema>;
-export type FighterProfile = z.infer<typeof fighterProfileSchema>;
-export type AuthorizedConnectionPageResponse = z.infer<typeof authorizedConnectionPageResponseSchema>;
-export type RespondToFollowRequestInput = z.infer<typeof respondToFollowRequestInputSchema>;
-export type ConnectionMutationResponse = z.infer<typeof connectionMutationResponseSchema>;
-export type ReportReason = z.infer<typeof reportReasonSchema>;
-export type ReportFighterInput = z.input<typeof reportFighterInputSchema>;
-export type ReportFighterResponse = z.infer<typeof reportFighterResponseSchema>;
+export type FollowStatus = ZodInfer<typeof followStatusSchema>;
+export type FollowDirection = ZodInfer<typeof followDirectionSchema>;
+export type FighterSummary = ZodInfer<typeof fighterSummarySchema>;
+export type ConnectionSection = ZodInfer<typeof connectionSectionSchema>;
+export type PublicConnectionSection = ZodInfer<typeof publicConnectionSectionSchema>;
+export type ConnectionSectionItem = ZodInfer<typeof connectionSectionItemSchema>;
+export type ConnectionCounts = ZodInfer<typeof connectionCountsSchema>;
+export type ConnectionsSummaryResponse = ZodInfer<typeof connectionsSummaryResponseSchema>;
+export type ConnectionSectionPageResponse = ZodInfer<typeof connectionSectionPageResponseSchema>;
+export type FighterConnection = ZodInfer<typeof fighterConnectionSchema>;
+export type FighterProfile = ZodInfer<typeof fighterProfileSchema>;
+export type AuthorizedConnectionPageResponse = ZodInfer<typeof authorizedConnectionPageResponseSchema>;
+export type RespondToFollowRequestInput = ZodInfer<typeof respondToFollowRequestInputSchema>;
+export type ConnectionMutationResponse = ZodInfer<typeof connectionMutationResponseSchema>;
+export type ReportReason = ZodInfer<typeof reportReasonSchema>;
+export type ReportFighterInput = ZodInput<typeof reportFighterInputSchema>;
+export type ReportFighterResponse = ZodInfer<typeof reportFighterResponseSchema>;

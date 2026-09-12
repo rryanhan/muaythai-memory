@@ -1,52 +1,59 @@
-import { z } from "zod";
+import {
+  array as zArray,
+  boolean as zBoolean,
+  coerce as zCoerce,
+  object as zObject,
+  string as zString,
+  type infer as ZodInfer,
+} from "zod";
 import {
   drillDetailSchema,
   drillSummarySchema,
 } from "@/modules/drills/contracts";
 import { fighterSummarySchema } from "@/modules/connections/contracts";
 
-export const drillShareRecipientItemSchema = z.object({
+export const drillShareRecipientItemSchema = zObject({
   profile: fighterSummarySchema,
-  shared: z.boolean(),
+  shared: zBoolean(),
 });
 
-export const drillShareRecipientPageSchema = z.object({
-  items: z.array(drillShareRecipientItemSchema),
-  nextCursor: z.string().nullable(),
+export const drillShareRecipientPageSchema = zObject({
+  items: zArray(drillShareRecipientItemSchema),
+  nextCursor: zString().nullable(),
 });
 
-export const updateDrillShareInputSchema = z.object({
-  recipientUserId: z.string().uuid(),
-  shared: z.boolean(),
+export const updateDrillShareInputSchema = zObject({
+  recipientUserId: zString().uuid(),
+  shared: zBoolean(),
 });
 
-export const updateDrillShareResponseSchema = z.object({
-  drillId: z.string().uuid(),
-  recipientUserId: z.string().uuid(),
-  shared: z.boolean(),
+export const updateDrillShareResponseSchema = zObject({
+  drillId: zString().uuid(),
+  recipientUserId: zString().uuid(),
+  shared: zBoolean(),
 });
 
-export const sharedDrillListItemSchema = z.object({
+export const sharedDrillListItemSchema = zObject({
   drill: drillSummarySchema,
   owner: fighterSummarySchema,
-  sharedAt: z.coerce.date(),
+  sharedAt: zCoerce.date(),
 });
 
-export const sharedDrillListResponseSchema = z.object({
-  items: z.array(sharedDrillListItemSchema),
-  nextCursor: z.string().nullable(),
+export const sharedDrillListResponseSchema = zObject({
+  items: zArray(sharedDrillListItemSchema),
+  nextCursor: zString().nullable(),
 });
 
-export const sharedDrillDetailResponseSchema = z.object({
+export const sharedDrillDetailResponseSchema = zObject({
   drill: drillDetailSchema,
   owner: fighterSummarySchema,
-  sharedAt: z.coerce.date(),
+  sharedAt: zCoerce.date(),
 });
 
-export type DrillShareRecipientItem = z.infer<typeof drillShareRecipientItemSchema>;
-export type DrillShareRecipientPage = z.infer<typeof drillShareRecipientPageSchema>;
-export type UpdateDrillShareInput = z.infer<typeof updateDrillShareInputSchema>;
-export type UpdateDrillShareResponse = z.infer<typeof updateDrillShareResponseSchema>;
-export type SharedDrillListItem = z.infer<typeof sharedDrillListItemSchema>;
-export type SharedDrillListResponse = z.infer<typeof sharedDrillListResponseSchema>;
-export type SharedDrillDetailResponse = z.infer<typeof sharedDrillDetailResponseSchema>;
+export type DrillShareRecipientItem = ZodInfer<typeof drillShareRecipientItemSchema>;
+export type DrillShareRecipientPage = ZodInfer<typeof drillShareRecipientPageSchema>;
+export type UpdateDrillShareInput = ZodInfer<typeof updateDrillShareInputSchema>;
+export type UpdateDrillShareResponse = ZodInfer<typeof updateDrillShareResponseSchema>;
+export type SharedDrillListItem = ZodInfer<typeof sharedDrillListItemSchema>;
+export type SharedDrillListResponse = ZodInfer<typeof sharedDrillListResponseSchema>;
+export type SharedDrillDetailResponse = ZodInfer<typeof sharedDrillDetailResponseSchema>;

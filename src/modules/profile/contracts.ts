@@ -1,41 +1,46 @@
-import { z } from "zod";
+import {
+  array as zArray,
+  number as zNumber,
+  object as zObject,
+  string as zString,
+  type infer as ZodInfer,
+} from "zod";
 
-export const profileDtoSchema = z.object({
-  id: z.string().uuid(),
-  displayName: z.string(),
-  username: z.string().nullable(),
-  firstName: z.string().nullable(),
-  lastName: z.string().nullable(),
-  location: z.string().nullable(),
-  avatarUrl: z.string().url().nullable(),
-  email: z.string().email().nullable(),
+export const profileDtoSchema = zObject({
+  id: zString().uuid(),
+  displayName: zString(),
+  username: zString().nullable(),
+  firstName: zString().nullable(),
+  lastName: zString().nullable(),
+  location: zString().nullable(),
+  avatarUrl: zString().url().nullable(),
+  email: zString().email().nullable(),
 });
 
-export const profileResponseSchema = z.object({
+export const profileResponseSchema = zObject({
   profile: profileDtoSchema,
 });
 
-export const profileOverviewTrainingMethodSchema = z.object({
-  id: z.string().uuid(),
-  name: z.string(),
-  slug: z.string(),
-  iconKey: z.string(),
-  count: z.number().int().nonnegative(),
+export const profileOverviewTrainingMethodSchema = zObject({
+  id: zString().uuid(),
+  name: zString(),
+  slug: zString(),
+  iconKey: zString(),
+  count: zNumber().int().nonnegative(),
 });
 
-export const profileOverviewSchema = z.object({
-  drillCount: z.number().int().nonnegative(),
-  favouriteCount: z.number().int().nonnegative(),
-  drillBackInCount: z.number().int().nonnegative(),
-  trainingMethods: z.array(profileOverviewTrainingMethodSchema),
+export const profileOverviewSchema = zObject({
+  drillCount: zNumber().int().nonnegative(),
+  favouriteCount: zNumber().int().nonnegative(),
+  drillBackInCount: zNumber().int().nonnegative(),
+  trainingMethods: zArray(profileOverviewTrainingMethodSchema),
 });
 
-export const profileOverviewResponseSchema = z.object({
+export const profileOverviewResponseSchema = zObject({
   overview: profileOverviewSchema,
 });
 
-export const profileUsernameSchema = z
-  .string()
+export const profileUsernameSchema = zString()
   .trim()
   .toLowerCase()
   .min(3, "Username must be at least 3 characters.")
@@ -46,14 +51,13 @@ export const profileFirstNameSchema = optionalProfileField(80, "First name");
 export const profileLastNameSchema = optionalProfileField(80, "Last name");
 export const profileLocationSchema = optionalProfileField(120, "Location");
 
-export type ProfileDto = z.infer<typeof profileDtoSchema>;
-export type ProfileResponse = z.infer<typeof profileResponseSchema>;
-export type ProfileOverview = z.infer<typeof profileOverviewSchema>;
-export type ProfileOverviewResponse = z.infer<typeof profileOverviewResponseSchema>;
+export type ProfileDto = ZodInfer<typeof profileDtoSchema>;
+export type ProfileResponse = ZodInfer<typeof profileResponseSchema>;
+export type ProfileOverview = ZodInfer<typeof profileOverviewSchema>;
+export type ProfileOverviewResponse = ZodInfer<typeof profileOverviewResponseSchema>;
 
 function optionalProfileField(max: number, label: string) {
-  return z
-    .string()
+  return zString()
     .trim()
     .max(max, `${label} must be ${max} characters or fewer.`)
     .transform((value) => value || null);

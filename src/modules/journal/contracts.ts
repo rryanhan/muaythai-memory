@@ -1,99 +1,107 @@
-import { z } from "zod";
+import {
+  array as zArray,
+  coerce as zCoerce,
+  enum as zEnum,
+  literal as zLiteral,
+  number as zNumber,
+  object as zObject,
+  string as zString,
+  type infer as ZodInfer,
+  type input as ZodInput,
+} from "zod";
 import { JOURNAL_VIDEO_MAX_BYTES, JOURNAL_VIDEO_MIME_TYPES } from "./constants";
 
-export const journalDateSchema = z
-  .string()
+export const journalDateSchema = zString()
   .regex(/^\d{4}-\d{2}-\d{2}$/, "Use a valid training date.")
   .refine((value) => {
     const date = new Date(`${value}T00:00:00Z`);
     return !Number.isNaN(date.valueOf()) && date.toISOString().startsWith(value);
   }, "Use a valid training date.");
 
-const optionalCaptionSchema = z
-  .string()
+const optionalCaptionSchema = zString()
   .trim()
   .max(2000, "Captions must be 2,000 characters or fewer.")
   .optional()
   .nullable()
   .transform((value) => value || null);
 
-export const createJournalUploadInputSchema = z.object({
-  fileName: z.string().trim().min(1).max(255),
-  mimeType: z.enum(JOURNAL_VIDEO_MIME_TYPES),
-  sizeBytes: z.number().int().positive().max(JOURNAL_VIDEO_MAX_BYTES),
-  durationMs: z.number().int().nonnegative().max(24 * 60 * 60 * 1000).optional().nullable(),
+export const createJournalUploadInputSchema = zObject({
+  fileName: zString().trim().min(1).max(255),
+  mimeType: zEnum(JOURNAL_VIDEO_MIME_TYPES),
+  sizeBytes: zNumber().int().positive().max(JOURNAL_VIDEO_MAX_BYTES),
+  durationMs: zNumber().int().nonnegative().max(24 * 60 * 60 * 1000).optional().nullable(),
   occurredOn: journalDateSchema,
   caption: optionalCaptionSchema,
-  drillId: z.string().uuid().optional().nullable(),
+  drillId: zString().uuid().optional().nullable(),
 });
 
-export const updateJournalEntryInputSchema = z.object({
+export const updateJournalEntryInputSchema = zObject({
   occurredOn: journalDateSchema,
   caption: optionalCaptionSchema,
-  drillId: z.string().uuid().optional().nullable(),
+  drillId: zString().uuid().optional().nullable(),
 });
 
-export const journalDrillSchema = z.object({
-  id: z.string().uuid(),
-  title: z.string(),
+export const journalDrillSchema = zObject({
+  id: zString().uuid(),
+  title: zString(),
 });
 
-export const journalEntrySummarySchema = z.object({
-  id: z.string().uuid(),
+export const journalEntrySummarySchema = zObject({
+  id: zString().uuid(),
   occurredOn: journalDateSchema,
-  caption: z.string().nullable(),
+  caption: zString().nullable(),
   drill: journalDrillSchema.nullable(),
-  durationMs: z.number().int().nonnegative().nullable(),
-  mimeType: z.enum(JOURNAL_VIDEO_MIME_TYPES),
-  posterUrl: z.string().url().nullable(),
-  createdAt: z.coerce.date(),
+  durationMs: zNumber().int().nonnegative().nullable(),
+  mimeType: zEnum(JOURNAL_VIDEO_MIME_TYPES),
+  posterUrl: zString().url().nullable(),
+  createdAt: zCoerce.date(),
 });
 
 export const journalEntryDetailSchema = journalEntrySummarySchema.extend({
-  playbackUrl: z.string().url(),
+  playbackUrl: zString().url(),
 });
 
-export const journalListResponseSchema = z.object({
-  entries: z.array(journalEntrySummarySchema),
-  nextCursor: z.string().nullable(),
+export const journalListResponseSchema = zObject({
+  entries: zArray(journalEntrySummarySchema),
+  nextCursor: zString().nullable(),
 });
 
-export const journalDetailResponseSchema = z.object({
+export const journalDetailResponseSchema = zObject({
   entry: journalEntryDetailSchema,
 });
 
-export const journalPreviewResponseSchema = z.object({
+export const journalPreviewResponseSchema = zObject({
   entry: journalEntryDetailSchema.nullable(),
-  total: z.number().int().nonnegative(),
+  total: zNumber().int().nonnegative(),
 });
 
-export const journalUploadIntentResponseSchema = z.object({
-  entryId: z.string().uuid(),
-  upload: z.object({
-    endpoint: z.string().url(),
-    token: z.string().min(1),
-    path: z.string().min(1),
+export const journalUploadIntentResponseSchema = zObject({
+  entryId: zString().uuid(),
+  upload: zObject({
+    endpoint: zString().url(),
+    token: zString().min(1),
+    path: zString().min(1),
   }),
 });
 
-export const completeJournalUploadResponseSchema = z.object({
+export const completeJournalUploadResponseSchema = zObject({
   entry: journalEntryDetailSchema,
 });
 
-export const journalPosterUploadResponseSchema = z.object({
-  uploaded: z.literal(true),
+export const journalPosterUploadResponseSchema = zObject({
+  uploaded: zLiteral(true),
 });
 
-export const deleteJournalEntryResponseSchema = z.object({
-  deletedId: z.string().uuid(),
+export const deleteJournalEntryResponseSchema = zObject({
+  deletedId: zString().uuid(),
 });
 
-export type CreateJournalUploadInput = z.input<typeof createJournalUploadInputSchema>;
-export type UpdateJournalEntryInput = z.input<typeof updateJournalEntryInputSchema>;
-export type JournalEntrySummary = z.infer<typeof journalEntrySummarySchema>;
-export type JournalEntryDetail = z.infer<typeof journalEntryDetailSchema>;
-export type JournalListResponse = z.infer<typeof journalListResponseSchema>;
-export type JournalPreviewResponse = z.infer<typeof journalPreviewResponseSchema>;
-export type JournalUploadIntentResponse = z.infer<typeof journalUploadIntentResponseSchema>;
-export type CompleteJournalUploadResponse = z.infer<typeof completeJournalUploadResponseSchema>;
-export type DeleteJournalEntryResponse = z.infer<typeof deleteJournalEntryResponseSchema>;
+export type CreateJournalUploadInput = ZodInput<typeof createJournalUploadInputSchema>;
+export type UpdateJournalEntryInput = ZodInput<typeof updateJournalEntryInputSchema>;
+export type JournalEntrySummary = ZodInfer<typeof journalEntrySummarySchema>;
+export type JournalEntryDetail = ZodInfer<typeof journalEntryDetailSchema>;
+export type JournalListResponse = ZodInfer<typeof journalListResponseSchema>;
+export type JournalPreviewResponse = ZodInfer<typeof journalPreviewResponseSchema>;
+export type JournalUploadIntentResponse = ZodInfer<typeof journalUploadIntentResponseSchema>;
+export type CompleteJournalUploadResponse = ZodInfer<typeof completeJournalUploadResponseSchema>;
+export type DeleteJournalEntryResponse = ZodInfer<typeof deleteJournalEntryResponseSchema>;

@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { string as zString } from "zod";
 import {
   drillShareRecipientPageSchema,
   sharedDrillListResponseSchema,
@@ -27,7 +27,7 @@ export async function getDrillShareRecipientPage(
   cursor: string | null,
   options: ApiClientOptions = {},
 ): Promise<DrillShareRecipientPage> {
-  const id = z.string().uuid().parse(drillId);
+  const id = zString().uuid().parse(drillId);
   const params = new URLSearchParams();
   if (cursor) params.set("cursor", cursor);
   const query = params.size > 0 ? `?${params.toString()}` : "";
@@ -43,7 +43,7 @@ export async function updateDrillShare(
   rawInput: UpdateDrillShareInput,
   options: ApiClientOptions = {},
 ): Promise<UpdateDrillShareResponse> {
-  const id = z.string().uuid().parse(drillId);
+  const id = zString().uuid().parse(drillId);
   const input = updateDrillShareInputSchema.parse(rawInput);
   return fetchJson(
     `/api/drills/${encodeURIComponent(id)}/shares`,

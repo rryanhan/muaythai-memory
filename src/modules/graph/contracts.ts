@@ -1,48 +1,55 @@
-import { z } from "zod";
+import {
+  array as zArray,
+  boolean as zBoolean,
+  enum as zEnum,
+  object as zObject,
+  string as zString,
+  type infer as ZodInfer,
+} from "zod";
 import { drillFiltersSchema, parseDrillFiltersFromSearchParams } from "@/modules/drills/contracts";
 
 // Graph payloads are intentionally lightweight: enough to render nodes/edges,
 // not full drill detail records.
-export const graphNodeTypeSchema = z.enum(["trainingMethod", "drill", "tag", "customTag", "statusTag"]);
-export const graphEdgeTypeSchema = z.enum(["method", "tag", "customTag", "statusTag"]);
+export const graphNodeTypeSchema = zEnum(["trainingMethod", "drill", "tag", "customTag", "statusTag"]);
+export const graphEdgeTypeSchema = zEnum(["method", "tag", "customTag", "statusTag"]);
 
-export const graphNodeSchema = z.object({
-  id: z.string(),
-  entityId: z.string().uuid(),
+export const graphNodeSchema = zObject({
+  id: zString(),
+  entityId: zString().uuid(),
   type: graphNodeTypeSchema,
-  label: z.string(),
-  slug: z.string().optional(),
-  iconKey: z.string().optional(),
-  active: z.boolean(),
-  matched: z.boolean(),
-  selected: z.boolean(),
+  label: zString(),
+  slug: zString().optional(),
+  iconKey: zString().optional(),
+  active: zBoolean(),
+  matched: zBoolean(),
+  selected: zBoolean(),
 });
 
-export const graphEdgeSchema = z.object({
-  id: z.string(),
-  from: z.string(),
-  to: z.string(),
+export const graphEdgeSchema = zObject({
+  id: zString(),
+  from: zString(),
+  to: zString(),
   type: graphEdgeTypeSchema,
-  active: z.boolean(),
+  active: zBoolean(),
 });
 
-export const graphOptionsSchema = z.object({
-  showTags: z.boolean().default(false),
-  showCustomTags: z.boolean().default(false),
-  showStatusTags: z.boolean().default(false),
+export const graphOptionsSchema = zObject({
+  showTags: zBoolean().default(false),
+  showCustomTags: zBoolean().default(false),
+  showStatusTags: zBoolean().default(false),
 });
 
-export const graphResponseSchema = z.object({
-  nodes: z.array(graphNodeSchema),
-  edges: z.array(graphEdgeSchema),
+export const graphResponseSchema = zObject({
+  nodes: zArray(graphNodeSchema),
+  edges: zArray(graphEdgeSchema),
   filters: drillFiltersSchema,
   options: graphOptionsSchema,
 });
 
-export type GraphNode = z.infer<typeof graphNodeSchema>;
-export type GraphEdge = z.infer<typeof graphEdgeSchema>;
-export type GraphOptions = z.infer<typeof graphOptionsSchema>;
-export type GraphResponse = z.infer<typeof graphResponseSchema>;
+export type GraphNode = ZodInfer<typeof graphNodeSchema>;
+export type GraphEdge = ZodInfer<typeof graphEdgeSchema>;
+export type GraphOptions = ZodInfer<typeof graphOptionsSchema>;
+export type GraphResponse = ZodInfer<typeof graphResponseSchema>;
 
 export function parseGraphRequestFromSearchParams(searchParams: URLSearchParams) {
   return {
