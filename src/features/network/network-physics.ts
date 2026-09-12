@@ -1,6 +1,7 @@
 import { zoomIdentity, type ZoomTransform } from "d3";
 import type { PointerEvent as ReactPointerEvent } from "react";
 import type { GraphEdge, GraphNode, GraphResponse } from "@/data";
+import { getNetworkMethodRank, NETWORK_METHOD_ORDER } from "./method-order";
 
 export type Size = {
   width: number;
@@ -60,8 +61,6 @@ export type PhysicsSimulation = {
   dragging: PhysicsNode | null;
 };
 
-const methodOrder = ["pad-work", "bag-work", "partner-drill", "clinch", "technical-work"];
-
 // Wireframe-derived custom physics. Keep values stable unless deliberately tuning graph feel.
 export function buildGraphModel(
   graph: GraphResponse,
@@ -72,7 +71,7 @@ export function buildGraphModel(
   const center = getCenter(layoutSize);
   const methodNodes = graph.nodes
     .filter((node) => node.type === "trainingMethod")
-    .sort((a, b) => getMethodRank(a.slug) - getMethodRank(b.slug));
+    .sort((a, b) => getNetworkMethodRank(a.slug) - getNetworkMethodRank(b.slug));
   const methodNodeIds = new Set(methodNodes.map((node) => node.id));
   const methodsById = new Map<string, GraphNode>(methodNodes.map((node) => [node.id, node]));
   const methodSlugsByDrillId = collectMethodSlugsByDrillId(graph.edges, methodsById, methodNodeIds);
@@ -433,9 +432,9 @@ function getMethodAnchorPoint(
   const center = getCenter(layoutSize);
   const radiusX = Math.min(layoutSize.width * 0.34, 210);
   const radiusY = Math.min(layoutSize.height * 0.35, 300);
-  const rank = getMethodRank(slug);
+  const rank = getNetworkMethodRank(slug);
   const index = rank === Number.MAX_SAFE_INTEGER ? fallbackIndex : rank;
-  const count = Math.max(methodCount, methodOrder.length, 1);
+  const count = Math.max(methodCount, NETWORK_METHOD_ORDER.length, 1);
   const angle = -Math.PI / 2 + (index / count) * Math.PI * 2;
 
   return {
@@ -469,7 +468,7 @@ function collectMethodSlugsByDrillId(
     const currentSlugs = methodSlugsByDrillId.get(drillId) ?? [];
     if (!currentSlugs.includes(methodSlug)) {
       currentSlugs.push(methodSlug);
-      currentSlugs.sort((a, b) => getMethodRank(a) - getMethodRank(b));
+      currentSlugs.sort((a, b) => getNetworkMethodRank(a) - getNetworkMethodRank(b));
     }
     methodSlugsByDrillId.set(drillId, currentSlugs);
   }
@@ -501,13 +500,7 @@ function getNodeCentroid(nodes: PhysicsNode[]): Point | undefined {
 }
 
 function pickPrimaryMethodSlug(methodSlugs: string[]): string | undefined {
-  return [...methodSlugs].sort((a, b) => getMethodRank(a) - getMethodRank(b))[0];
-}
-
-function getMethodRank(slug: string | undefined): number {
-  if (!slug) return Number.MAX_SAFE_INTEGER;
-  const rank = methodOrder.indexOf(slug);
-  return rank === -1 ? Number.MAX_SAFE_INTEGER : rank;
+  return [...methodSlugs].sort((a, b) => getNetworkMethodRank(a) - getNetworkMethodRank(b))[0];
 }
 
 function truncateLabel(label: string, maxLength: number): string {

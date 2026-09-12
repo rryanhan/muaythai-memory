@@ -12,11 +12,10 @@ import {
   type NetworkFilters,
   type NetworkGraphVisualState,
 } from "./types";
-
-const methodOrder = ["pad-work", "bag-work", "partner-drill", "clinch", "technical-work"];
+import { getNetworkMethodRank } from "./method-order";
 
 export function sortMethods(nodes: GraphNode[]): GraphNode[] {
-  return [...nodes].sort((a, b) => getMethodRank(a.slug) - getMethodRank(b.slug));
+  return [...nodes].sort((a, b) => getNetworkMethodRank(a.slug) - getNetworkMethodRank(b.slug));
 }
 
 export function normalizeNetworkFilters(filters: NetworkFilters): NetworkFilters {
@@ -215,12 +214,6 @@ export function isAbortError(error: unknown): boolean {
 }
 
 export { emptyNetworkFilters };
-
-function getMethodRank(slug: string | undefined): number {
-  if (!slug) return Number.MAX_SAFE_INTEGER;
-  const rank = methodOrder.indexOf(slug);
-  return rank === -1 ? Number.MAX_SAFE_INTEGER : rank;
-}
 
 function listsMatch(left: string[], right: string[]): boolean {
   if (left.length !== right.length) return false;
