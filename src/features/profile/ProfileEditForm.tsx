@@ -1,6 +1,8 @@
 "use client";
 
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { useModalFallbackAccessibility } from "@/components/shared/useModalFallbackAccessibility";
 import { updateProfile } from "@/data/profile";
 import { prepareImageForClientDecode } from "@/features/media/prepare-image-for-decode";
 import type { CurrentAppUser } from "@/modules/auth";
@@ -236,26 +238,28 @@ export function ProfileEditForm({ initialProfile, onDirtyChange, onCancel, onSav
 }
 
 function AvatarCropSheetLoading({ onCancel }: { onCancel: () => void }) {
+  const backdropRef = useRef<HTMLDivElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
   const cancelButtonRef = useRef<HTMLButtonElement>(null);
+  const handleKeyDown = useModalFallbackAccessibility({
+    backdropRef,
+    dialogRef,
+    initialFocusRef: cancelButtonRef,
+    onEscape: onCancel,
+  });
 
-  return (
+  return createPortal(
     <>
-      <div className={styles.cropBackdrop} aria-hidden="true" />
+      <div ref={backdropRef} className={styles.cropBackdrop} aria-hidden="true" />
       <div
+        ref={dialogRef}
         className={`${styles.cropSheet} ${styles.cropLoading}`}
         role="dialog"
         aria-modal="true"
         aria-labelledby="avatar-crop-loading-title"
         aria-describedby="avatar-crop-loading-description"
-        onKeyDown={(event) => {
-          if (event.key === "Escape") {
-            event.preventDefault();
-            onCancel();
-          } else if (event.key === "Tab") {
-            event.preventDefault();
-            cancelButtonRef.current?.focus();
-          }
-        }}
+        tabIndex={-1}
+        onKeyDown={handleKeyDown}
       >
         <header className={styles.cropHeader}>
           <div>
@@ -267,11 +271,12 @@ function AvatarCropSheetLoading({ onCancel }: { onCancel: () => void }) {
           </p>
         </header>
         <div className={styles.cropActions}>
-          <button ref={cancelButtonRef} type="button" autoFocus onClick={onCancel}>
+          <button ref={cancelButtonRef} type="button" onClick={onCancel}>
             Cancel
           </button>
         </div>
       </div>
-    </>
+    </>,
+    document.body,
   );
 }

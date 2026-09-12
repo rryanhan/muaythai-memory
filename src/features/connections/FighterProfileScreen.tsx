@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { lazy, Suspense, useEffect, useId, useRef, useState } from "react";
+import { lazy, Suspense, useId, useRef, useState, type RefObject } from "react";
 import { createPortal } from "react-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check } from "@phosphor-icons/react/Check";
@@ -12,6 +12,7 @@ import { X } from "@phosphor-icons/react/X";
 import { RoutedBottomNav } from "@/components/navigation/RoutedBottomNav";
 import { badgeByIconKey } from "@/components/shared/context-badges";
 import { DecodedImage } from "@/components/shared/DecodedImage";
+import { useModalFallbackAccessibility } from "@/components/shared/useModalFallbackAccessibility";
 import {
   blockFighter,
   cancelOrUnfollow,
@@ -64,6 +65,7 @@ export function FighterProfileScreen({
   const [reportOpen, setReportOpen] = useState(false);
   const [reportCycle, setReportCycle] = useState(0);
   const [profileStatus, setProfileStatus] = useState<string | null>(null);
+  const moreTriggerRef = useRef<HTMLButtonElement>(null);
   const queryKey = ["fighter", initialFighter.profile.username];
   const fighterQuery = useQuery({
     queryKey,
@@ -165,6 +167,7 @@ export function FighterProfileScreen({
 
       <ProfileActions
         fighter={fighter}
+        moreTriggerRef={moreTriggerRef}
         pending={actionMutation.isPending}
         onMore={() => {
           setMoreMounted(true);
@@ -244,6 +247,7 @@ export function FighterProfileScreen({
                 <FighterSheetLoading
                   title={confirmation === "unfollow" ? "Unfollow?" : "Block Fighter?"}
                   message="Loading confirmation…"
+                  returnFocusFallbackRef={moreTriggerRef}
                   onCancel={() => {
                     actionMutation.reset();
                     setConfirmation(null);
@@ -273,6 +277,7 @@ export function FighterProfileScreen({
                 <FighterSheetLoading
                   title={`@${fighter.profile.username}`}
                   message="Loading fighter actions…"
+                  returnFocusFallbackRef={moreTriggerRef}
                   onCancel={() => setMoreOpen(false)}
                 />
               )
@@ -306,6 +311,7 @@ export function FighterProfileScreen({
                 <FighterSheetLoading
                   title="Report Fighter"
                   message="Loading report form…"
+                  returnFocusFallbackRef={moreTriggerRef}
                   onCancel={() => {
                     reportMutation.reset();
                     setReportOpen(false);
@@ -336,48 +342,39 @@ export function FighterProfileScreen({
 function FighterSheetLoading({
   title,
   message,
+  returnFocusFallbackRef,
   onCancel,
 }: {
   title: string;
   message: string;
+  returnFocusFallbackRef: RefObject<HTMLButtonElement | null>;
   onCancel: () => void;
 }) {
   const titleId = useId();
   const messageId = useId();
+  const backdropRef = useRef<HTMLDivElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
   const cancelButtonRef = useRef<HTMLButtonElement>(null);
-  const returnFocusRef = useRef<HTMLElement | null>(null);
-
-  useEffect(() => {
-    returnFocusRef.current = document.activeElement instanceof HTMLElement
-      ? document.activeElement
-      : null;
-    cancelButtonRef.current?.focus();
-
-    return () => {
-      const returnFocus = returnFocusRef.current;
-      returnFocusRef.current = null;
-      if (returnFocus?.isConnected) returnFocus.focus();
-    };
-  }, []);
+  const handleKeyDown = useModalFallbackAccessibility({
+    backdropRef,
+    dialogRef,
+    fallbackReturnFocusRef: returnFocusFallbackRef,
+    initialFocusRef: cancelButtonRef,
+    onEscape: onCancel,
+  });
 
   return createPortal(
     <>
-      <div className={styles.drawerBackdrop} aria-hidden="true" />
+      <div ref={backdropRef} className={styles.drawerBackdrop} aria-hidden="true" />
       <div
+        ref={dialogRef}
         className={styles.confirmationSheet}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
         aria-describedby={messageId}
-        onKeyDown={(event) => {
-          if (event.key === "Escape") {
-            event.preventDefault();
-            onCancel();
-          } else if (event.key === "Tab") {
-            event.preventDefault();
-            cancelButtonRef.current?.focus();
-          }
-        }}
+        tabIndex={-1}
+        onKeyDown={handleKeyDown}
       >
         <div className="sheet-handle" aria-hidden="true" />
         <h2 id={titleId}>{title}</h2>
@@ -399,11 +396,13 @@ function SocialCount({ count, label, href }: { count: number; label: string; hre
 
 function ProfileActions({
   fighter,
+  moreTriggerRef,
   pending,
   onMore,
   onAction,
 }: {
   fighter: FighterProfile;
+  moreTriggerRef: RefObject<HTMLButtonElement | null>;
   pending: boolean;
   onMore: () => void;
   onAction: (action: ProfileAction) => void;
@@ -442,6 +441,7 @@ function ProfileActions({
         <span className={styles.followsYou}>Follows you</span>
       )}
       <button
+        ref={moreTriggerRef}
         className={styles.moreTrigger}
         type="button"
         aria-label="More fighter actions"

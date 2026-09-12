@@ -33,6 +33,9 @@ const profileInviteSheetModule = vi.hoisted(() => {
   return { loadingGate, resolveLoading };
 });
 
+let originalBodyStyle: string | null | undefined;
+let preservedBackground: HTMLElement | null = null;
+
 vi.mock("@/data/connections", async (importOriginal) => ({
   ...await importOriginal<typeof import("@/data/connections")>(),
   ...mocks,
@@ -73,7 +76,11 @@ vi.mock("./ProfileInviteSheet", async () => {
 });
 vi.mock("./SharedDrillsSection", () => ({ SharedDrillsSection: () => null }));
 
-afterAll(() => profileInviteSheetModule.resolveLoading());
+afterAll(() => {
+  profileInviteSheetModule.resolveLoading();
+  restoreBodyStyle();
+  preservedBackground?.remove();
+});
 
 describe("ConnectionsScreen", () => {
   let sectionItems: Record<ConnectionSection, ConnectionSectionItem[]>;
@@ -216,6 +223,20 @@ describe("ConnectionsScreen", () => {
     const user = userEvent.setup();
     renderScreen("followers");
     const shareButton = screen.getByRole("button", { name: "Share @current_fighter" });
+    const main = screen.getByRole("main");
+    const appRoot = main.parentElement;
+    if (!appRoot) throw new Error("Connections render root was not mounted.");
+    originalBodyStyle = document.body.getAttribute("style");
+    const originalBodyInert = document.body.getAttribute("inert");
+    const originalBodyAriaHidden = document.body.getAttribute("aria-hidden");
+    document.body.style.setProperty("overflow-x", "clip", "important");
+    document.body.style.setProperty("overflow-y", "auto");
+    appRoot.setAttribute("aria-hidden", "false");
+    const existingBackground = document.createElement("aside");
+    existingBackground.setAttribute("inert", "connections-preserved");
+    existingBackground.setAttribute("aria-hidden", "false");
+    preservedBackground = existingBackground;
+    document.body.append(existingBackground);
 
     expect(mocks.profileInviteSheetLoaded).not.toHaveBeenCalled();
     expect(screen.queryByTestId("profile-invite-sheet")).not.toBeInTheDocument();
@@ -223,16 +244,37 @@ describe("ConnectionsScreen", () => {
     await user.click(shareButton);
 
     const loadingDialog = await screen.findByRole("dialog", { name: "Share Your Profile" });
+    expect(main).not.toContainElement(loadingDialog);
+    expect(loadingDialog.parentElement).toBe(document.body);
     expect(screen.getByRole("status")).toHaveTextContent("Loading share tools…");
+    expect(document.body.style.overflow).toBe("hidden");
+    expect(document.body.style.getPropertyPriority("overflow")).toBe("important");
+    expect(document.body.getAttribute("inert")).toBe(originalBodyInert);
+    expect(document.body.getAttribute("aria-hidden")).toBe(originalBodyAriaHidden);
+    expect(appRoot).toHaveAttribute("inert", "");
+    expect(appRoot).toHaveAttribute("aria-hidden", "true");
+    expect(existingBackground).toHaveAttribute("inert", "");
+    expect(existingBackground).toHaveAttribute("aria-hidden", "true");
     const loadingCancel = screen.getByRole("button", { name: "Cancel" });
     expect(loadingCancel).toHaveFocus();
     expect(mocks.profileInviteSheetLoaded).toHaveBeenCalledOnce();
     fireEvent.keyDown(loadingDialog, { key: "Tab" });
     expect(loadingCancel).toHaveFocus();
+    fireEvent.keyDown(loadingDialog, { key: "Tab", shiftKey: true });
+    expect(loadingCancel).toHaveFocus();
 
     fireEvent.keyDown(loadingDialog, { key: "Escape" });
-    expect(screen.queryByRole("dialog", { name: "Share Your Profile" })).not.toBeInTheDocument();
-    expect(shareButton).toHaveFocus();
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog", { name: "Share Your Profile" })).not.toBeInTheDocument();
+      expect(shareButton).toHaveFocus();
+      expect(document.body.style.overflowX).toBe("clip");
+      expect(document.body.style.getPropertyPriority("overflow-x")).toBe("important");
+      expect(document.body.style.overflowY).toBe("auto");
+      expect(appRoot).not.toHaveAttribute("inert");
+      expect(appRoot).toHaveAttribute("aria-hidden", "false");
+    });
+    expect(existingBackground).toHaveAttribute("inert", "connections-preserved");
+    expect(existingBackground).toHaveAttribute("aria-hidden", "false");
 
     await user.click(shareButton);
     expect(await screen.findByRole("dialog", { name: "Share Your Profile" })).toBeVisible();
@@ -242,6 +284,13 @@ describe("ConnectionsScreen", () => {
     });
 
     const inviteSheet = await screen.findByTestId("profile-invite-sheet");
+    expect(document.body.style.overflowX).toBe("clip");
+    expect(document.body.style.getPropertyPriority("overflow-x")).toBe("important");
+    expect(document.body.style.overflowY).toBe("auto");
+    expect(appRoot).not.toHaveAttribute("inert");
+    expect(appRoot).toHaveAttribute("aria-hidden", "false");
+    expect(existingBackground).toHaveAttribute("inert", "connections-preserved");
+    expect(existingBackground).toHaveAttribute("aria-hidden", "false");
     expect(mocks.profileInviteSheetLoaded).toHaveBeenCalledOnce();
     expect(inviteSheet).toHaveAttribute("data-open", "true");
 
@@ -251,8 +300,19 @@ describe("ConnectionsScreen", () => {
     await user.click(screen.getByRole("button", { name: "Share @current_fighter" }));
     expect(inviteSheet).toHaveAttribute("data-open", "true");
     expect(mocks.profileInviteSheetLoaded).toHaveBeenCalledOnce();
+
+    restoreBodyStyle();
+    existingBackground.remove();
+    preservedBackground = null;
   });
 });
+
+function restoreBodyStyle() {
+  if (originalBodyStyle === undefined) return;
+  if (originalBodyStyle === null) document.body.removeAttribute("style");
+  else document.body.setAttribute("style", originalBodyStyle);
+  originalBodyStyle = undefined;
+}
 
 function renderScreen(initialTab: ConnectionsTab) {
   const queryClient = new QueryClient({

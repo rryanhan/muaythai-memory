@@ -1,8 +1,9 @@
 "use client";
 
-import { lazy, Suspense, useId, useLayoutEffect, useRef, useState } from "react";
+import { lazy, Suspense, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ShareNetwork } from "@phosphor-icons/react/ShareNetwork";
+import { useModalFallbackAccessibility } from "@/components/shared/useModalFallbackAccessibility";
 import styles from "./DrillShare.module.css";
 
 const DrillShareSheet = lazy(
@@ -44,45 +45,12 @@ function DrillShareSheetLoading({ onCancel }: { onCancel: () => void }) {
   const backdropRef = useRef<HTMLDivElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
   const doneButtonRef = useRef<HTMLButtonElement>(null);
-  const returnFocusRef = useRef<HTMLElement | null>(null);
-
-  useLayoutEffect(() => {
-    returnFocusRef.current = document.activeElement instanceof HTMLElement
-      ? document.activeElement
-      : null;
-    const previousOverflow = document.body.style.overflow;
-    const backgroundElements = Array.from(document.body.children)
-      .filter((element): element is HTMLElement => (
-        element instanceof HTMLElement
-        && element !== backdropRef.current
-        && element !== dialogRef.current
-      ))
-      .map((element) => ({
-        element,
-        ariaHidden: element.getAttribute("aria-hidden"),
-        inert: element.getAttribute("inert"),
-      }));
-
-    for (const { element } of backgroundElements) {
-      element.setAttribute("inert", "");
-      element.setAttribute("aria-hidden", "true");
-    }
-    document.body.style.overflow = "hidden";
-    doneButtonRef.current?.focus();
-
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      for (const { element, ariaHidden, inert } of backgroundElements) {
-        if (inert === null) element.removeAttribute("inert");
-        else element.setAttribute("inert", inert);
-        if (ariaHidden === null) element.removeAttribute("aria-hidden");
-        else element.setAttribute("aria-hidden", ariaHidden);
-      }
-      const returnFocus = returnFocusRef.current;
-      returnFocusRef.current = null;
-      if (returnFocus?.isConnected) returnFocus.focus();
-    };
-  }, []);
+  const handleKeyDown = useModalFallbackAccessibility({
+    backdropRef,
+    dialogRef,
+    initialFocusRef: doneButtonRef,
+    onEscape: onCancel,
+  });
 
   return createPortal(
     <>
@@ -99,15 +67,8 @@ function DrillShareSheetLoading({ onCancel }: { onCancel: () => void }) {
         aria-modal="true"
         aria-labelledby={titleId}
         aria-describedby={`${descriptionId} ${statusId}`}
-        onKeyDown={(event) => {
-          if (event.key === "Escape") {
-            event.preventDefault();
-            onCancel();
-          } else if (event.key === "Tab") {
-            event.preventDefault();
-            doneButtonRef.current?.focus();
-          }
-        }}
+        tabIndex={-1}
+        onKeyDown={handleKeyDown}
       >
         <div className="sheet-handle" aria-hidden="true" />
         <div className={styles.heading}>

@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { lazy, Suspense, useEffect, useRef, useState, type FormEvent } from "react";
+import { lazy, Suspense, useRef, useState, type FormEvent } from "react";
+import { createPortal } from "react-dom";
 import {
   useInfiniteQuery,
   useMutation,
@@ -15,6 +16,7 @@ import { ShareNetwork } from "@phosphor-icons/react/ShareNetwork";
 import { UserPlus } from "@phosphor-icons/react/UserPlus";
 import { X } from "@phosphor-icons/react/X";
 import { RoutedBottomNav } from "@/components/navigation/RoutedBottomNav";
+import { useModalFallbackAccessibility } from "@/components/shared/useModalFallbackAccessibility";
 import {
   cancelOrUnfollow,
   getConnectionSectionPage,
@@ -286,40 +288,28 @@ export function ConnectionsScreen({
 }
 
 function ProfileInviteSheetLoading({ onCancel }: { onCancel: () => void }) {
+  const backdropRef = useRef<HTMLDivElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
   const cancelButtonRef = useRef<HTMLButtonElement>(null);
-  const returnFocusRef = useRef<HTMLElement | null>(null);
+  const handleKeyDown = useModalFallbackAccessibility({
+    backdropRef,
+    dialogRef,
+    initialFocusRef: cancelButtonRef,
+    onEscape: onCancel,
+  });
 
-  useEffect(() => {
-    returnFocusRef.current = document.activeElement instanceof HTMLElement
-      ? document.activeElement
-      : null;
-    cancelButtonRef.current?.focus();
-
-    return () => {
-      const returnFocus = returnFocusRef.current;
-      returnFocusRef.current = null;
-      if (returnFocus?.isConnected) returnFocus.focus();
-    };
-  }, []);
-
-  return (
+  return createPortal(
     <>
-      <div className={styles.drawerBackdrop} aria-hidden="true" />
+      <div ref={backdropRef} className={styles.drawerBackdrop} aria-hidden="true" />
       <div
+        ref={dialogRef}
         className={styles.inviteSheet}
         role="dialog"
         aria-modal="true"
         aria-labelledby="profile-invite-loading-title"
         aria-describedby="profile-invite-loading-description"
-        onKeyDown={(event) => {
-          if (event.key === "Escape") {
-            event.preventDefault();
-            onCancel();
-          } else if (event.key === "Tab") {
-            event.preventDefault();
-            cancelButtonRef.current?.focus();
-          }
-        }}
+        tabIndex={-1}
+        onKeyDown={handleKeyDown}
       >
         <div className="sheet-handle" aria-hidden="true" />
         <h2 id="profile-invite-loading-title">Share Your Profile</h2>
@@ -332,7 +322,8 @@ function ProfileInviteSheetLoading({ onCancel }: { onCancel: () => void }) {
           </button>
         </div>
       </div>
-    </>
+    </>,
+    document.body,
   );
 }
 

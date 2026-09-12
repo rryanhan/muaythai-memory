@@ -15,7 +15,7 @@ const shareSheetModule = vi.hoisted(() => {
   return { gate, resolve };
 });
 
-let originalBodyOverflow = "";
+let originalBodyStyle: string | null | undefined;
 let preservedBackground: HTMLElement | null = null;
 
 vi.mock("./DrillShareSheet", async () => {
@@ -40,7 +40,7 @@ vi.mock("./DrillShareSheet", async () => {
 
 afterAll(() => {
   shareSheetModule.resolve();
-  document.body.style.overflow = originalBodyOverflow;
+  restoreBodyStyle();
   preservedBackground?.remove();
 });
 
@@ -49,10 +49,11 @@ it("loads the share sheet once after first interaction and provides an accessibl
   const { container } = render(
     <DrillShareButton drillId="00000000-0000-4000-8000-000000000001" />,
   );
-  originalBodyOverflow = document.body.style.overflow;
+  originalBodyStyle = document.body.getAttribute("style");
   const originalBodyInert = document.body.getAttribute("inert");
   const originalBodyAriaHidden = document.body.getAttribute("aria-hidden");
-  document.body.style.overflow = "clip";
+  document.body.style.setProperty("overflow-x", "clip", "important");
+  document.body.style.setProperty("overflow-y", "auto");
   container.setAttribute("aria-hidden", "false");
   const existingBackground = document.createElement("aside");
   existingBackground.setAttribute("inert", "preserved");
@@ -89,11 +90,16 @@ it("loads the share sheet once after first interaction and provides an accessibl
   await waitFor(() => expect(done).toHaveFocus());
   fireEvent.keyDown(loadingDialog, { key: "Tab" });
   expect(done).toHaveFocus();
+  fireEvent.keyDown(loadingDialog, { key: "Tab", shiftKey: true });
+  expect(done).toHaveFocus();
   fireEvent.keyDown(loadingDialog, { key: "Escape" });
   await waitFor(() => {
     expect(screen.queryByRole("dialog", { name: "Share Drill" })).not.toBeInTheDocument();
     expect(trigger).toHaveFocus();
-    expect(document.body.style.overflow).toBe("clip");
+    expect(document.body.style.overflowX).toBe("clip");
+    expect(document.body.style.getPropertyPriority("overflow-x")).toBe("important");
+    expect(document.body.style.overflowY).toBe("auto");
+    expect(document.body.style.getPropertyPriority("overflow-y")).toBe("");
     expect(container).not.toHaveAttribute("inert");
     expect(container).toHaveAttribute("aria-hidden", "false");
   });
@@ -109,7 +115,9 @@ it("loads the share sheet once after first interaction and provides an accessibl
 
   const shareSheet = await screen.findByTestId("drill-share-sheet");
   await waitFor(() => {
-    expect(document.body.style.overflow).toBe("clip");
+    expect(document.body.style.overflowX).toBe("clip");
+    expect(document.body.style.getPropertyPriority("overflow-x")).toBe("important");
+    expect(document.body.style.overflowY).toBe("auto");
     expect(container).not.toHaveAttribute("inert");
     expect(container).toHaveAttribute("aria-hidden", "false");
   });
@@ -125,7 +133,14 @@ it("loads the share sheet once after first interaction and provides an accessibl
   expect(shareSheet).toHaveAttribute("data-open", "true");
   expect(mocks.shareSheetLoaded).toHaveBeenCalledOnce();
 
-  document.body.style.overflow = originalBodyOverflow;
+  restoreBodyStyle();
   existingBackground.remove();
   preservedBackground = null;
 });
+
+function restoreBodyStyle() {
+  if (originalBodyStyle === undefined) return;
+  if (originalBodyStyle === null) document.body.removeAttribute("style");
+  else document.body.setAttribute("style", originalBodyStyle);
+  originalBodyStyle = undefined;
+}
