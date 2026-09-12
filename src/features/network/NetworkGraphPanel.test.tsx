@@ -82,6 +82,9 @@ describe("NetworkGraphPanel hidden lifecycle", () => {
     const user = userEvent.setup();
     const { rerender } = render(<Harness active />);
 
+    expect(screen.queryByTestId("controls-sheet")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("detail-sheet")).not.toBeInTheDocument();
+
     await user.click(screen.getByRole("button", { name: "Network controls" }));
     await user.click(screen.getByRole("button", { name: "Search network" }));
     await user.click(screen.getByRole("button", { name: "Open fixture drill" }));

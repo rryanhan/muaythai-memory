@@ -2,9 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { getGraph } from "@/data/graph";
-import { getTaxonomy } from "@/data/taxonomy";
-import type { GraphResponse, TaxonomyResponse } from "@/data/types";
+import type {
+  ApiClientOptions,
+  DrillFilterInput,
+  GraphOptionsInput,
+  GraphResponse,
+  TaxonomyResponse,
+} from "@/data/types";
 import { useDebouncedValue } from "@/features/shared/use-debounced-value";
 import {
   addPreviewKeyword,
@@ -67,7 +71,7 @@ export function NetworkView({ active, initialGraph, initialTaxonomy }: NetworkVi
   );
   const taxonomyQuery = useQuery({
     queryKey: ["taxonomy"],
-    queryFn: ({ signal }) => getTaxonomy({ requestInit: { signal } }),
+    queryFn: ({ signal }) => getTaxonomyOnDemand({ requestInit: { signal } }),
     initialData: initialTaxonomy,
     staleTime: 10 * 60 * 1000,
   });
@@ -117,7 +121,11 @@ export function NetworkView({ active, initialGraph, initialTaxonomy }: NetworkVi
       });
     });
 
-    getGraph(toDrillFilters(stableRequestFilters), layerOptions, { requestInit: { signal: controller.signal } })
+    getGraphOnDemand(
+      toDrillFilters(stableRequestFilters),
+      layerOptions,
+      { requestInit: { signal: controller.signal } },
+    )
       .then((graph) => {
         if (!cancelled && !controller.signal.aborted) {
           setLoadState({ status: "loaded", graph, refreshing: false });
@@ -178,4 +186,18 @@ export function NetworkView({ active, initialGraph, initialTaxonomy }: NetworkVi
       )}
     </section>
   );
+}
+
+async function getGraphOnDemand(
+  filters: DrillFilterInput,
+  graphOptions: GraphOptionsInput,
+  options: ApiClientOptions,
+): Promise<GraphResponse> {
+  const { getGraph } = await import("@/data/graph");
+  return getGraph(filters, graphOptions, options);
+}
+
+async function getTaxonomyOnDemand(options: ApiClientOptions): Promise<TaxonomyResponse> {
+  const { getTaxonomy } = await import("@/data/taxonomy");
+  return getTaxonomy(options);
 }

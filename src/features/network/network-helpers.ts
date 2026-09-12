@@ -1,4 +1,4 @@
-import { ApiError, ApiResponseValidationError } from "@/data/api-core";
+import { ApiError, ApiResponseValidationError } from "@/data/api-errors";
 import type {
   DrillFilterInput,
   GraphEdge,

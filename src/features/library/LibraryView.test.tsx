@@ -88,6 +88,7 @@ describe("LibraryView", () => {
     renderLibrary();
 
     await waitFor(() => expect(mocks.getDrills).toHaveBeenCalledOnce());
+    expect(screen.queryByTestId("library-filter-sheet")).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Filter by tags" }));
     await waitFor(() => {
       expect(screen.getByTestId("library-filter-sheet")).toHaveAttribute("data-open", "true");

@@ -3,7 +3,7 @@
 import { FunnelSimple } from "@phosphor-icons/react/FunnelSimple";
 import { MagnifyingGlass } from "@phosphor-icons/react/MagnifyingGlass";
 import { DRILL_LIMITS } from "@/config/domain-limits";
-import { useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import Image from "next/image";
 import { badgeByIconKey } from "@/components/shared/context-badges";
@@ -12,7 +12,6 @@ import { getTaxonomy } from "@/data/taxonomy";
 import type { TagDto } from "@/data/types";
 import { useDebouncedValue } from "@/features/shared/use-debounced-value";
 import { LibraryDrillRow, LibraryLoadingList, LibraryStatePanel } from "./LibraryDrillList";
-import { LibraryFilterSheet } from "./LibraryFilterSheet";
 import { LibraryIndexPanel } from "./LibraryIndexPanel";
 import {
   formatDrillCount,
@@ -27,11 +26,16 @@ import {
 import { emptyLibraryFilters, type BuiltInStatusFilter, type LibraryFilters } from "./types";
 import styles from "./Library.module.css";
 
+const LibraryFilterSheet = lazy(
+  () => import("./LibraryFilterSheet").then((module) => ({ default: module.LibraryFilterSheet })),
+);
+
 // Owns Training Log query/filter state. Child components own index, sheet, and row presentation.
 export function LibraryView() {
   const [filters, setFilters] = useState<LibraryFilters>(emptyLibraryFilters);
   const [indexOpen, setIndexOpen] = useState(false);
   const [tagPanelOpen, setTagPanelOpen] = useState(false);
+  const [tagPanelMounted, setTagPanelMounted] = useState(false);
   const [draftTagSlugs, setDraftTagSlugs] = useState<string[]>([]);
   const [draftStatusTagSlugs, setDraftStatusTagSlugs] = useState<string[]>([]);
   const [tagSearch, setTagSearch] = useState("");
@@ -183,6 +187,7 @@ export function LibraryView() {
 
   function handleTagPanelOpenChange(open: boolean) {
     if (open) {
+      setTagPanelMounted(true);
       setDraftTagSlugs(filters.tagSlugs);
       setDraftStatusTagSlugs(filters.statusTagSlugs);
     } else {
@@ -293,27 +298,35 @@ export function LibraryView() {
         )}
       </header>
 
-      <LibraryFilterSheet
-        open={tagPanelOpen}
-        onOpenChange={handleTagPanelOpenChange}
-        taxonomyState={taxonomyState}
-        tagCategories={standardTagCategories}
-        customTags={customTags}
-        builtInStatuses={builtInStatuses}
-        activeTagSlugs={filters.tagSlugs}
-        activeStatusTagSlugs={filters.statusTagSlugs}
-        draftTagSlugs={draftTagSlugs}
-        draftStatusTagSlugs={draftStatusTagSlugs}
-        tagSearch={tagSearch}
-        previewState={previewState}
-        onTagSearchChange={setTagSearch}
-        onToggleTag={toggleDraftTag}
-        onToggleStatusTag={toggleDraftStatusTag}
-        onApplyTags={applyTagFilters}
-        onClearTags={clearTagFilters}
-        onRetry={() => void taxonomyQuery.refetch()}
-        onRetryPreview={() => void previewQuery.refetch()}
-      />
+      {tagPanelMounted && (
+        <Suspense
+          fallback={tagPanelOpen
+            ? <span className="sr-only" role="status">Loading filters…</span>
+            : null}
+        >
+          <LibraryFilterSheet
+            open={tagPanelOpen}
+            onOpenChange={handleTagPanelOpenChange}
+            taxonomyState={taxonomyState}
+            tagCategories={standardTagCategories}
+            customTags={customTags}
+            builtInStatuses={builtInStatuses}
+            activeTagSlugs={filters.tagSlugs}
+            activeStatusTagSlugs={filters.statusTagSlugs}
+            draftTagSlugs={draftTagSlugs}
+            draftStatusTagSlugs={draftStatusTagSlugs}
+            tagSearch={tagSearch}
+            previewState={previewState}
+            onTagSearchChange={setTagSearch}
+            onToggleTag={toggleDraftTag}
+            onToggleStatusTag={toggleDraftStatusTag}
+            onApplyTags={applyTagFilters}
+            onClearTags={clearTagFilters}
+            onRetry={() => void taxonomyQuery.refetch()}
+            onRetryPreview={() => void previewQuery.refetch()}
+          />
+        </Suspense>
+      )}
 
       {drillListState.status === "loading" && <LibraryLoadingList />}
 

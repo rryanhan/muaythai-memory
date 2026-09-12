@@ -1,13 +1,22 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type Dispatch, type SetStateAction } from "react";
+import {
+  lazy,
+  Suspense,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type Dispatch,
+  type SetStateAction,
+} from "react";
 import Link from "next/link";
 import { MagnifyingGlass } from "@phosphor-icons/react/MagnifyingGlass";
 import { Microphone } from "@phosphor-icons/react/Microphone";
 import { SlidersHorizontal } from "@phosphor-icons/react/SlidersHorizontal";
 import { badgeByIconKey } from "@/components/shared/context-badges";
 import { DRILL_LIMITS } from "@/config/domain-limits";
-import { getDrill } from "@/data/drills";
 import type {
   GraphOptions,
   GraphResponse,
@@ -15,10 +24,8 @@ import type {
   TaxonomyResponse,
   UpdateSavedListResponse,
 } from "@/data/types";
-import { DrillDetailSheet } from "@/features/drills/DrillDetailSheet";
 import { getBuiltInStatusFilters, type BuiltInStatusFilter } from "@/features/shared/tag-filter-helpers";
 import { updateStatusTags } from "@/features/shared/saved-list-state";
-import { NetworkControlsSheet } from "./NetworkControlsSheet";
 import { NetworkForceGraph } from "./NetworkForceGraph";
 import {
   buildNetworkGraphVisualState,
@@ -31,6 +38,13 @@ import {
 } from "./network-helpers";
 import { type DrillDetailLoadState, type NetworkFilters } from "./types";
 import { NetworkStatePanel } from "./NetworkStates";
+
+const NetworkControlsSheet = lazy(
+  () => import("./NetworkControlsSheet").then((module) => ({ default: module.NetworkControlsSheet })),
+);
+const DrillDetailSheet = lazy(
+  () => import("@/features/drills/DrillDetailSheet").then((module) => ({ default: module.DrillDetailSheet })),
+);
 
 type NetworkGraphPanelProps = {
   active: boolean;
@@ -77,6 +91,7 @@ export function NetworkGraphPanel({
   onRetryTaxonomy,
 }: NetworkGraphPanelProps) {
   const [controlsOpen, setControlsOpen] = useState(false);
+  const [controlsMounted, setControlsMounted] = useState(false);
   const [tagSearch, setTagSearch] = useState("");
   const [tagSelectOpen, setTagSelectOpen] = useState(false);
   const [selectedDrillId, setSelectedDrillId] = useState<string | null>(null);
@@ -134,7 +149,7 @@ export function NetworkGraphPanel({
 
     const controller = new AbortController();
 
-    getDrill(selectedDrillId, { requestInit: { signal: controller.signal } })
+    getDrillOnDemand(selectedDrillId, { requestInit: { signal: controller.signal } })
       .then((drill) => {
         if (!controller.signal.aborted) {
           setDetailLoadState({ status: "loaded", drill });
@@ -417,28 +432,36 @@ export function NetworkGraphPanel({
         </form>
       )}
 
-      <NetworkControlsSheet
-        open={active && controlsOpen}
-        onOpenChange={(open) => {
-          setControlsOpen(open);
-          if (!open) {
-            setTagSearch("");
-            setTagSelectOpen(false);
-          }
-        }}
-        filters={filters}
-        layerOptions={layerOptions}
-        taxonomy={taxonomy}
-        taxonomyLoading={taxonomyLoading}
-        taxonomyErrorMessage={taxonomyErrorMessage}
-        tagSearch={tagSearch}
-        tagSelectOpen={tagSelectOpen}
-        onTagSearchChange={setTagSearch}
-        onTagSelectOpenChange={setTagSelectOpen}
-        onUpdateFilters={onUpdateFilters}
-        onLayerOptionsChange={onLayerOptionsChange}
-        onRetryTaxonomy={onRetryTaxonomy}
-      />
+      {controlsMounted && (
+        <Suspense
+          fallback={controlsOpen
+            ? <span className="sr-only" role="status">Loading network controls…</span>
+            : null}
+        >
+          <NetworkControlsSheet
+            open={active && controlsOpen}
+            onOpenChange={(open) => {
+              setControlsOpen(open);
+              if (!open) {
+                setTagSearch("");
+                setTagSelectOpen(false);
+              }
+            }}
+            filters={filters}
+            layerOptions={layerOptions}
+            taxonomy={taxonomy}
+            taxonomyLoading={taxonomyLoading}
+            taxonomyErrorMessage={taxonomyErrorMessage}
+            tagSearch={tagSearch}
+            tagSelectOpen={tagSelectOpen}
+            onTagSearchChange={setTagSearch}
+            onTagSelectOpenChange={setTagSelectOpen}
+            onUpdateFilters={onUpdateFilters}
+            onLayerOptionsChange={onLayerOptionsChange}
+            onRetryTaxonomy={onRetryTaxonomy}
+          />
+        </Suspense>
+      )}
 
       <div className="network-action-rail" aria-label="Network actions">
         <button
@@ -446,7 +469,10 @@ export function NetworkGraphPanel({
           aria-label="Network controls"
           aria-expanded={active && controlsOpen}
           data-active={active && controlsOpen}
-          onClick={() => setControlsOpen((open) => !open)}
+          onClick={() => {
+            setControlsMounted(true);
+            setControlsOpen((open) => !open);
+          }}
         >
           <SlidersHorizontal size={25} weight="regular" aria-hidden="true" />
         </button>
@@ -470,18 +496,28 @@ export function NetworkGraphPanel({
       </div>
 
       {active && selectedDrillId && visibleDetailState.status !== "idle" && (
-        <DrillDetailSheet
-          state={visibleDetailState}
-          badgeByIconKey={badgeByIconKey}
-          open={detailOpen}
-          onOpenChange={setDetailOpen}
-          onAnimationEnd={handleDetailAnimationEnd}
-          onRetry={retryDrillDetail}
-          onSavedListChange={handleDetailSavedListChange}
-        />
+        <Suspense fallback={<span className="sr-only" role="status">Loading drill details…</span>}>
+          <DrillDetailSheet
+            state={visibleDetailState}
+            badgeByIconKey={badgeByIconKey}
+            open={detailOpen}
+            onOpenChange={setDetailOpen}
+            onAnimationEnd={handleDetailAnimationEnd}
+            onRetry={retryDrillDetail}
+            onSavedListChange={handleDetailSavedListChange}
+          />
+        </Suspense>
       )}
     </>
   );
+}
+
+async function getDrillOnDemand(
+  id: string,
+  options: { requestInit: { signal: AbortSignal } },
+) {
+  const { getDrill } = await import("@/data/drills");
+  return getDrill(id, options);
 }
 
 function toFallbackTag(slug: string): TagDto {

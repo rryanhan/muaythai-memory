@@ -151,6 +151,9 @@ describe("NetworkView initial data", () => {
     fireEvent.submit(screen.getByRole("form", { name: "Network keyword search" }));
 
     expect(screen.queryByRole("textbox", { name: "Search keyword" })).not.toBeInTheDocument();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
     expect(mocks.getGraph).toHaveBeenCalledOnce();
     expect(mocks.getGraph.mock.calls[0]?.[0]).toMatchObject({ keywords: ["muay"] });
 
