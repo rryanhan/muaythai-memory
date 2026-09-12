@@ -85,7 +85,7 @@ export function AppShell({
 
 function writeViewToUrl(view: AppView) {
   const path = view === "network" ? "/" : `/?view=${view}`;
-  window.history.replaceState(window.history.state, "", path);
+  window.history.replaceState(null, "", path);
 }
 
 function parseView(value: string | null): AppView {

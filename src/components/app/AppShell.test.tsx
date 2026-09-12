@@ -82,6 +82,11 @@ describe("AppShell view lifecycle", () => {
     fireEvent.click(screen.getByRole("button", { name: "Training Log" }));
 
     expect(window.location.search).toBe("?view=library");
+    expect(window.history.replaceState).toHaveBeenLastCalledWith(
+      null,
+      "",
+      "/?view=library",
+    );
     expect(screen.getByLabelText("Training Log view")).toBeVisible();
     expect(await screen.findByText("Training Log content")).toBeVisible();
     expect(screen.getByRole("button", { name: "Network state 1", hidden: true }))
