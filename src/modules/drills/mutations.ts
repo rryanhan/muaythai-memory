@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNull, or } from "drizzle-orm";
+import { and, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   drillCreationKeys,
@@ -85,6 +85,17 @@ export class SavedListMutationError extends Error {
   }
 }
 
+type DrillTaxonomyReference = {
+  id: string;
+  slug: string;
+};
+
+type ActiveDrillTaxonomyRows = {
+  methodRows: DrillTaxonomyReference[];
+  tagRows: DrillTaxonomyReference[];
+  statusRows: DrillTaxonomyReference[];
+};
+
 export async function createDrill(
   userId: string,
   rawInput: CreateDrillInput,
@@ -110,11 +121,12 @@ export async function createDrill(
   const trainingMethodSlugs = unique(input.trainingMethodSlugs);
   const tagSlugs = unique(input.tagSlugs);
   const statusSlugs = unique(input.statusTagSlugs);
-  const [methodRows, tagRows, statusRows] = await Promise.all([
-    getActiveTrainingMethodsBySlug(trainingMethodSlugs),
-    getActiveTagsBySlug(userId, tagSlugs),
-    getActiveStatusTagsBySlug(statusSlugs),
-  ]);
+  const { methodRows, tagRows, statusRows } = await getActiveDrillTaxonomyRows(
+    userId,
+    trainingMethodSlugs,
+    tagSlugs,
+    statusSlugs,
+  );
   const issues = [
     ...getMissingSlugIssues("Training Method", trainingMethodSlugs, methodRows.map((method) => method.slug)),
     ...getMissingSlugIssues("Tag", tagSlugs, tagRows.map((tag) => tag.slug)),
@@ -239,11 +251,12 @@ export async function updateDrill(userId: string, id: string, rawInput: UpdateDr
   const trainingMethodSlugs = unique(input.trainingMethodSlugs);
   const tagSlugs = unique(input.tagSlugs);
   const statusSlugs = unique(input.statusTagSlugs);
-  const [methodRows, tagRows, statusRows] = await Promise.all([
-    getActiveTrainingMethodsBySlug(trainingMethodSlugs),
-    getActiveTagsBySlug(userId, tagSlugs),
-    getActiveStatusTagsBySlug(statusSlugs),
-  ]);
+  const { methodRows, tagRows, statusRows } = await getActiveDrillTaxonomyRows(
+    userId,
+    trainingMethodSlugs,
+    tagSlugs,
+    statusSlugs,
+  );
   const issues = [
     ...getMissingSlugIssues("Training Method", trainingMethodSlugs, methodRows.map((method) => method.slug)),
     ...getMissingSlugIssues("Tag", tagSlugs, tagRows.map((tag) => tag.slug)),
@@ -372,35 +385,61 @@ export async function setDrillSavedList(
   });
 }
 
-async function getActiveTrainingMethodsBySlug(slugs: string[]) {
-  return db
-    .select({ id: trainingMethods.id, slug: trainingMethods.slug })
-    .from(trainingMethods)
-    .where(and(inArray(trainingMethods.slug, slugs), eq(trainingMethods.active, true)));
-}
-
-async function getActiveTagsBySlug(userId: string, slugs: string[]) {
-  if (slugs.length === 0) return [];
-
-  return db
-    .select({ id: tags.id, slug: tags.slug })
-    .from(tags)
-    .where(
-      and(
-        inArray(tags.slug, slugs),
-        eq(tags.active, true),
-        or(isNull(tags.userId), eq(tags.userId, userId)),
-      ),
-    );
-}
-
-async function getActiveStatusTagsBySlug(slugs: string[]) {
-  if (slugs.length === 0) return [];
-
-  return db
-    .select({ id: statusTags.id, slug: statusTags.slug })
-    .from(statusTags)
-    .where(and(inArray(statusTags.slug, slugs), eq(statusTags.active, true)));
+async function getActiveDrillTaxonomyRows(
+  userId: string,
+  trainingMethodSlugs: string[],
+  tagSlugs: string[],
+  statusSlugs: string[],
+): Promise<ActiveDrillTaxonomyRows> {
+  const tagRowsQuery = tagSlugs.length > 0
+    ? sql`
+        coalesce((
+          select jsonb_agg(jsonb_build_object(
+            'id', ${tags.id},
+            'slug', ${tags.slug}
+          ))
+          from ${tags}
+          where ${and(
+            inArray(tags.slug, tagSlugs),
+            eq(tags.active, true),
+            or(isNull(tags.userId), eq(tags.userId, userId)),
+          )}
+        ), '[]'::jsonb)
+      `
+    : sql`'[]'::jsonb`;
+  const statusRowsQuery = statusSlugs.length > 0
+    ? sql`
+        coalesce((
+          select jsonb_agg(jsonb_build_object(
+            'id', ${statusTags.id},
+            'slug', ${statusTags.slug}
+          ))
+          from ${statusTags}
+          where ${and(
+            inArray(statusTags.slug, statusSlugs),
+            eq(statusTags.active, true),
+          )}
+        ), '[]'::jsonb)
+      `
+    : sql`'[]'::jsonb`;
+  const [rows] = await db.execute<ActiveDrillTaxonomyRows>(sql`
+    select
+      coalesce((
+        select jsonb_agg(jsonb_build_object(
+          'id', ${trainingMethods.id},
+          'slug', ${trainingMethods.slug}
+        ))
+        from ${trainingMethods}
+        where ${and(
+          inArray(trainingMethods.slug, trainingMethodSlugs),
+          eq(trainingMethods.active, true),
+        )}
+      ), '[]'::jsonb) as "methodRows",
+      ${tagRowsQuery} as "tagRows",
+      ${statusRowsQuery} as "statusRows"
+  `);
+  if (!rows) throw new Error("Active drill taxonomy could not be loaded.");
+  return rows;
 }
 
 function getMissingSlugIssues(label: string, requestedSlugs: string[], foundSlugs: string[]): string[] {
