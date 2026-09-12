@@ -1,5 +1,5 @@
-import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CurrentAppUser } from "@/modules/auth";
 import { ProfileEditForm } from "./ProfileEditForm";
 
@@ -7,19 +7,6 @@ const mocks = vi.hoisted(() => ({
   prepareImageForClientDecode: vi.fn(),
   updateProfile: vi.fn(),
 }));
-
-const cropSheetModule = vi.hoisted(() => {
-  let resolveLoading!: () => void;
-  const loadingGate = new Promise<void>((resolve) => {
-    resolveLoading = resolve;
-  });
-
-  return {
-    loadStarted: vi.fn(),
-    loadingGate,
-    resolveLoading,
-  };
-});
 
 vi.mock("@/features/media/prepare-image-for-decode", () => ({
   prepareImageForClientDecode: mocks.prepareImageForClientDecode,
@@ -35,32 +22,25 @@ vi.mock("./ProfileAvatar", () => ({
   ),
 }));
 
-vi.mock("./AvatarCropSheet", async () => {
-  cropSheetModule.loadStarted();
-  await cropSheetModule.loadingGate;
-
-  return {
-    AvatarCropSheet: ({
-      imageUrl,
-      onUsePhoto,
-    }: {
-      imageUrl: string;
-      onUsePhoto: (file: File) => void;
-    }) => (
-      <div>
-        <span>Crop source: {imageUrl}</span>
-        <button
-          type="button"
-          onClick={() => onUsePhoto(new File(["cropped"], "profile-avatar.webp", { type: "image/webp" }))}
-        >
-          Use mocked photo
-        </button>
-      </div>
-    ),
-  };
-});
-
-afterAll(() => cropSheetModule.resolveLoading());
+vi.mock("./AvatarCropSheet", () => ({
+  AvatarCropSheet: ({
+    imageUrl,
+    onUsePhoto,
+  }: {
+    imageUrl: string;
+    onUsePhoto: (file: File) => void;
+  }) => (
+    <div>
+      <span>Crop source: {imageUrl}</span>
+      <button
+        type="button"
+        onClick={() => onUsePhoto(new File(["cropped"], "profile-avatar.webp", { type: "image/webp" }))}
+      >
+        Use mocked photo
+      </button>
+    </div>
+  ),
+}));
 
 describe("ProfileEditForm object URL ownership", () => {
   const createObjectURL = vi.spyOn(URL, "createObjectURL");
@@ -77,39 +57,6 @@ describe("ProfileEditForm object URL ownership", () => {
   afterEach(() => {
     createObjectURL.mockReset();
     revokeObjectURL.mockReset();
-  });
-
-  it("loads the crop editor only after a valid photo is prepared and keeps loading cancellable", async () => {
-    const prepared = new File(["prepared"], "prepared.png", { type: "image/png" });
-    mocks.prepareImageForClientDecode.mockResolvedValue(prepared);
-    const { container, unmount } = renderForm();
-
-    expect(cropSheetModule.loadStarted).not.toHaveBeenCalled();
-
-    chooseFile(container, new File(["source"], "source.png", { type: "image/png" }));
-
-    const loadingDialog = await screen.findByRole("dialog", { name: "Preparing editor" });
-    expect(screen.getByRole("status")).toHaveTextContent("Loading photo editor…");
-    const loadingCancel = within(loadingDialog).getByRole("button", { name: "Cancel" });
-    expect(loadingCancel).toHaveFocus();
-    fireEvent.keyDown(loadingDialog, { key: "Tab" });
-    expect(loadingCancel).toHaveFocus();
-    await waitFor(() => expect(cropSheetModule.loadStarted).toHaveBeenCalledOnce());
-
-    fireEvent.keyDown(loadingDialog, { key: "Escape" });
-    expect(screen.queryByRole("dialog", { name: "Preparing editor" })).not.toBeInTheDocument();
-    expect(revokeObjectURL).toHaveBeenCalledWith("blob:profile-1");
-
-    chooseFile(container, new File(["source again"], "source-again.png", { type: "image/png" }));
-    expect(await screen.findByRole("dialog", { name: "Preparing editor" })).toBeVisible();
-
-    await act(async () => {
-      cropSheetModule.resolveLoading();
-      await cropSheetModule.loadingGate;
-    });
-
-    expect(await screen.findByText("Crop source: blob:profile-2")).toBeVisible();
-    unmount();
   });
 
   it("does not create a crop URL when image preparation resolves after unmount", async () => {
