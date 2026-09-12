@@ -1,7 +1,6 @@
 import {
   and,
   asc,
-  countDistinct,
   eq,
   gt,
   isNotNull,
@@ -45,6 +44,15 @@ type FighterConnectionSnapshotRow = FighterProfileRow & {
   incomingStatus: "pending" | "accepted" | null;
   incomingRequestedAt: Date | string | null;
   incomingAcceptedAt: Date | string | null;
+};
+
+type FighterTrainingStats = NonNullable<FighterProfile["stats"]>;
+type FighterProfileSnapshotRow = FighterConnectionSnapshotRow & {
+  followers: number;
+  following: number;
+  canViewConnections: boolean;
+  drillCount: number | null;
+  trainingMethods: FighterTrainingStats["trainingMethods"] | null;
 };
 
 const sectionCursorSchema = z.object({
@@ -226,58 +234,143 @@ export async function findFighterByUsername(
     limit 1
   `);
   if (!snapshot) return null;
-
-  const profile = toFighterSummary(snapshot);
-  if (!profile) throw new Error("Visible fighter query returned an incomplete profile.");
-  if (profile.id === currentUserId) {
-    return {
-      profile,
-      isSelf: true,
-      blockedByViewer: false,
-      outgoing: emptyDirection(),
-      incoming: emptyDirection(),
-      mutual: false,
-    };
-  }
-
-  const outgoing = toSnapshotDirection(
-    snapshot.outgoingStatus,
-    snapshot.outgoingRequestedAt,
-    snapshot.outgoingAcceptedAt,
-  );
-  const incoming = toSnapshotDirection(
-    snapshot.incomingStatus,
-    snapshot.incomingRequestedAt,
-    snapshot.incomingAcceptedAt,
-  );
-  return {
-    profile,
-    isSelf: false,
-    blockedByViewer: false,
-    outgoing,
-    incoming,
-    mutual: outgoing.status === "accepted" && incoming.status === "accepted",
-  };
+  return toFighterConnection(snapshot, currentUserId);
 }
 
 export async function getFighterProfileByUsername(
   currentUserId: string,
   username: string,
 ): Promise<FighterProfile | null> {
-  const connection = await findFighterByUsername(currentUserId, username);
-  if (!connection) return null;
+  const [snapshot] = await db.execute<FighterProfileSnapshotRow>(sql`
+    with request_context as (
+      select
+        ${currentUserId}::uuid as "viewerId",
+        ${username}::text as "username"
+    ),
+    visible_fighter as materialized (
+      select
+        ${users.id} as "id",
+        ${users.username} as "username",
+        ${users.avatarUrl} as "avatarUrl",
+        outgoing_follow."status" as "outgoingStatus",
+        outgoing_follow."created_at" as "outgoingRequestedAt",
+        case
+          when outgoing_follow."status" = 'accepted'
+            then coalesce(outgoing_follow."responded_at", outgoing_follow."updated_at")
+          else null
+        end as "outgoingAcceptedAt",
+        incoming_follow."status" as "incomingStatus",
+        incoming_follow."created_at" as "incomingRequestedAt",
+        case
+          when incoming_follow."status" = 'accepted'
+            then coalesce(incoming_follow."responded_at", incoming_follow."updated_at")
+          else null
+        end as "incomingAcceptedAt",
+        (
+          ${users.id} = request_context."viewerId"
+          or (
+            outgoing_follow."status" = 'accepted'
+            and incoming_follow."status" = 'accepted'
+          )
+        ) as "canViewConnections"
+      from request_context
+      inner join ${users}
+        on ${users.username} = request_context."username"
+        and ${users.profileOnboardedAt} is not null
+      left join ${follows} as outgoing_follow
+        on outgoing_follow."follower_id" = request_context."viewerId"
+        and outgoing_follow."following_id" = ${users.id}
+      left join ${follows} as incoming_follow
+        on incoming_follow."follower_id" = ${users.id}
+        and incoming_follow."following_id" = request_context."viewerId"
+      where ${users.id} = request_context."viewerId"
+        or not exists (
+          select 1
+          from ${userBlocks} as pair_block
+          where (
+            pair_block."blocker_id" = request_context."viewerId"
+            and pair_block."blocked_id" = ${users.id}
+          ) or (
+            pair_block."blocker_id" = ${users.id}
+            and pair_block."blocked_id" = request_context."viewerId"
+          )
+        )
+      limit 1
+    )
+    select
+      visible_fighter.*,
+      (
+        select count(*)::integer
+        from ${follows}
+        where ${follows.followingId} = visible_fighter."id"
+          and ${follows.status} = 'accepted'
+      ) as "followers",
+      (
+        select count(*)::integer
+        from ${follows}
+        where ${follows.followerId} = visible_fighter."id"
+          and ${follows.status} = 'accepted'
+      ) as "following",
+      private_stats."drillCount",
+      private_stats."trainingMethods"
+    from visible_fighter
+    left join lateral (
+      select
+        (
+          select count(*)::integer
+          from ${drills}
+          where ${drills.userId} = visible_fighter."id"
+        ) as "drillCount",
+        coalesce((
+          select jsonb_agg(
+            jsonb_build_object(
+              'id', method_counts."id",
+              'name', method_counts."name",
+              'slug', method_counts."slug",
+              'iconKey', method_counts."iconKey",
+              'count', method_counts."count"
+            ) order by method_counts."sortOrder", method_counts."name"
+          )
+          from (
+            select
+              ${trainingMethods.id} as "id",
+              ${trainingMethods.name} as "name",
+              ${trainingMethods.slug} as "slug",
+              ${trainingMethods.iconKey} as "iconKey",
+              ${trainingMethods.sortOrder} as "sortOrder",
+              count(distinct ${drills.id})::integer as "count"
+            from ${drills}
+            inner join ${drillTrainingMethods}
+              on ${drillTrainingMethods.drillId} = ${drills.id}
+            inner join ${trainingMethods}
+              on ${trainingMethods.id} = ${drillTrainingMethods.trainingMethodId}
+            where ${drills.userId} = visible_fighter."id"
+              and ${trainingMethods.active} = true
+            group by
+              ${trainingMethods.id},
+              ${trainingMethods.name},
+              ${trainingMethods.slug},
+              ${trainingMethods.iconKey},
+              ${trainingMethods.sortOrder}
+          ) as method_counts
+        ), '[]'::jsonb) as "trainingMethods"
+    ) as private_stats on visible_fighter."canViewConnections"
+  `);
+  if (!snapshot) return null;
 
-  const [socialCounts, stats] = await Promise.all([
-    getPublicSocialCounts(connection.profile.id),
-    connection.isSelf || connection.mutual
-      ? loadPrivateTrainingStats(currentUserId, connection.profile.id)
-      : Promise.resolve(null),
-  ]);
+  const connection = toFighterConnection(snapshot, currentUserId);
+  const canViewConnections = connection.isSelf || connection.mutual;
+  const stats = canViewConnections
+    ? toFighterTrainingStats(snapshot)
+    : null;
 
   return {
     ...connection,
-    socialCounts,
-    canViewConnections: connection.isSelf || connection.mutual,
+    socialCounts: {
+      followers: snapshot.followers,
+      following: snapshot.following,
+    },
+    canViewConnections,
     stats,
   };
 }
@@ -327,91 +420,51 @@ function toConnectionDate(value: Date | string): Date {
   return value instanceof Date ? value : new Date(value);
 }
 
-async function getPublicSocialCounts(userId: string) {
-  const [counts] = await db.execute<FighterProfile["socialCounts"]>(sql`
-    select
-      inbound."followers",
-      outbound."following"
-    from (
-      select count(*)::integer as "followers"
-      from ${follows}
-      where ${follows.followingId} = ${userId}
-        and ${follows.status} = 'accepted'
-    ) as inbound
-    cross join (
-      select count(*)::integer as "following"
-      from ${follows}
-      where ${follows.followerId} = ${userId}
-        and ${follows.status} = 'accepted'
-    ) as outbound
-  `);
+function toFighterConnection(
+  snapshot: FighterConnectionSnapshotRow,
+  currentUserId: string,
+): FighterConnection {
+  const profile = toFighterSummary(snapshot);
+  if (!profile) throw new Error("Visible fighter query returned an incomplete profile.");
+  if (profile.id === currentUserId) {
+    return {
+      profile,
+      isSelf: true,
+      blockedByViewer: false,
+      outgoing: emptyDirection(),
+      incoming: emptyDirection(),
+      mutual: false,
+    };
+  }
 
-  if (!counts) throw new Error("Public social counts could not be loaded.");
-  return counts;
+  const outgoing = toSnapshotDirection(
+    snapshot.outgoingStatus,
+    snapshot.outgoingRequestedAt,
+    snapshot.outgoingAcceptedAt,
+  );
+  const incoming = toSnapshotDirection(
+    snapshot.incomingStatus,
+    snapshot.incomingRequestedAt,
+    snapshot.incomingAcceptedAt,
+  );
+  return {
+    profile,
+    isSelf: false,
+    blockedByViewer: false,
+    outgoing,
+    incoming,
+    mutual: outgoing.status === "accepted" && incoming.status === "accepted",
+  };
 }
 
-async function loadPrivateTrainingStats(
-  viewerUserId: string,
-  fighterUserId: string,
-): Promise<FighterProfile["stats"]> {
-  return db.transaction(async (tx) => {
-    if (viewerUserId !== fighterUserId) {
-      const rows = await tx
-        .select({ followerId: follows.followerId })
-        .from(follows)
-        .where(and(
-          eq(follows.status, "accepted"),
-          or(
-            and(
-              eq(follows.followerId, viewerUserId),
-              eq(follows.followingId, fighterUserId),
-            ),
-            and(
-              eq(follows.followerId, fighterUserId),
-              eq(follows.followingId, viewerUserId),
-            ),
-          ),
-        ))
-        .for("share")
-        .limit(2);
-      if (rows.length !== 2) return null;
-    }
-
-    const [drillTotalRows, methodRows] = await Promise.all([
-      tx
-        .select({ count: countDistinct(drills.id) })
-        .from(drills)
-        .where(eq(drills.userId, fighterUserId)),
-      tx
-        .select({
-          id: trainingMethods.id,
-          name: trainingMethods.name,
-          slug: trainingMethods.slug,
-          iconKey: trainingMethods.iconKey,
-          count: countDistinct(drills.id),
-        })
-        .from(drills)
-        .innerJoin(drillTrainingMethods, eq(drillTrainingMethods.drillId, drills.id))
-        .innerJoin(trainingMethods, eq(trainingMethods.id, drillTrainingMethods.trainingMethodId))
-        .where(and(
-          eq(drills.userId, fighterUserId),
-          eq(trainingMethods.active, true),
-        ))
-        .groupBy(
-          trainingMethods.id,
-          trainingMethods.name,
-          trainingMethods.slug,
-          trainingMethods.iconKey,
-          trainingMethods.sortOrder,
-        )
-        .orderBy(asc(trainingMethods.sortOrder), asc(trainingMethods.name)),
-    ]);
-
-    return {
-      drillCount: drillTotalRows[0]?.count ?? 0,
-      trainingMethods: methodRows,
-    };
-  });
+function toFighterTrainingStats(snapshot: FighterProfileSnapshotRow): FighterTrainingStats {
+  if (snapshot.drillCount === null || snapshot.trainingMethods === null) {
+    throw new Error("Authorized fighter query returned incomplete private stats.");
+  }
+  return {
+    drillCount: snapshot.drillCount,
+    trainingMethods: snapshot.trainingMethods,
+  };
 }
 
 async function loadFighterProfileByUsername(

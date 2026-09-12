@@ -212,9 +212,48 @@ describe("connection count queries", () => {
     expect(mocks.execute).toHaveBeenCalledOnce();
   });
 
-  it("loads accepted public follower directions in one statement", async () => {
-    mocks.execute
-      .mockResolvedValueOnce([{
+  it("loads visibility, social counts, and gated stats in one statement", async () => {
+    mocks.execute.mockImplementationOnce(async (query) => {
+      const compiled = new PgDialect().sqlToQuery(query);
+      const normalizedSql = compiled.sql.replace(/\s+/g, " ").trim();
+
+      expect(normalizedSql).toContain(`with request_context as (`);
+      expect(normalizedSql).toContain(`visible_fighter as materialized (`);
+      expect(normalizedSql).toContain(
+        `"users"."profile_onboarded_at" is not null`,
+      );
+      expect(normalizedSql).toContain(
+        `pair_block."blocker_id" = request_context."viewerId" ` +
+          `and pair_block."blocked_id" = "users"."id"`,
+      );
+      expect(normalizedSql).toContain(
+        `pair_block."blocker_id" = "users"."id" ` +
+          `and pair_block."blocked_id" = request_context."viewerId"`,
+      );
+      expect(normalizedSql).toContain(
+        `outgoing_follow."status" = 'accepted' ` +
+          `and incoming_follow."status" = 'accepted'`,
+      );
+      expect(normalizedSql).toContain(
+        `where "follows"."following_id" = visible_fighter."id" ` +
+          `and "follows"."status" = 'accepted'`,
+      );
+      expect(normalizedSql).toContain(
+        `where "follows"."follower_id" = visible_fighter."id" ` +
+          `and "follows"."status" = 'accepted'`,
+      );
+      expect(normalizedSql).toContain(
+        `left join lateral ( select`,
+      );
+      expect(normalizedSql).toContain(
+        `) as private_stats on visible_fighter."canViewConnections"`,
+      );
+      expect(normalizedSql).toContain(
+        `and "training_methods"."active" = true`,
+      );
+      expect(compiled.params).toEqual([viewerId, "target_fighter"]);
+
+      return [{
         id: userId,
         username: "target_fighter",
         avatarUrl: null,
@@ -224,28 +263,129 @@ describe("connection count queries", () => {
         incomingStatus: null,
         incomingRequestedAt: null,
         incomingAcceptedAt: null,
-      }])
-      .mockImplementationOnce(async (query) => {
-        const compiled = new PgDialect().sqlToQuery(query);
-        const normalizedSql = compiled.sql.replace(/\s+/g, " ").trim();
-
-        expect(normalizedSql).toContain(
-          `select count(*)::integer as "followers" from "follows" ` +
-            `where "follows"."following_id" = $1 and "follows"."status" = 'accepted'`,
-        );
-        expect(normalizedSql).toContain(
-          `select count(*)::integer as "following" from "follows" ` +
-            `where "follows"."follower_id" = $2 and "follows"."status" = 'accepted'`,
-        );
-        expect(compiled.params).toEqual([userId, userId]);
-        return [{ followers: 7, following: 9 }];
-      });
+        canViewConnections: false,
+        followers: 7,
+        following: 9,
+        drillCount: null,
+        trainingMethods: null,
+      }];
+    });
 
     const fighter = await getFighterProfileByUsername(viewerId, "target_fighter");
 
     expect(fighter?.socialCounts).toEqual({ followers: 7, following: 9 });
     expect(fighter?.stats).toBeNull();
-    expect(mocks.execute).toHaveBeenCalledTimes(2);
+    expect(fighter?.canViewConnections).toBe(false);
+    expect(mocks.execute).toHaveBeenCalledOnce();
+    expect(mocks.select).not.toHaveBeenCalled();
+  });
+
+  it("maps mutual directions and authorized private training stats", async () => {
+    const requestedAt = new Date("2026-04-01T00:00:00.000Z");
+    const acceptedAt = new Date("2026-04-02T00:00:00.000Z");
+    mocks.execute.mockResolvedValueOnce([{
+      id: userId,
+      username: "target_fighter",
+      avatarUrl: null,
+      outgoingStatus: "accepted",
+      outgoingRequestedAt: requestedAt,
+      outgoingAcceptedAt: acceptedAt,
+      incomingStatus: "accepted",
+      incomingRequestedAt: requestedAt,
+      incomingAcceptedAt: acceptedAt,
+      canViewConnections: true,
+      followers: 4,
+      following: 5,
+      drillCount: 6,
+      trainingMethods: [{
+        id: "33333333-3333-4333-8333-333333333333",
+        name: "Pad Work",
+        slug: "pad-work",
+        iconKey: "pads",
+        count: 3,
+      }],
+    }]);
+
+    const fighter = await getFighterProfileByUsername(viewerId, "target_fighter");
+
+    expect(fighter).toMatchObject({
+      mutual: true,
+      canViewConnections: true,
+      socialCounts: { followers: 4, following: 5 },
+      stats: {
+        drillCount: 6,
+        trainingMethods: [{ name: "Pad Work", count: 3 }],
+      },
+    });
+    expect(mocks.execute).toHaveBeenCalledOnce();
+  });
+
+  it("allows self access while keeping follow directions hidden", async () => {
+    mocks.execute.mockResolvedValueOnce([{
+      id: viewerId,
+      username: "viewer_fighter",
+      avatarUrl: null,
+      outgoingStatus: "accepted",
+      outgoingRequestedAt: new Date(),
+      outgoingAcceptedAt: new Date(),
+      incomingStatus: "accepted",
+      incomingRequestedAt: new Date(),
+      incomingAcceptedAt: new Date(),
+      canViewConnections: true,
+      followers: 1,
+      following: 2,
+      drillCount: 0,
+      trainingMethods: [],
+    }]);
+
+    await expect(getFighterProfileByUsername(viewerId, "viewer_fighter")).resolves.toMatchObject({
+      isSelf: true,
+      mutual: false,
+      outgoing: { status: "none" },
+      incoming: { status: "none" },
+      canViewConnections: true,
+      stats: { drillCount: 0, trainingMethods: [] },
+    });
+    expect(mocks.execute).toHaveBeenCalledOnce();
+  });
+
+  it("does not expose private fields unless mapped follow directions are mutual", async () => {
+    mocks.execute.mockResolvedValueOnce([{
+      id: userId,
+      username: "target_fighter",
+      avatarUrl: null,
+      outgoingStatus: "accepted",
+      outgoingRequestedAt: new Date(),
+      outgoingAcceptedAt: new Date(),
+      incomingStatus: "pending",
+      incomingRequestedAt: new Date(),
+      incomingAcceptedAt: null,
+      canViewConnections: true,
+      followers: 1,
+      following: 2,
+      drillCount: 99,
+      trainingMethods: [{
+        id: "33333333-3333-4333-8333-333333333333",
+        name: "Private",
+        slug: "private",
+        iconKey: null,
+        count: 99,
+      }],
+    }]);
+
+    const fighter = await getFighterProfileByUsername(viewerId, "target_fighter");
+
+    expect(fighter?.mutual).toBe(false);
+    expect(fighter?.canViewConnections).toBe(false);
+    expect(fighter?.stats).toBeNull();
+    expect(mocks.execute).toHaveBeenCalledOnce();
+  });
+
+  it("returns null in one statement when the profile is absent, unonboarded, or blocked", async () => {
+    mocks.execute.mockResolvedValueOnce([]);
+
+    await expect(getFighterProfileByUsername(viewerId, "hidden_fighter")).resolves.toBeNull();
+    expect(mocks.execute).toHaveBeenCalledOnce();
     expect(mocks.select).not.toHaveBeenCalled();
   });
 });
