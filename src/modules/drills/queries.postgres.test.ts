@@ -2,7 +2,11 @@ import { drizzle } from "drizzle-orm/postgres-js";
 import postgres, { type Sql } from "postgres";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import * as schema from "@/db/schema";
-import { getDrillById } from "./queries";
+import {
+  getDrillById,
+  getDrillSummariesByOwnerPairs,
+  listDrills,
+} from "./queries";
 
 const databaseUrl = process.env.JOURNAL_TEST_DATABASE_URL;
 const describePostgres = databaseUrl ? describe : describe.skip;
@@ -10,6 +14,8 @@ const describePostgres = databaseUrl ? describe : describe.skip;
 const ownerId = "71000000-0000-4000-8000-000000000001";
 const otherUserId = "71000000-0000-4000-8000-000000000002";
 const drillId = "72000000-0000-4000-8000-000000000001";
+const relationlessDrillId = "72000000-0000-4000-8000-000000000002";
+const otherOwnerDrillId = "72000000-0000-4000-8000-000000000003";
 const bagWorkMethodId = "73000000-0000-4000-8000-000000000001";
 const sparringMethodId = "73000000-0000-4000-8000-000000000002";
 const inactiveMethodId = "73000000-0000-4000-8000-000000000003";
@@ -27,11 +33,13 @@ const firstStepId = "77000000-0000-4000-8000-000000000001";
 const secondStepId = "77000000-0000-4000-8000-000000000002";
 const createdAt = new Date("2026-09-10T10:00:00.000Z");
 const updatedAt = new Date("2026-09-11T11:30:00.000Z");
+const relationlessCreatedAt = new Date("2026-09-12T09:00:00.000Z");
+const otherOwnerCreatedAt = new Date("2026-09-13T09:00:00.000Z");
 
 let connection: Sql;
 let database: ReturnType<typeof drizzle<typeof schema>>;
 
-describePostgres("drill detail aggregation with PostgreSQL", () => {
+describePostgres("drill query aggregation with PostgreSQL", () => {
   beforeAll(() => {
     assertLoopbackTestDatabase(databaseUrl!);
     connection = postgres(databaseUrl!, { max: 1, prepare: false });
@@ -140,6 +148,139 @@ describePostgres("drill detail aggregation with PostgreSQL", () => {
   it("returns null when the same drill is requested by a different user", async () => {
     await expect(getDrillById(otherUserId, drillId, { database })).resolves.toBeNull();
   });
+
+  it("returns ordered full summaries and preserves drills without active relations", async () => {
+    const response = await listDrills(ownerId, {}, { database });
+
+    expect(response.drills.map((drill) => drill.id)).toEqual([
+      relationlessDrillId,
+      drillId,
+    ]);
+    expect(response.drills[0]).toEqual({
+      id: relationlessDrillId,
+      title: "A relationless drill",
+      summary: "No active relations yet.",
+      trainingMethods: [],
+      tags: [],
+      customTags: [],
+      statusTags: [],
+      createdAt: relationlessCreatedAt,
+      updatedAt: relationlessCreatedAt,
+    });
+    expect(response.drills[1]).toMatchObject({
+      id: drillId,
+      trainingMethods: [
+        { id: bagWorkMethodId, sortOrder: 10 },
+        { id: sparringMethodId, sortOrder: 20 },
+      ],
+      tags: [
+        { id: crossTagId, sortOrder: 10 },
+        { id: roundKickTagId, sortOrder: 20 },
+      ],
+      customTags: [
+        { id: balanceTagId, sortOrder: 10 },
+        { id: powerTagId, sortOrder: 20 },
+      ],
+      statusTags: [
+        { id: learningStatusId, sortOrder: 10 },
+        { id: favouriteStatusId, sortOrder: 20 },
+      ],
+      createdAt,
+      updatedAt,
+    });
+    expect(response.drills[1]?.customTags.map((tag) => tag.id)).not.toContain(
+      foreignCustomTagId,
+    );
+  });
+
+  it("executes every optional-relation combination and still hydrates labels required for filtering", async () => {
+    const lean = await listDrills(ownerId, {}, {
+      includeTags: false,
+      includeStatusTags: false,
+      database,
+    });
+    expect(lean.drills.find((drill) => drill.id === drillId)).toMatchObject({
+      trainingMethods: [
+        { id: bagWorkMethodId },
+        { id: sparringMethodId },
+      ],
+      tags: [],
+      customTags: [],
+      statusTags: [],
+    });
+
+    const tagsOnly = await listDrills(ownerId, {}, {
+      includeTags: true,
+      includeStatusTags: false,
+      database,
+    });
+    expect(tagsOnly.drills.find((drill) => drill.id === drillId)).toMatchObject({
+      tags: [
+        { id: crossTagId },
+        { id: roundKickTagId },
+      ],
+      customTags: [
+        { id: balanceTagId },
+        { id: powerTagId },
+      ],
+      statusTags: [],
+    });
+
+    const statusOnly = await listDrills(ownerId, {}, {
+      includeTags: false,
+      includeStatusTags: true,
+      database,
+    });
+    expect(statusOnly.drills.find((drill) => drill.id === drillId)).toMatchObject({
+      tags: [],
+      customTags: [],
+      statusTags: [
+        { id: learningStatusId },
+        { id: favouriteStatusId },
+      ],
+    });
+
+    const keywordMatch = await listDrills(
+      ownerId,
+      { keywords: ["power cue"] },
+      { includeTags: false, includeStatusTags: false, database },
+    );
+    expect(keywordMatch.drills.map((drill) => drill.id)).toEqual([drillId]);
+    expect(keywordMatch.drills[0]?.customTags.map((tag) => tag.id)).toEqual([
+      balanceTagId,
+      powerTagId,
+    ]);
+  });
+
+  it("batches mixed owners while preserving requested order and duplicates", async () => {
+    const summaries = await getDrillSummariesByOwnerPairs([
+      { ownerId: otherUserId, drillId: otherOwnerDrillId },
+      { ownerId, drillId },
+      { ownerId: otherUserId, drillId: otherOwnerDrillId },
+      { ownerId, drillId: otherOwnerDrillId },
+    ], {
+      includeStatusTags: false,
+      database,
+    });
+
+    expect(summaries.map((drill) => drill.id)).toEqual([
+      otherOwnerDrillId,
+      drillId,
+      otherOwnerDrillId,
+    ]);
+    expect(summaries[0]).toMatchObject({
+      trainingMethods: [{ id: bagWorkMethodId }],
+      tags: [],
+      customTags: [{ id: foreignCustomTagId }],
+      statusTags: [],
+      createdAt: otherOwnerCreatedAt,
+      updatedAt: otherOwnerCreatedAt,
+    });
+    expect(summaries[1]?.customTags.map((tag) => tag.id)).toEqual([
+      balanceTagId,
+      powerTagId,
+    ]);
+  });
 });
 
 async function resetFixture(sql: Sql): Promise<void> {
@@ -178,22 +319,42 @@ async function resetFixture(sql: Sql): Promise<void> {
   `;
   await sql`
     insert into drills (id, user_id, title, summary, notes, created_at, updated_at)
-    values (
-      ${drillId},
-      ${ownerId},
-      'Rear round kick counter',
-      'Catch, return, and recover stance.',
-      'Keep the guard high.',
-      ${createdAt.toISOString()},
-      ${updatedAt.toISOString()}
-    )
+    values
+      (
+        ${drillId},
+        ${ownerId},
+        'Rear round kick counter',
+        'Catch, return, and recover stance.',
+        'Keep the guard high.',
+        ${createdAt.toISOString()},
+        ${updatedAt.toISOString()}
+      ),
+      (
+        ${relationlessDrillId},
+        ${ownerId},
+        'A relationless drill',
+        'No active relations yet.',
+        null,
+        ${relationlessCreatedAt.toISOString()},
+        ${relationlessCreatedAt.toISOString()}
+      ),
+      (
+        ${otherOwnerDrillId},
+        ${otherUserId},
+        'Other owner drill',
+        'Owned by the second fixture user.',
+        null,
+        ${otherOwnerCreatedAt.toISOString()},
+        ${otherOwnerCreatedAt.toISOString()}
+      )
   `;
   await sql`
     insert into drill_training_methods (drill_id, training_method_id)
     values
       (${drillId}, ${sparringMethodId}),
       (${drillId}, ${inactiveMethodId}),
-      (${drillId}, ${bagWorkMethodId})
+      (${drillId}, ${bagWorkMethodId}),
+      (${otherOwnerDrillId}, ${bagWorkMethodId})
   `;
   await sql`
     insert into drill_tags (drill_id, tag_id)
@@ -203,7 +364,8 @@ async function resetFixture(sql: Sql): Promise<void> {
       (${drillId}, ${foreignCustomTagId}),
       (${drillId}, ${inactiveTagId}),
       (${drillId}, ${crossTagId}),
-      (${drillId}, ${balanceTagId})
+      (${drillId}, ${balanceTagId}),
+      (${otherOwnerDrillId}, ${foreignCustomTagId})
   `;
   await sql`
     insert into drill_status_tags (drill_id, status_tag_id)
@@ -221,7 +383,10 @@ async function resetFixture(sql: Sql): Promise<void> {
 }
 
 async function clearFixture(sql: Sql): Promise<void> {
-  await sql`delete from drills where id = ${drillId}`;
+  await sql`
+    delete from drills
+    where id in (${drillId}, ${relationlessDrillId}, ${otherOwnerDrillId})
+  `;
   await sql`
     delete from tags
     where id in (

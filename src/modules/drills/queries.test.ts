@@ -143,70 +143,77 @@ describe("getDrillById", () => {
 });
 
 describe("listDrills", () => {
-  it("can hydrate the default graph with only drills and training methods", async () => {
+  it("hydrates the default graph in one statement while omitting unused tag relations", async () => {
     const now = new Date("2026-09-11T00:00:00Z");
-    mocks.select
-      .mockReturnValueOnce(fluentQueryReturning([{
-        id: drillId,
-        title: "Rear round kick",
-        summary: "Turn the hip over.",
-        createdAt: now,
-        updatedAt: now,
-      }]))
-      .mockReturnValueOnce(fluentQueryReturning([{
-        drillId,
+    mocks.execute.mockResolvedValueOnce([{
+      id: drillId,
+      userId,
+      title: "Rear round kick",
+      summary: "Turn the hip over.",
+      trainingMethods: [{
         id: "33333333-3333-4333-8333-333333333333",
         name: "Pad work",
         slug: "pad-work",
         iconKey: "pad-work",
         sortOrder: 1,
-      }]));
+      }],
+      tags: [],
+      customTags: [],
+      statusTags: [],
+      createdAt: now.toISOString(),
+      updatedAt: now.toISOString(),
+    }]);
 
     const response = await listDrills(userId, {}, {
       includeTags: false,
       includeStatusTags: false,
     });
 
-    expect(mocks.select).toHaveBeenCalledTimes(2);
-    expect(Object.keys(mocks.select.mock.calls[0]?.[0] ?? {})).toEqual([
-      "id",
-      "title",
-      "summary",
-      "createdAt",
-      "updatedAt",
-    ]);
+    expect(mocks.execute).toHaveBeenCalledOnce();
+    expect(mocks.select).not.toHaveBeenCalled();
     expect(response.drills[0]).toMatchObject({
       id: drillId,
       tags: [],
       customTags: [],
       statusTags: [],
       trainingMethods: [{ slug: "pad-work" }],
+      createdAt: now,
+      updatedAt: now,
     });
+
+    const statement = new PgDialect().sqlToQuery(mocks.execute.mock.calls[0]?.[0]);
+    const normalizedSql = statement.sql.replace(/\s+/g, " ").trim();
+    expect(statement.params).toEqual([userId]);
+    expect(normalizedSql).toContain("with owned_drills as materialized");
+    expect(normalizedSql).toContain('join "drill_training_methods"');
+    expect(normalizedSql).not.toContain('join "drill_tags"');
+    expect(normalizedSql).not.toContain('join "drill_status_tags"');
+    expect(normalizedSql).toContain(
+      'order by owned_drills."createdAt" desc, owned_drills."title" asc',
+    );
   });
 
-  it("still hydrates every searchable label when keyword filtering is requested", async () => {
+  it("hydrates every searchable label in the same statement when keyword filtering is requested", async () => {
     const now = new Date("2026-09-11T00:00:00Z");
-    mocks.select
-      .mockReturnValueOnce(fluentQueryReturning([{
-        id: drillId,
-        title: "Rear round kick",
-        summary: "Turn the hip over.",
-        createdAt: now,
-        updatedAt: now,
-      }]))
-      .mockReturnValueOnce(fluentQueryReturning([]))
-      .mockReturnValueOnce(fluentQueryReturning([{
-        drillId,
+    mocks.execute.mockResolvedValueOnce([{
+      id: drillId,
+      userId,
+      title: "Rear round kick",
+      summary: "Turn the hip over.",
+      trainingMethods: [],
+      tags: [],
+      customTags: [{
         id: "44444444-4444-4444-8444-444444444444",
         name: "Counter timing",
         slug: "counter-timing",
-        kind: "custom",
+        kind: "custom" as const,
         sortOrder: 1,
-        categoryId: null,
-        categoryName: null,
-        categorySlug: null,
-      }]))
-      .mockReturnValueOnce(fluentQueryReturning([]));
+        category: null,
+      }],
+      statusTags: [],
+      createdAt: now,
+      updatedAt: now,
+    }]);
 
     const response = await listDrills(
       userId,
@@ -214,37 +221,137 @@ describe("listDrills", () => {
       { includeTags: false, includeStatusTags: false },
     );
 
-    expect(mocks.select).toHaveBeenCalledTimes(4);
+    expect(mocks.execute).toHaveBeenCalledOnce();
+    expect(mocks.select).not.toHaveBeenCalled();
     expect(response.drills.map((drill) => drill.id)).toEqual([drillId]);
     expect(response.drills[0]?.customTags.map((tag) => tag.slug)).toEqual([
       "counter-timing",
     ]);
+
+    const statement = new PgDialect().sqlToQuery(mocks.execute.mock.calls[0]?.[0]);
+    const normalizedSql = statement.sql.replace(/\s+/g, " ").trim();
+    expect(normalizedSql).toContain('join "drill_tags"');
+    expect(normalizedSql).toContain('join "drill_status_tags"');
+  });
+
+  it.each([
+    {
+      label: "tag filters",
+      filters: { tagSlugs: ["counter-timing"] },
+      includedTable: 'join "drill_tags"',
+      omittedTable: 'join "drill_status_tags"',
+      row: {
+        tags: [{
+          id: "44444444-4444-4444-8444-444444444444",
+          name: "Counter timing",
+          slug: "counter-timing",
+          kind: "standard" as const,
+          sortOrder: 1,
+          category: null,
+        }],
+        customTags: [],
+        statusTags: [],
+      },
+    },
+    {
+      label: "status filters",
+      filters: { statusTagSlugs: ["starred"] },
+      includedTable: 'join "drill_status_tags"',
+      omittedTable: 'join "drill_tags"',
+      row: {
+        tags: [],
+        customTags: [],
+        statusTags: [{
+          id: "55555555-5555-4555-8555-555555555555",
+          name: "Starred",
+          slug: "starred",
+          sortOrder: 1,
+        }],
+      },
+    },
+  ])("forces only the relation required by $label", async ({
+    filters,
+    includedTable,
+    omittedTable,
+    row,
+  }) => {
+    const now = new Date("2026-09-11T00:00:00Z");
+    mocks.execute.mockResolvedValueOnce([{
+      id: drillId,
+      userId,
+      title: "Rear round kick",
+      summary: "Turn the hip over.",
+      trainingMethods: [],
+      ...row,
+      createdAt: now,
+      updatedAt: now,
+    }]);
+
+    await listDrills(userId, filters, {
+      includeTags: false,
+      includeStatusTags: false,
+    });
+
+    expect(mocks.execute).toHaveBeenCalledOnce();
+    const statement = new PgDialect().sqlToQuery(mocks.execute.mock.calls[0]?.[0]);
+    const normalizedSql = statement.sql.replace(/\s+/g, " ").trim();
+    expect(normalizedSql).toContain(includedTable);
+    expect(normalizedSql).not.toContain(omittedTable);
   });
 });
 
 describe("getDrillSummariesByOwnerPairs", () => {
   it("returns immediately for empty input", async () => {
     await expect(getDrillSummariesByOwnerPairs([])).resolves.toEqual([]);
+    expect(mocks.execute).not.toHaveBeenCalled();
     expect(mocks.select).not.toHaveBeenCalled();
   });
 
-  it("can omit discarded status tags and batch mixed owners in three statements", async () => {
+  it("omits status tags and batches mixed owners in one statement", async () => {
     const ownerA = userId;
     const ownerB = "33333333-3333-4333-8333-333333333333";
     const drillA = drillId;
     const drillB = "44444444-4444-4444-8444-444444444444";
     const now = new Date("2026-09-10T00:00:00Z");
-    let pairWhere: unknown;
-    let methodWhere: unknown;
-    let tagWhere: unknown;
-
-    mocks.select
-      .mockReturnValueOnce(fluentQueryReturning([
-        { id: drillB, userId: ownerB, title: "B", summary: "B summary", notes: null, sourceTranscript: null, archivedAt: null, createdAt: now, updatedAt: now },
-        { id: drillA, userId: ownerA, title: "A", summary: "A summary", notes: null, sourceTranscript: null, archivedAt: null, createdAt: now, updatedAt: now },
-      ], (query) => { pairWhere = query; }))
-      .mockReturnValueOnce(fluentQueryReturning([{ drillId: drillA, id: "method", name: "Method", slug: "method", iconKey: "method", sortOrder: 1 }], (query) => { methodWhere = query; }))
-      .mockReturnValueOnce(fluentQueryReturning([{ drillId: drillB, id: "tag", name: "Owner B tag", slug: "owner-b-tag", kind: "custom", sortOrder: 1, categoryId: null, categoryName: null, categorySlug: null }], (query) => { tagWhere = query; }));
+    mocks.execute.mockResolvedValueOnce([
+      {
+        id: drillB,
+        userId: ownerB,
+        title: "B",
+        summary: "B summary",
+        trainingMethods: [],
+        tags: [],
+        customTags: [{
+          id: "55555555-5555-4555-8555-555555555555",
+          name: "Owner B tag",
+          slug: "owner-b-tag",
+          kind: "custom" as const,
+          sortOrder: 1,
+          category: null,
+        }],
+        statusTags: [],
+        createdAt: now,
+        updatedAt: now,
+      },
+      {
+        id: drillA,
+        userId: ownerA,
+        title: "A",
+        summary: "A summary",
+        trainingMethods: [{
+          id: "66666666-6666-4666-8666-666666666666",
+          name: "Method",
+          slug: "method",
+          iconKey: "method",
+          sortOrder: 1,
+        }],
+        tags: [],
+        customTags: [],
+        statusTags: [],
+        createdAt: now,
+        updatedAt: now,
+      },
+    ]);
 
     const result = await getDrillSummariesByOwnerPairs([
       { ownerId: ownerA, drillId: drillA },
@@ -253,51 +360,56 @@ describe("getDrillSummariesByOwnerPairs", () => {
       { ownerId: ownerA, drillId: drillB },
     ], { includeStatusTags: false });
 
-    expect(mocks.select).toHaveBeenCalledTimes(3);
+    expect(mocks.execute).toHaveBeenCalledOnce();
+    expect(mocks.select).not.toHaveBeenCalled();
     expect(result.map((drill) => drill.id)).toEqual([drillA, drillB, drillA]);
     expect(result[0]?.trainingMethods).toHaveLength(1);
     expect(result[0]?.statusTags).toEqual([]);
     expect(result[1]?.customTags.map((tag) => tag.slug)).toEqual(["owner-b-tag"]);
 
-    const dialect = new PgDialect();
-    const pairQuery = dialect.sqlToQuery(pairWhere as never);
-    expect(pairQuery.params).toEqual([drillA, ownerA, drillB, ownerB, drillB, ownerA]);
-    const tagQuery = dialect.sqlToQuery(tagWhere as never);
-    expect(tagQuery.sql.replace(/\s+/g, " ")).toContain(
-      '"tags"."active" = $3 and ("tags"."user_id" is null or "tags"."user_id" = "drills"."user_id")',
+    const statement = new PgDialect().sqlToQuery(mocks.execute.mock.calls[0]?.[0]);
+    const normalizedSql = statement.sql.replace(/\s+/g, " ").trim();
+    expect(statement.params).toEqual([
+      ownerA,
+      drillA,
+      ownerB,
+      drillB,
+      ownerA,
+      drillB,
+    ]);
+    expect(normalizedSql).toContain(
+      'inner join (values ($1::uuid, $2::uuid), ($3::uuid, $4::uuid), ($5::uuid, $6::uuid))',
     );
-    expect(tagQuery.params.at(-1)).toBe(true);
-    expect(dialect.sqlToQuery(methodWhere as never).params.at(-1)).toBe(true);
+    expect(normalizedSql).toContain('join "drill_tags"');
+    expect(normalizedSql).not.toContain('join "drill_status_tags"');
   });
 
   it("hydrates status tags by default for generic callers", async () => {
     const now = new Date("2026-09-10T00:00:00Z");
-    mocks.select
-      .mockReturnValueOnce(fluentQueryReturning([{
-        id: drillId,
-        userId,
-        title: "A",
-        summary: "A summary",
-        notes: null,
-        sourceTranscript: null,
-        archivedAt: null,
-        createdAt: now,
-        updatedAt: now,
-      }]))
-      .mockReturnValueOnce(fluentQueryReturning([]))
-      .mockReturnValueOnce(fluentQueryReturning([]))
-      .mockReturnValueOnce(fluentQueryReturning([{
-        drillId,
+    mocks.execute.mockResolvedValueOnce([{
+      id: drillId,
+      userId,
+      title: "A",
+      summary: "A summary",
+      trainingMethods: [],
+      tags: [],
+      customTags: [],
+      statusTags: [{
         id: "status",
         name: "Learning",
         slug: "learning",
         sortOrder: 1,
-      }]));
+      }],
+      createdAt: now,
+      updatedAt: now,
+    }]);
 
     const [result] = await getDrillSummariesByOwnerPairs([{ ownerId: userId, drillId }]);
 
-    expect(mocks.select).toHaveBeenCalledTimes(4);
+    expect(mocks.execute).toHaveBeenCalledOnce();
     expect(result?.statusTags.map((status) => status.slug)).toEqual(["learning"]);
+    const statement = new PgDialect().sqlToQuery(mocks.execute.mock.calls[0]?.[0]);
+    expect(statement.sql).toContain('join "drill_status_tags"');
   });
 });
 
@@ -313,27 +425,5 @@ function queryReturning(rows: unknown[], captureWhere: (query: unknown) => void 
     return builder;
   });
   builder.limit.mockResolvedValue(rows);
-  return builder;
-}
-
-function fluentQueryReturning(rows: unknown[], captureWhere: (query: unknown) => void = () => undefined) {
-  const builder = {
-    from: vi.fn(),
-    innerJoin: vi.fn(),
-    leftJoin: vi.fn(),
-    where: vi.fn(),
-    orderBy: vi.fn(),
-    then: (resolve: (value: unknown[]) => unknown, reject: (reason: unknown) => unknown) => (
-      Promise.resolve(rows).then(resolve, reject)
-    ),
-  };
-  builder.from.mockReturnValue(builder);
-  builder.innerJoin.mockReturnValue(builder);
-  builder.leftJoin.mockReturnValue(builder);
-  builder.where.mockImplementation((query) => {
-    captureWhere(query);
-    return builder;
-  });
-  builder.orderBy.mockResolvedValue(rows);
   return builder;
 }
