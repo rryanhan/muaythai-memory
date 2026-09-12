@@ -14,7 +14,11 @@ import {
   users,
 } from "@/db/schema";
 import { updateDrillShare } from "@/modules/sharing/mutations";
-import { getSharedDrillById, listSharedDrills } from "@/modules/sharing/queries";
+import {
+  getDrillShareRecipientPage,
+  getSharedDrillById,
+  listSharedDrills,
+} from "@/modules/sharing/queries";
 import { ConnectionMutationError } from "./errors";
 import { consumeConnectionRateLimit } from "./limits";
 import {
@@ -136,7 +140,19 @@ async function main() {
       "Non-reciprocal users must not open another fighter's lists.",
     );
 
+    const unsharedRecipientPage = await getDrillShareRecipientPage(
+      userB.id,
+      fighterDrill.id,
+      null,
+    );
+    assert.equal(unsharedRecipientPage.items[0]?.profile.id, userA.id);
+    assert.equal(unsharedRecipientPage.items[0]?.shared, false);
     await updateDrillShare(userB.id, fighterDrill.id, userA.id, true);
+    assert.equal(
+      (await getDrillShareRecipientPage(userB.id, fighterDrill.id, null)).items[0]?.shared,
+      true,
+      "The recipient snapshot must include the drill share flag.",
+    );
     assert.equal(
       (await listSharedDrills(userA.id, null, userB.username)).items[0]?.drill.id,
       fighterDrill.id,
@@ -236,6 +252,16 @@ async function main() {
     const followingPages = await collectSectionPages(userA.id, "following");
     assert.equal(followerPages, 52);
     assert.equal(followingPages, 52);
+    const [paginationDrill] = await db
+      .insert(drills)
+      .values({ userId: userA.id, title: "Share pagination drill", summary: "" })
+      .returning({ id: drills.id });
+    if (!paginationDrill) throw new Error("Could not create share pagination drill.");
+    assert.deepEqual(
+      await collectDrillShareRecipientPages(userA.id, paginationDrill.id),
+      paginatedUsers.map((user) => user.id),
+      "Share recipients must remain ordered and unique across real cursor pages.",
+    );
     const paginatedCounts = (await getConnectionsSummary(userA.id)).counts;
     assert.equal(paginatedCounts.followers, 52);
     assert.equal(paginatedCounts.following, 52);
@@ -285,6 +311,21 @@ async function collectSectionPages(
     cursor = page.nextCursor;
   } while (cursor);
   return total;
+}
+
+async function collectDrillShareRecipientPages(ownerUserId: string, drillId: string) {
+  const recipientIds: string[] = [];
+  let cursor: string | null = null;
+  do {
+    const page = await getDrillShareRecipientPage(ownerUserId, drillId, cursor);
+    assert.ok(
+      page.items.every((item) => item.shared === false),
+      "Fresh recipient pages must not report shares.",
+    );
+    recipientIds.push(...page.items.map((item) => item.profile.id));
+    cursor = page.nextCursor;
+  } while (cursor);
+  return recipientIds;
 }
 
 function loadPairRows(firstUserId: string, secondUserId: string) {
