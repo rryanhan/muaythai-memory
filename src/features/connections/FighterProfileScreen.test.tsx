@@ -87,16 +87,39 @@ describe("FighterProfileScreen", () => {
     await user.click(screen.getByRole("button", { name: "More fighter actions" }));
     expect(screen.getByRole("button", { name: "Block Fighter" })).toBeInTheDocument();
   });
+
+  it("invalidates cached drill-share recipients after a profile connection mutation", async () => {
+    const existingDrillShareKey = ["drill-shares", "cached-drill"] as const;
+    mocks.getFighterProfile.mockResolvedValue(fighterProfile);
+    mocks.respondToFollowRequest.mockResolvedValue({
+      userId: fighterProfile.profile.id,
+      blockedByViewer: false,
+      outgoing: direction("accepted"),
+      incoming: direction("accepted"),
+      mutual: true,
+    });
+    const queryClient = renderScreen(fighterProfile);
+    queryClient.setQueryData(existingDrillShareKey, { items: [] });
+    expect(queryClient.getQueryState(existingDrillShareKey)?.isInvalidated).toBe(false);
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Accept" }));
+
+    await waitFor(() => {
+      expect(queryClient.getQueryState(existingDrillShareKey)?.isInvalidated).toBe(true);
+    });
+  });
 });
 function renderScreen(initialFighter: FighterProfile) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
-  return render(
+  render(
     <QueryClientProvider client={queryClient}>
       <FighterProfileScreen initialFighter={initialFighter} />
     </QueryClientProvider>,
   );
+  return queryClient;
 }
 
 function direction(status: "none" | "pending" | "accepted") {

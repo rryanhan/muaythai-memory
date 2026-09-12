@@ -17,13 +17,14 @@ import {
 } from "@/data/sharing";
 import { useDrawerFocus } from "@/features/media/use-drawer-focus";
 import { ProfileAvatar } from "@/features/profile/ProfileAvatar";
+import { drillShareQueryKey } from "./query-keys";
 import styles from "./DrillShare.module.css";
 
 export function DrillShareButton({ drillId }: { drillId: string }) {
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const contentRef = useDrawerFocus(open);
-  const queryKey = ["drill-shares", drillId];
+  const queryKey = drillShareQueryKey(drillId);
   const recipientsQuery = useInfiniteQuery({
     queryKey,
     queryFn: ({ pageParam, signal }) => getDrillShareRecipientPage(

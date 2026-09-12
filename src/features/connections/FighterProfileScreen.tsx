@@ -26,6 +26,7 @@ import { ProfileAvatar } from "@/features/profile/ProfileAvatar";
 import { FighterActionConfirmationSheet } from "./FighterActionConfirmationSheet";
 import { FighterMoreActionsSheet } from "./FighterMoreActionsSheet";
 import { FighterReportSheet } from "./FighterReportSheet";
+import { drillShareQueryKeyPrefix } from "./query-keys";
 import { SharedDrillsSection } from "./SharedDrillsSection";
 import styles from "./Connections.module.css";
 
@@ -74,7 +75,7 @@ export function FighterProfileScreen({
         : current);
       void queryClient.invalidateQueries({ queryKey: ["connections"] });
       void queryClient.invalidateQueries({ queryKey: ["fighter"] });
-      void queryClient.invalidateQueries({ queryKey: ["drill-share"] });
+      void queryClient.invalidateQueries({ queryKey: drillShareQueryKeyPrefix });
       void queryClient.invalidateQueries({ queryKey: ["shared-drills"] });
       setConfirmation(null);
       if (action === "block") router.replace("/connections?tab=blocked");

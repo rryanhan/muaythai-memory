@@ -30,6 +30,7 @@ import {
   type FighterSummary,
 } from "@/data/connections";
 import { ProfileAvatar } from "@/features/profile/ProfileAvatar";
+import { drillShareQueryKeyPrefix } from "./query-keys";
 import { SharedDrillsSection } from "./SharedDrillsSection";
 import styles from "./Connections.module.css";
 
@@ -86,7 +87,7 @@ export function ConnectionsScreen({
     onSuccess: (result) => {
       void queryClient.invalidateQueries({ queryKey: ["connections"] });
       void queryClient.invalidateQueries({ queryKey: ["fighter"] });
-      void queryClient.invalidateQueries({ queryKey: ["drill-share"] });
+      void queryClient.invalidateQueries({ queryKey: drillShareQueryKeyPrefix });
       void queryClient.invalidateQueries({ queryKey: ["shared-drills"] });
       setSearchResult((current) => current?.profile.id === result.userId
         ? applyMutationResult(current, result)

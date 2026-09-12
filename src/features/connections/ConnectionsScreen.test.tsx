@@ -158,6 +158,22 @@ describe("ConnectionsScreen", () => {
     await waitFor(() => expect(screen.queryByText("@beta_fighter")).not.toBeInTheDocument());
   });
 
+  it("invalidates cached drill-share recipients after a connection mutation", async () => {
+    const existingDrillShareKey = ["drill-shares", "cached-drill"] as const;
+    sectionItems.outgoing = [requestItem("beta_fighter")];
+    mocks.cancelOrUnfollow.mockResolvedValueOnce(mutationResult("beta_fighter"));
+    const queryClient = renderScreen("requests");
+    queryClient.setQueryData(existingDrillShareKey, { items: [] });
+    expect(queryClient.getQueryState(existingDrillShareKey)?.isInvalidated).toBe(false);
+
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "Cancel" }));
+
+    await waitFor(() => {
+      expect(queryClient.getQueryState(existingDrillShareKey)?.isInvalidated).toBe(true);
+    });
+  });
+
   it("continues a paginated followers list without replacing its first page", async () => {
     mocks.getConnectionsSummary.mockResolvedValue({
       counts: { followers: 2, following: 0, incoming: 0, outgoing: 0, blocked: 0 },
@@ -241,11 +257,12 @@ function renderScreen(initialTab: ConnectionsTab) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
-  return render(
+  render(
     <QueryClientProvider client={queryClient}>
       <ConnectionsScreen currentUsername="current_fighter" initialTab={initialTab} />
     </QueryClientProvider>,
   );
+  return queryClient;
 }
 
 function profile(username: string) {
