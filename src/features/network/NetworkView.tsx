@@ -9,6 +9,7 @@ import type {
   GraphResponse,
   TaxonomyResponse,
 } from "@/data/types";
+import { taxonomyQueryKey } from "@/features/shared/query-keys";
 import { useDebouncedValue } from "@/features/shared/use-debounced-value";
 import {
   addPreviewKeyword,
@@ -70,7 +71,7 @@ export function NetworkView({ active, initialGraph, initialTaxonomy }: NetworkVi
     [serializedRequestFilters],
   );
   const taxonomyQuery = useQuery({
-    queryKey: ["taxonomy"],
+    queryKey: taxonomyQueryKey,
     queryFn: ({ signal }) => getTaxonomyOnDemand({ requestInit: { signal } }),
     initialData: initialTaxonomy,
     staleTime: 10 * 60 * 1000,

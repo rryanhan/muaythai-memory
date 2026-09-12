@@ -15,6 +15,7 @@ import { AddDrillSkeleton } from "@/features/drills/AddDrillSkeleton";
 import type { DrillFormCleanupState, DrillFormInitialValues } from "@/features/drills/drill-form-types";
 import type { DrillCleanupValues } from "@/features/drills/cleanup-merge";
 import drillStyles from "@/features/drills/DrillForm.module.css";
+import { taxonomyQueryKey } from "@/features/shared/query-keys";
 import { isCurrentCaptureCleanup } from "./capture-session";
 import styles from "./Capture.module.css";
 import type { CaptureMethodCoach, VoiceCaptureState } from "./VoiceCapturePanel";
@@ -105,7 +106,7 @@ export function CaptureDraftForm({
   const activeCleanupRequestId = useRef<number | null>(null);
   const nextCleanupRevision = useRef(1);
   const taxonomyQuery = useQuery({
-    queryKey: ["taxonomy"],
+    queryKey: taxonomyQueryKey,
     queryFn: ({ signal }) => getTaxonomy({ requestInit: { signal } }),
     staleTime: 10 * 60 * 1000,
   });

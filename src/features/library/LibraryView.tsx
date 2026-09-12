@@ -10,6 +10,7 @@ import { badgeByIconKey } from "@/components/shared/context-badges";
 import { getDrills } from "@/data/drills";
 import { getTaxonomy } from "@/data/taxonomy";
 import type { TagDto } from "@/data/types";
+import { taxonomyQueryKey } from "@/features/shared/query-keys";
 import { useDebouncedValue } from "@/features/shared/use-debounced-value";
 import { LibraryDrillRow, LibraryLoadingList, LibraryStatePanel } from "./LibraryDrillList";
 import { LibraryIndexPanel } from "./LibraryIndexPanel";
@@ -59,7 +60,7 @@ export function LibraryView() {
   );
 
   const taxonomyQuery = useQuery({
-    queryKey: ["taxonomy"],
+    queryKey: taxonomyQueryKey,
     queryFn: ({ signal }) => getTaxonomy({ requestInit: { signal } }),
     staleTime: 10 * 60 * 1000,
   });

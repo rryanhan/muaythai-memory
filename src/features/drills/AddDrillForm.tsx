@@ -16,6 +16,7 @@ import { badgeByIconKey } from "@/components/shared/context-badges";
 import skeletonStyles from "@/components/shared/Skeleton.module.css";
 import { DRILL_LIMITS } from "@/config/domain-limits";
 import captureStyles from "@/features/capture/Capture.module.css";
+import { taxonomyQueryKey } from "@/features/shared/query-keys";
 import { SavedListToken } from "@/features/shared/SavedListToken";
 import { getBuiltInStatusFilters } from "@/features/shared/tag-filter-helpers";
 import type { ApiError } from "@/data/api-core";
@@ -94,7 +95,7 @@ export function AddDrillForm({
     tagSlugs: false,
   });
   const taxonomyQuery = useQuery({
-    queryKey: ["taxonomy"],
+    queryKey: taxonomyQueryKey,
     queryFn: ({ signal }) => getTaxonomy({ requestInit: { signal } }),
     staleTime: 10 * 60 * 1000,
   });
