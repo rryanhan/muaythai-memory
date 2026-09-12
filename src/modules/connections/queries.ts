@@ -38,7 +38,14 @@ type FighterProfileRow = {
   avatarUrl: string | null;
 };
 
-type FollowRow = typeof follows.$inferSelect;
+type FighterConnectionSnapshotRow = FighterProfileRow & {
+  outgoingStatus: "pending" | "accepted" | null;
+  outgoingRequestedAt: Date | string | null;
+  outgoingAcceptedAt: Date | string | null;
+  incomingStatus: "pending" | "accepted" | null;
+  incomingRequestedAt: Date | string | null;
+  incomingAcceptedAt: Date | string | null;
+};
 
 const sectionCursorSchema = z.object({
   username: z.string().min(1).max(30),
@@ -170,9 +177,87 @@ export async function findFighterByUsername(
   currentUserId: string,
   username: string,
 ): Promise<FighterConnection | null> {
-  const profile = await loadFighterProfileByUsername(username);
-  if (!profile) return null;
-  return getVisibleFighterConnection(currentUserId, profile);
+  const [snapshot] = await db.execute<FighterConnectionSnapshotRow>(sql`
+    with request_context as (
+      select
+        ${currentUserId}::uuid as "viewerId",
+        ${username}::text as "username"
+    )
+    select
+      ${users.id} as "id",
+      ${users.username} as "username",
+      ${users.avatarUrl} as "avatarUrl",
+      outgoing_follow."status" as "outgoingStatus",
+      outgoing_follow."created_at" as "outgoingRequestedAt",
+      case
+        when outgoing_follow."status" = 'accepted'
+          then coalesce(outgoing_follow."responded_at", outgoing_follow."updated_at")
+        else null
+      end as "outgoingAcceptedAt",
+      incoming_follow."status" as "incomingStatus",
+      incoming_follow."created_at" as "incomingRequestedAt",
+      case
+        when incoming_follow."status" = 'accepted'
+          then coalesce(incoming_follow."responded_at", incoming_follow."updated_at")
+        else null
+      end as "incomingAcceptedAt"
+    from request_context
+    inner join ${users}
+      on ${users.username} = request_context."username"
+      and ${users.profileOnboardedAt} is not null
+    left join ${follows} as outgoing_follow
+      on outgoing_follow."follower_id" = request_context."viewerId"
+      and outgoing_follow."following_id" = ${users.id}
+    left join ${follows} as incoming_follow
+      on incoming_follow."follower_id" = ${users.id}
+      and incoming_follow."following_id" = request_context."viewerId"
+    where ${users.id} = request_context."viewerId"
+      or not exists (
+        select 1
+        from ${userBlocks} as pair_block
+        where (
+          pair_block."blocker_id" = request_context."viewerId"
+          and pair_block."blocked_id" = ${users.id}
+        ) or (
+          pair_block."blocker_id" = ${users.id}
+          and pair_block."blocked_id" = request_context."viewerId"
+        )
+      )
+    limit 1
+  `);
+  if (!snapshot) return null;
+
+  const profile = toFighterSummary(snapshot);
+  if (!profile) throw new Error("Visible fighter query returned an incomplete profile.");
+  if (profile.id === currentUserId) {
+    return {
+      profile,
+      isSelf: true,
+      blockedByViewer: false,
+      outgoing: emptyDirection(),
+      incoming: emptyDirection(),
+      mutual: false,
+    };
+  }
+
+  const outgoing = toSnapshotDirection(
+    snapshot.outgoingStatus,
+    snapshot.outgoingRequestedAt,
+    snapshot.outgoingAcceptedAt,
+  );
+  const incoming = toSnapshotDirection(
+    snapshot.incomingStatus,
+    snapshot.incomingRequestedAt,
+    snapshot.incomingAcceptedAt,
+  );
+  return {
+    profile,
+    isSelf: false,
+    blockedByViewer: false,
+    outgoing,
+    incoming,
+    mutual: outgoing.status === "accepted" && incoming.status === "accepted",
+  };
 }
 
 export async function getFighterProfileByUsername(
@@ -222,89 +307,24 @@ export async function hasReciprocalAcceptedFollows(
   return rows.length === 2;
 }
 
-async function getVisibleFighterConnection(
-  currentUserId: string,
-  profile: FighterSummary,
-): Promise<FighterConnection | null> {
-  if (currentUserId === profile.id) {
-    return {
-      profile,
-      isSelf: true,
-      blockedByViewer: false,
-      outgoing: emptyDirection(),
-      incoming: emptyDirection(),
-      mutual: false,
-    };
-  }
-
-  const [blockRows, followRows] = await Promise.all([
-    db
-      .select({ blockerId: userBlocks.blockerId })
-      .from(userBlocks)
-      .where(or(
-        and(
-          eq(userBlocks.blockerId, currentUserId),
-          eq(userBlocks.blockedId, profile.id),
-        ),
-        and(
-          eq(userBlocks.blockerId, profile.id),
-          eq(userBlocks.blockedId, currentUserId),
-        ),
-      ))
-      .limit(1),
-    loadPairFollows(currentUserId, profile.id),
-  ]);
-
-  // Blocking makes profiles undiscoverable in either direction. A user can
-  // still unblock someone from their own Blocked tab.
-  if (blockRows[0]) return null;
-  return connectionFromRows(profile, currentUserId, followRows);
-}
-
-function connectionFromRows(
-  profile: FighterSummary,
-  currentUserId: string,
-  rows: FollowRow[],
-): FighterConnection {
-  const outgoingRow = rows.find((row) => row.followerId === currentUserId);
-  const incomingRow = rows.find((row) => row.followingId === currentUserId);
-  const outgoing = toDirection(outgoingRow);
-  const incoming = toDirection(incomingRow);
+function toSnapshotDirection(
+  status: "pending" | "accepted" | null,
+  requestedAt: Date | string | null,
+  acceptedAt: Date | string | null,
+): FollowDirection {
+  if (!status) return emptyDirection();
+  if (!requestedAt) throw new Error("Visible fighter query returned an incomplete follow direction.");
   return {
-    profile,
-    isSelf: false,
-    blockedByViewer: false,
-    outgoing,
-    incoming,
-    mutual: outgoing.status === "accepted" && incoming.status === "accepted",
-  };
-}
-
-function toDirection(row: FollowRow | undefined): FollowDirection {
-  if (!row) return emptyDirection();
-  return {
-    status: row.status as "pending" | "accepted",
-    requestedAt: row.createdAt,
-    acceptedAt: row.status === "accepted"
-      ? row.respondedAt ?? row.updatedAt
+    status,
+    requestedAt: toConnectionDate(requestedAt),
+    acceptedAt: status === "accepted" && acceptedAt
+      ? toConnectionDate(acceptedAt)
       : null,
   };
 }
 
-async function loadPairFollows(firstUserId: string, secondUserId: string) {
-  return db
-    .select()
-    .from(follows)
-    .where(or(
-      and(
-        eq(follows.followerId, firstUserId),
-        eq(follows.followingId, secondUserId),
-      ),
-      and(
-        eq(follows.followerId, secondUserId),
-        eq(follows.followingId, firstUserId),
-      ),
-    ));
+function toConnectionDate(value: Date | string): Date {
+  return value instanceof Date ? value : new Date(value);
 }
 
 async function getPublicSocialCounts(userId: string) {
