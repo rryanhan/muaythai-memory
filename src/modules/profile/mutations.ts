@@ -1,5 +1,6 @@
 import { eq } from "drizzle-orm";
 import { db } from "@/db/client";
+import { hasPostgresErrorCode } from "@/db/postgres-errors";
 import { users } from "@/db/schema";
 import type { CurrentAppUser } from "@/modules/auth";
 import {
@@ -59,7 +60,7 @@ export async function updateProfile(currentUser: CurrentAppUser, input: UpdatePr
     await cleanupCommittedProfileAvatars(currentUser.id, outcome.previousAvatarPath);
     return { ...outcome.updatedUser, email: currentUser.email };
   } catch (error) {
-    if (isUniqueUsernameError(error)) {
+    if (hasPostgresErrorCode(error, "23505")) {
       throw new ProfileUpdateError("That username is already taken.", 409);
     }
     throw error;
@@ -425,14 +426,4 @@ function parseProfileFields(input: UpdateProfileInput) {
     lastName: results.lastName.data as string | null,
     location: results.location.data as string | null,
   };
-}
-
-function isUniqueUsernameError(error: unknown): boolean {
-  return hasPostgresCode(error, "23505");
-}
-
-function hasPostgresCode(error: unknown, code: string): boolean {
-  if (typeof error !== "object" || error === null) return false;
-  if ("code" in error && error.code === code) return true;
-  return "cause" in error && hasPostgresCode(error.cause, code);
 }

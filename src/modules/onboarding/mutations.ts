@@ -1,5 +1,6 @@
 import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/db/client";
+import { hasPostgresErrorCode } from "@/db/postgres-errors";
 import { users } from "@/db/schema";
 import type { CurrentAppUser } from "@/modules/auth";
 import { createDrill } from "@/modules/drills/mutations";
@@ -48,7 +49,7 @@ export async function completeProfileOnboarding(
     if (!updated?.username) throw new OnboardingValidationError("Profile could not be found.", 404);
     return updated.username;
   } catch (error) {
-    if (isUniqueUsernameError(error)) {
+    if (hasPostgresErrorCode(error, "23505")) {
       throw new OnboardingValidationError("That username is already taken.", 409);
     }
     throw error;
@@ -93,14 +94,4 @@ export async function skipFirstDrillGuide(userId: string): Promise<boolean> {
     .limit(1);
   if (!existing) throw new OnboardingValidationError("Profile could not be found.", 404);
   return Boolean(existing.skippedAt && !existing.completedAt);
-}
-
-function isUniqueUsernameError(error: unknown): boolean {
-  return hasPostgresCode(error, "23505");
-}
-
-function hasPostgresCode(error: unknown, code: string): boolean {
-  if (typeof error !== "object" || error === null) return false;
-  if ("code" in error && error.code === code) return true;
-  return "cause" in error && hasPostgresCode(error.cause, code);
 }
