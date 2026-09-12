@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { ZodError } from "zod";
 import { graphResponseSchema, parseGraphRequestFromSearchParams } from "@/modules/graph/contracts";
 import { getMuayThaiGraph } from "@/modules/graph/queries";
-import { authenticationErrorResponse, requireOnboardedUserId } from "@/modules/auth";
+import { requireOnboardedUserId } from "@/modules/auth/current-user";
+import { authenticationErrorResponse } from "@/modules/auth/http";
 
 export const dynamic = "force-dynamic";
 

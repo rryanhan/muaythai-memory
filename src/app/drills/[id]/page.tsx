@@ -12,7 +12,7 @@ import { DrillShareButton } from "@/features/connections/DrillShareButton";
 import { RoutedBottomNav } from "@/components/navigation/RoutedBottomNav";
 import { getDrillById } from "@/modules/drills/queries";
 import routeStyles from "@/features/drills/DrillRouteShell.module.css";
-import { requireCurrentPageUserId } from "@/modules/auth";
+import { requireCurrentPageUserId } from "@/modules/auth/page-user";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";

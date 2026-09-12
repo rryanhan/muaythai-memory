@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { z } from "zod";
 import { JournalEditScreen } from "@/features/journal/JournalEditScreen";
-import { requireCurrentPageUserId } from "@/modules/auth";
+import { requireCurrentPageUserId } from "@/modules/auth/page-user";
 import { getJournalEntryById } from "@/modules/journal/queries";
 
 export const metadata: Metadata = { title: "Edit Journal Entry | Muay Thai Memory" };

@@ -44,9 +44,12 @@ const mocks = vi.hoisted(() => {
   };
 });
 
-vi.mock("@/modules/auth", () => ({
+vi.mock("@/modules/auth/current-user", () => ({
   AuthenticationRequiredError: mocks.AuthenticationRequiredError,
   OnboardingRequiredError: mocks.OnboardingRequiredError,
+  requireProfileOnboardedUserId: mocks.requireProfileOnboardedUserId,
+}));
+vi.mock("@/modules/auth/http", () => ({
   authenticationErrorResponse: (error: unknown) => {
     if (
       error instanceof mocks.AuthenticationRequiredError
@@ -56,8 +59,9 @@ vi.mock("@/modules/auth", () => ({
     }
     return null;
   },
+}));
+vi.mock("@/modules/auth/onboarding-state", () => ({
   invalidateOnboardingState: mocks.invalidateOnboardingState,
-  requireProfileOnboardedUserId: mocks.requireProfileOnboardedUserId,
 }));
 vi.mock("@/modules/drills/mutations", () => ({
   CreateDrillIdempotencyError: mocks.CreateDrillIdempotencyError,

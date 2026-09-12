@@ -37,7 +37,7 @@ vi.mock("next/navigation", () => ({
 vi.mock("@/components/navigation/RoutedBottomNav", () => ({
   RoutedBottomNav: () => <nav aria-label="Bottom navigation" />,
 }));
-vi.mock("@/modules/auth", () => ({
+vi.mock("@/modules/auth/page-user", () => ({
   requireCurrentPageUserId: mocks.requireCurrentPageUserId,
 }));
 vi.mock("@/modules/drills/queries", () => ({

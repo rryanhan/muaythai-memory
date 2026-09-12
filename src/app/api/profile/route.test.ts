@@ -7,14 +7,18 @@ const mocks = vi.hoisted(() => ({
   updateProfile: vi.fn(),
 }));
 
-vi.mock("@/modules/auth", () => ({
+vi.mock("@/modules/auth/current-user", () => ({
+  requireCurrentAppUser: mocks.requireCurrentAppUser,
+}));
+vi.mock("@/modules/auth/http", () => ({
   authenticationErrorResponse: (error: unknown) => (
     error instanceof Error && error.message === "unauthenticated"
       ? NextResponse.json({ error: error.message }, { status: 401 })
       : null
   ),
+}));
+vi.mock("@/modules/auth/onboarding-state", () => ({
   invalidateOnboardingState: mocks.invalidateOnboardingState,
-  requireCurrentAppUser: mocks.requireCurrentAppUser,
 }));
 vi.mock("@/modules/profile/avatar", () => ({
   AvatarValidationError: class extends Error {},

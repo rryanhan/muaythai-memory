@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
-import { authenticationErrorResponse } from "@/modules/auth";
+import { authenticationErrorResponse } from "@/modules/auth/http";
 import { ConnectionMutationError } from "./errors";
 
 export function connectionErrorResponse(

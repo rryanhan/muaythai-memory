@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ZodError } from "zod";
-import {
-  authenticationErrorResponse,
-  requireProfileOnboardedUserId,
-} from "@/modules/auth";
+import { requireProfileOnboardedUserId } from "@/modules/auth/current-user";
+import { authenticationErrorResponse } from "@/modules/auth/http";
 import {
   CreateDrillIdempotencyError,
   CreateDrillValidationError,

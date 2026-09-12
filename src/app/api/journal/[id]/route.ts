@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { requireOnboardedUserId } from "@/modules/auth";
+import { requireOnboardedUserId } from "@/modules/auth/current-user";
 import {
   deleteJournalEntryResponseSchema,
   journalDetailResponseSchema,

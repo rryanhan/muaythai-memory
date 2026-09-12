@@ -5,7 +5,7 @@ import { RoutedBottomNav } from "@/components/navigation/RoutedBottomNav";
 import journalStyles from "@/features/journal/Journal.module.css";
 import mediaStyles from "@/features/journal/JournalMedia.module.css";
 import routeStyles from "@/features/drills/DrillRouteShell.module.css";
-import { requireCurrentPageUserId } from "@/modules/auth";
+import { requireCurrentPageUserId } from "@/modules/auth/page-user";
 import { getOwnedDrillHeader } from "@/modules/drills/queries";
 import { listJournalEntries } from "@/modules/journal/queries";
 

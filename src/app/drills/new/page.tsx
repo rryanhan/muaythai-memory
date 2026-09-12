@@ -5,7 +5,10 @@ import { AddDrillPageForm } from "@/features/drills/AddDrillPageForm";
 import routeStyles from "@/features/drills/DrillRouteShell.module.css";
 import { FirstDrillCommitProvider } from "@/features/onboarding/FirstDrillCommitContext";
 import { safeInternalPath } from "@/lib/safe-internal-path";
-import { requireCurrentPageUserId, requireProfileOnboardedPageUserId } from "@/modules/auth";
+import {
+  requireCurrentPageUserId,
+  requireProfileOnboardedPageUserId,
+} from "@/modules/auth/page-user";
 
 export const metadata: Metadata = {
   title: "Add Drill | Muay Thai Memory",

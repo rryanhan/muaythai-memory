@@ -18,7 +18,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/lib/supabase/server", () => ({
   createSupabaseServerClient: mocks.createSupabaseServerClient,
 }));
-vi.mock("@/modules/auth", () => ({
+vi.mock("@/modules/auth/current-user", () => ({
   getOnboardingPath: mocks.getOnboardingPath,
   synchronizeAppUserFromVerifiedAuthUser:
     mocks.synchronizeAppUserFromVerifiedAuthUser,

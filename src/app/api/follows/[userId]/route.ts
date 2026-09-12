@@ -1,11 +1,9 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { requireOnboardedUserId } from "@/modules/auth";
-import {
-  cancelOrUnfollow,
-  connectionErrorResponse,
-  connectionMutationResponseSchema,
-} from "@/modules/connections";
+import { requireOnboardedUserId } from "@/modules/auth/current-user";
+import { connectionMutationResponseSchema } from "@/modules/connections/contracts";
+import { connectionErrorResponse } from "@/modules/connections/http";
+import { cancelOrUnfollow } from "@/modules/connections/mutations";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";

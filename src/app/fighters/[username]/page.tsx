@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { FighterProfileScreen } from "@/features/connections/FighterProfileScreen";
-import { requireCurrentPageUserId } from "@/modules/auth";
-import { getFighterProfileByUsername } from "@/modules/connections";
+import { requireCurrentPageUserId } from "@/modules/auth/page-user";
+import { getFighterProfileByUsername } from "@/modules/connections/queries";
 import { profileUsernameSchema } from "@/modules/profile/contracts";
 
 export const dynamic = "force-dynamic";

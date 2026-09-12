@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireOnboardedUserId } from "@/modules/auth";
+import { requireOnboardedUserId } from "@/modules/auth/current-user";
 import {
-  connectionErrorResponse,
   connectionMutationResponseSchema,
-  requestFollow,
   requestFollowInputSchema,
-} from "@/modules/connections";
+} from "@/modules/connections/contracts";
+import { connectionErrorResponse } from "@/modules/connections/http";
+import { requestFollow } from "@/modules/connections/mutations";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";

@@ -4,7 +4,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import {
   getOnboardingPath,
   synchronizeAppUserFromVerifiedAuthUser,
-} from "@/modules/auth";
+} from "@/modules/auth/current-user";
 import {
   clearRecoveryGrantCookie,
   clearRecoveryIntentCookie,

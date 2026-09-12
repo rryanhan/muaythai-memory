@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireOnboardedUserId } from "@/modules/auth";
+import { requireOnboardedUserId } from "@/modules/auth/current-user";
 import {
   createJournalUploadInputSchema,
   journalUploadIntentResponseSchema,

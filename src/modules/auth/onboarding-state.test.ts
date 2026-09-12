@@ -16,8 +16,6 @@ const mocks = vi.hoisted(() => {
   const completeProfileOnboarding = vi.fn();
   const createGuidedFirstDrill = vi.fn();
   const skipFirstDrillGuide = vi.fn();
-  let invalidateDelegate: ((userId: string) => void) | null = null;
-
   class OnboardingValidationError extends Error {
     readonly status = 400;
   }
@@ -67,12 +65,6 @@ const mocks = vi.hoisted(() => {
     createGuidedFirstDrill,
     CreateDrillIdempotencyError,
     CreateDrillValidationError,
-    get invalidateDelegate() {
-      return invalidateDelegate;
-    },
-    set invalidateDelegate(delegate: ((userId: string) => void) | null) {
-      invalidateDelegate = delegate;
-    },
     OnboardingValidationError,
     readUserIds,
     revalidateTag,
@@ -107,11 +99,12 @@ vi.mock("@/db/schema", () => ({
     firstDrillGuideSkippedAt: "firstDrillGuideSkippedAt",
   },
 }));
-vi.mock("@/modules/auth", () => ({
-  authenticationErrorResponse: () => null,
-  invalidateOnboardingState: (userId: string) => mocks.invalidateDelegate?.(userId),
+vi.mock("@/modules/auth/current-user", () => ({
   requireCurrentAppUser: mocks.requireCurrentAppUser,
   requireProfileOnboardedUserId: mocks.requireProfileOnboardedUserId,
+}));
+vi.mock("@/modules/auth/http", () => ({
+  authenticationErrorResponse: () => null,
 }));
 vi.mock("@/modules/drills/mutations", () => ({
   CreateDrillIdempotencyError: mocks.CreateDrillIdempotencyError,
@@ -145,7 +138,6 @@ describe("production onboarding state cache adapter", () => {
     mocks.requireCurrentAppUser.mockReset();
     mocks.requireProfileOnboardedUserId.mockReset();
     mocks.skipFirstDrillGuide.mockReset();
-    mocks.invalidateDelegate = invalidateOnboardingState;
   });
 
   it("isolates two users and reads through profile, completion, and skip invalidations", async () => {

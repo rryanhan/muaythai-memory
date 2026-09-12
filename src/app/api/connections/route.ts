@@ -1,13 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireOnboardedUserId } from "@/modules/auth";
+import { requireOnboardedUserId } from "@/modules/auth/current-user";
 import {
-  connectionErrorResponse,
   connectionSectionPageResponseSchema,
   connectionSectionSchema,
   connectionsSummaryResponseSchema,
+} from "@/modules/connections/contracts";
+import { connectionErrorResponse } from "@/modules/connections/http";
+import {
   getConnectionSectionPage,
   getConnectionsSummary,
-} from "@/modules/connections";
+} from "@/modules/connections/queries";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";

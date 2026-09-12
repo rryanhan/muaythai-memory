@@ -12,10 +12,8 @@ import {
   updateDrill,
 } from "@/modules/drills/mutations";
 import { getDrillById } from "@/modules/drills/queries";
-import {
-  authenticationErrorResponse,
-  requireOnboardedUserId,
-} from "@/modules/auth";
+import { requireOnboardedUserId } from "@/modules/auth/current-user";
+import { authenticationErrorResponse } from "@/modules/auth/http";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";

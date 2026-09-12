@@ -6,9 +6,11 @@ const mocks = vi.hoisted(() => ({
   select: vi.fn(),
 }));
 
-vi.mock("@/modules/auth", () => ({
-  authenticationErrorResponse: () => null,
+vi.mock("@/modules/auth/current-user", () => ({
   requireOnboardedUserId: mocks.requireOnboardedUserId,
+}));
+vi.mock("@/modules/auth/http", () => ({
+  authenticationErrorResponse: () => null,
 }));
 
 vi.mock("@/db/client", () => ({

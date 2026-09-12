@@ -22,13 +22,15 @@ const mocks = vi.hoisted(() => {
   };
 });
 
-vi.mock("@/modules/auth", () => ({
+vi.mock("@/modules/auth/current-user", () => ({
+  requireProfileOnboardedUserId: mocks.requireProfileOnboardedUserId,
+}));
+vi.mock("@/modules/auth/http", () => ({
   authenticationErrorResponse: (error: unknown) => (
     error instanceof Error && error.message === "unauthenticated"
       ? NextResponse.json({ error: error.message }, { status: 401 })
       : null
   ),
-  requireProfileOnboardedUserId: mocks.requireProfileOnboardedUserId,
 }));
 vi.mock("@/modules/capture/rate-limits", () => ({
   CaptureRateLimitError: mocks.CaptureRateLimitError,

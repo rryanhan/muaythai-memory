@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { requireOnboardedUserId } from "@/modules/auth";
+import { requireOnboardedUserId } from "@/modules/auth/current-user";
 import {
-  connectionErrorResponse,
   connectionMutationResponseSchema,
-  respondToFollowRequest,
   respondToFollowRequestInputSchema,
-} from "@/modules/connections";
+} from "@/modules/connections/contracts";
+import { connectionErrorResponse } from "@/modules/connections/http";
+import { respondToFollowRequest } from "@/modules/connections/mutations";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";

@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { requireOnboardedUserId } from "@/modules/auth";
+import { requireOnboardedUserId } from "@/modules/auth/current-user";
 import {
-  drillShareErrorResponse,
   drillShareRecipientPageSchema,
-  getDrillShareRecipientPage,
-  updateDrillShare,
   updateDrillShareInputSchema,
   updateDrillShareResponseSchema,
-} from "@/modules/sharing";
+} from "@/modules/sharing/contracts";
+import { drillShareErrorResponse } from "@/modules/sharing/http";
+import { updateDrillShare } from "@/modules/sharing/mutations";
+import { getDrillShareRecipientPage } from "@/modules/sharing/queries";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";

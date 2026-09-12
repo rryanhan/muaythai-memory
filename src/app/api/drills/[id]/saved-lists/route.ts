@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z, ZodError } from "zod";
-import { authenticationErrorResponse, requireOnboardedUserId } from "@/modules/auth";
+import { requireOnboardedUserId } from "@/modules/auth/current-user";
+import { authenticationErrorResponse } from "@/modules/auth/http";
 import {
   updateSavedListInputSchema,
   updateSavedListResponseSchema,

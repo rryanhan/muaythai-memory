@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { requireOnboardedUserId } from "@/modules/auth";
+import { requireOnboardedUserId } from "@/modules/auth/current-user";
 import { journalPreviewResponseSchema } from "@/modules/journal/contracts";
 import { journalErrorResponse } from "@/modules/journal/http";
 import { getJournalPreviewForDrill } from "@/modules/journal/queries";

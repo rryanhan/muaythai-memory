@@ -1,7 +1,8 @@
 import { redirect } from "next/navigation";
 import { GuidedFirstDrillForm } from "@/features/onboarding/GuidedFirstDrillForm";
 import { safeInternalPath } from "@/lib/safe-internal-path";
-import { isOnboardingComplete, isProfileOnboarded, requireAuthenticatedPageUser } from "@/modules/auth";
+import { isOnboardingComplete, isProfileOnboarded } from "@/modules/auth/current-user";
+import { requireAuthenticatedPageUser } from "@/modules/auth/page-user";
 
 export default async function OnboardingFirstDrillPage({ searchParams }: { searchParams: Promise<{ mode?: string; next?: string; replay?: string }> }) {
   const params = await searchParams;

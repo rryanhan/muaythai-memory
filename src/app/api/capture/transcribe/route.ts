@@ -10,7 +10,8 @@ import {
   validateCaptureAudioMetadata,
 } from "@/modules/capture/transcription";
 import { CaptureRateLimitError, consumeCaptureRateLimit } from "@/modules/capture/rate-limits";
-import { authenticationErrorResponse, requireProfileOnboardedUserId } from "@/modules/auth";
+import { requireProfileOnboardedUserId } from "@/modules/auth/current-user";
+import { authenticationErrorResponse } from "@/modules/auth/http";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";

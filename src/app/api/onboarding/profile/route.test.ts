@@ -7,10 +7,14 @@ const mocks = vi.hoisted(() => ({
   requireCurrentAppUser: vi.fn(),
 }));
 
-vi.mock("@/modules/auth", () => ({
-  authenticationErrorResponse: () => null,
-  invalidateOnboardingState: mocks.invalidateOnboardingState,
+vi.mock("@/modules/auth/current-user", () => ({
   requireCurrentAppUser: mocks.requireCurrentAppUser,
+}));
+vi.mock("@/modules/auth/http", () => ({
+  authenticationErrorResponse: () => null,
+}));
+vi.mock("@/modules/auth/onboarding-state", () => ({
+  invalidateOnboardingState: mocks.invalidateOnboardingState,
 }));
 vi.mock("@/modules/onboarding/mutations", () => ({
   completeProfileOnboarding: mocks.completeProfileOnboarding,

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { ProfileSavedListPage } from "@/features/profile/ProfileSavedListPage";
-import { requireCurrentPageUserId } from "@/modules/auth";
+import { requireCurrentPageUserId } from "@/modules/auth/page-user";
 import { listDrills } from "@/modules/drills/queries";
 
 export const dynamic = "force-dynamic";

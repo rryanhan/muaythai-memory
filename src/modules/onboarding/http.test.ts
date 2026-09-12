@@ -5,7 +5,7 @@ const mocks = vi.hoisted(() => ({
   invalidateOnboardingState: vi.fn(),
 }));
 
-vi.mock("@/modules/auth", () => ({
+vi.mock("@/modules/auth/onboarding-state", () => ({
   invalidateOnboardingState: mocks.invalidateOnboardingState,
 }));
 

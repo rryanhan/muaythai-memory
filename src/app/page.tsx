@@ -2,8 +2,8 @@ import { preload } from "react-dom";
 import { AppShell } from "@/components/app/AppShell";
 import type { AppView } from "@/components/navigation/BottomNav";
 import { contextBadgeUrls } from "@/components/shared/context-badges";
-import { getInitialNetworkData } from "@/modules/graph";
-import { requireCurrentPageUser } from "@/modules/auth";
+import { getInitialNetworkData } from "@/modules/graph/queries";
+import { requireCurrentPageUser } from "@/modules/auth/page-user";
 
 export const dynamic = "force-dynamic";
 

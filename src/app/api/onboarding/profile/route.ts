@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import {
-  authenticationErrorResponse,
-  requireCurrentAppUser,
-} from "@/modules/auth";
+import { requireCurrentAppUser } from "@/modules/auth/current-user";
+import { authenticationErrorResponse } from "@/modules/auth/http";
 import {
   completeProfileOnboarding,
   OnboardingValidationError,

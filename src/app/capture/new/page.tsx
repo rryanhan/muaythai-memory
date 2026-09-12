@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { CaptureDraftScreen, type CaptureOrigin } from "@/features/capture/CaptureDraftScreen";
 import type { CaptureMode } from "@/features/capture/CaptureDraftForm";
-import { requireCurrentPageUserId } from "@/modules/auth";
+import { requireCurrentPageUserId } from "@/modules/auth/page-user";
 
 export const metadata: Metadata = {
   title: "Capture Drill | Muay Thai Memory",

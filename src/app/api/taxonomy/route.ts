@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 import { taxonomyResponseSchema } from "@/modules/taxonomy/contracts";
 import { getTaxonomy } from "@/modules/taxonomy/queries";
-import { authenticationErrorResponse, requireCurrentUserId } from "@/modules/auth";
+import { requireCurrentUserId } from "@/modules/auth/current-user";
+import { authenticationErrorResponse } from "@/modules/auth/http";
 
 export const dynamic = "force-dynamic";
 

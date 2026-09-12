@@ -2,7 +2,8 @@ import { redirect } from "next/navigation";
 import { OnboardingProfileForm } from "@/features/onboarding/OnboardingProfileForm";
 import styles from "@/features/onboarding/Onboarding.module.css";
 import { safeInternalPath } from "@/lib/safe-internal-path";
-import { isProfileOnboarded, requireAuthenticatedPageUser } from "@/modules/auth";
+import { isProfileOnboarded } from "@/modules/auth/current-user";
+import { requireAuthenticatedPageUser } from "@/modules/auth/page-user";
 
 export default async function OnboardingProfilePage({ searchParams }: { searchParams: Promise<{ next?: string }> }) {
   const nextPath = safeInternalPath((await searchParams).next);

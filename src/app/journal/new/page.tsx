@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { JournalUploadScreen } from "@/features/journal/JournalUploadScreen";
-import { requireCurrentPageUserId } from "@/modules/auth";
+import { requireCurrentPageUserId } from "@/modules/auth/page-user";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";

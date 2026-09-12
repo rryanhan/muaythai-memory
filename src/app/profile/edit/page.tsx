@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { ProfileEditScreen } from "@/features/profile/ProfileEditScreen";
-import { requireCurrentPageUser } from "@/modules/auth";
+import { requireCurrentPageUser } from "@/modules/auth/page-user";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";

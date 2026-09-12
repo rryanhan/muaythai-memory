@@ -6,13 +6,15 @@ const mocks = vi.hoisted(() => ({
   requireOnboardedUserId: vi.fn(),
 }));
 
-vi.mock("@/modules/auth", () => ({
+vi.mock("@/modules/auth/current-user", () => ({
+  requireOnboardedUserId: mocks.requireOnboardedUserId,
+}));
+vi.mock("@/modules/auth/http", () => ({
   authenticationErrorResponse: (error: unknown) => (
     error instanceof Error && error.message === "unauthenticated"
       ? NextResponse.json({ error: error.message }, { status: 401 })
       : null
   ),
-  requireOnboardedUserId: mocks.requireOnboardedUserId,
 }));
 vi.mock("@/modules/profile/queries", () => ({
   getProfileOverview: mocks.getProfileOverview,

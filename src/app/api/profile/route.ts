@@ -2,11 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { AvatarValidationError } from "@/modules/profile/avatar";
 import { profileResponseSchema } from "@/modules/profile/contracts";
 import { ProfileUpdateError, updateProfile } from "@/modules/profile/mutations";
-import {
-  authenticationErrorResponse,
-  invalidateOnboardingState,
-  requireCurrentAppUser,
-} from "@/modules/auth";
+import { requireCurrentAppUser } from "@/modules/auth/current-user";
+import { authenticationErrorResponse } from "@/modules/auth/http";
+import { invalidateOnboardingState } from "@/modules/auth/onboarding-state";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";

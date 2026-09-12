@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { invalidateOnboardingState } from "@/modules/auth";
+import { invalidateOnboardingState } from "@/modules/auth/onboarding-state";
 
 export function finalizeOnboardingMutationResponse({
   userId,

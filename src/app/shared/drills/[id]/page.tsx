@@ -8,8 +8,8 @@ import { RoutedBottomNav } from "@/components/navigation/RoutedBottomNav";
 import { DrillDetailBackButton } from "@/features/drills/DrillDetailBackButton";
 import { DrillDetailContent } from "@/features/drills/DrillDetailContent";
 import routeStyles from "@/features/drills/DrillRouteShell.module.css";
-import { requireCurrentPageUserId } from "@/modules/auth";
-import { getSharedDrillById } from "@/modules/sharing";
+import { requireCurrentPageUserId } from "@/modules/auth/page-user";
+import { getSharedDrillById } from "@/modules/sharing/queries";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";

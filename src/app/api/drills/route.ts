@@ -8,10 +8,8 @@ import {
 } from "@/modules/drills/contracts";
 import { CreateDrillValidationError, createDrill } from "@/modules/drills/mutations";
 import { listDrills } from "@/modules/drills/queries";
-import {
-  authenticationErrorResponse,
-  requireOnboardedUserId,
-} from "@/modules/auth";
+import { requireOnboardedUserId } from "@/modules/auth/current-user";
+import { authenticationErrorResponse } from "@/modules/auth/http";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";

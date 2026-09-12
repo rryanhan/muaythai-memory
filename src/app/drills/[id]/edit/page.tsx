@@ -8,7 +8,7 @@ import { AddDrillForm } from "@/features/drills/AddDrillForm";
 import { DeleteDrillSection } from "@/features/drills/DeleteDrillSection";
 import { getDrillById } from "@/modules/drills/queries";
 import routeStyles from "@/features/drills/DrillRouteShell.module.css";
-import { requireCurrentPageUserId } from "@/modules/auth";
+import { requireCurrentPageUserId } from "@/modules/auth/page-user";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";

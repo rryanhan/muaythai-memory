@@ -1,11 +1,9 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { requireOnboardedUserId } from "@/modules/auth";
-import {
-  drillShareErrorResponse,
-  getSharedDrillById,
-  sharedDrillDetailResponseSchema,
-} from "@/modules/sharing";
+import { requireOnboardedUserId } from "@/modules/auth/current-user";
+import { sharedDrillDetailResponseSchema } from "@/modules/sharing/contracts";
+import { drillShareErrorResponse } from "@/modules/sharing/http";
+import { getSharedDrillById } from "@/modules/sharing/queries";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";

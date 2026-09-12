@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { requireOnboardedUserId } from "@/modules/auth";
+import { requireOnboardedUserId } from "@/modules/auth/current-user";
 import {
   authorizedConnectionPageResponseSchema,
-  connectionErrorResponse,
-  getAuthorizedConnectionPage,
   publicConnectionSectionSchema,
-} from "@/modules/connections";
+} from "@/modules/connections/contracts";
+import { connectionErrorResponse } from "@/modules/connections/http";
+import { getAuthorizedConnectionPage } from "@/modules/connections/queries";
 import { profileUsernameSchema } from "@/modules/profile/contracts";
 
 export const dynamic = "force-dynamic";

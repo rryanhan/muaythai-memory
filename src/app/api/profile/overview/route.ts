@@ -1,8 +1,6 @@
 import { NextResponse } from "next/server";
-import {
-  authenticationErrorResponse,
-  requireOnboardedUserId,
-} from "@/modules/auth";
+import { requireOnboardedUserId } from "@/modules/auth/current-user";
+import { authenticationErrorResponse } from "@/modules/auth/http";
 import { profileOverviewResponseSchema } from "@/modules/profile/contracts";
 import { getProfileOverview } from "@/modules/profile/queries";
 

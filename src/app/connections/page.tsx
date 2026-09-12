@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { ConnectionsScreen, type ConnectionsTab } from "@/features/connections/ConnectionsScreen";
-import { requireCurrentPageOnboardingState } from "@/modules/auth";
+import { requireCurrentPageOnboardingState } from "@/modules/auth/page-user";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";

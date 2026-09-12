@@ -1,11 +1,9 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { requireOnboardedUserId } from "@/modules/auth";
-import {
-  connectionErrorResponse,
-  fighterProfileResponseSchema,
-  getFighterProfileByUsername,
-} from "@/modules/connections";
+import { requireOnboardedUserId } from "@/modules/auth/current-user";
+import { fighterProfileResponseSchema } from "@/modules/connections/contracts";
+import { connectionErrorResponse } from "@/modules/connections/http";
+import { getFighterProfileByUsername } from "@/modules/connections/queries";
 import { profileUsernameSchema } from "@/modules/profile/contracts";
 
 export const dynamic = "force-dynamic";

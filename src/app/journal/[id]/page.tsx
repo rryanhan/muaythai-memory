@@ -7,7 +7,7 @@ import { RoutedBottomNav } from "@/components/navigation/RoutedBottomNav";
 import { JournalDeleteSection } from "@/features/journal/JournalDeleteSection";
 import { JournalVideoPlayer } from "@/features/journal/JournalVideoPlayer";
 import styles from "@/features/journal/Journal.module.css";
-import { requireCurrentPageUserId } from "@/modules/auth";
+import { requireCurrentPageUserId } from "@/modules/auth/page-user";
 import { getJournalEntryById } from "@/modules/journal/queries";
 
 export const dynamic = "force-dynamic";
