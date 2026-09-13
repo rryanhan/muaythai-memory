@@ -2,7 +2,7 @@ import { type ComponentProps, useState } from "react";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { GraphOptions, GraphResponse } from "@/data/types";
+import type { GraphOptions, GraphResponse, TaxonomyResponse } from "@/data/types";
 import { defaultNetworkLayerOptions, emptyNetworkFilters } from "./types";
 
 const mocks = vi.hoisted(() => ({
@@ -41,11 +41,13 @@ vi.mock("./NetworkControlsSheet", () => ({
     onOpenChange,
     tagSearch,
     onTagSearchChange,
+    onTaxonomyLoaded,
   }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     tagSearch: string;
     onTagSearchChange: (value: string) => void;
+    onTaxonomyLoaded: (taxonomy: TaxonomyResponse) => void;
   }) => (
     <div data-testid="controls-sheet" data-open={String(open)} data-tag-search={tagSearch}>
       {open && (
@@ -57,6 +59,9 @@ vi.mock("./NetworkControlsSheet", () => ({
           />
           <button type="button" onClick={() => onOpenChange(false)}>
             Close loaded controls
+          </button>
+          <button type="button" onClick={() => onTaxonomyLoaded(taxonomy)}>
+            Publish fixture taxonomy
           </button>
         </>
       )}
@@ -187,6 +192,27 @@ describe("NetworkGraphPanel hidden lifecycle", () => {
       prefetch: undefined,
     });
   });
+
+  it("replaces a selected tag's fallback slug label after controls publish full taxonomy", async () => {
+    const user = userEvent.setup();
+    render(
+      <Harness
+        active
+        initialFilters={{ ...emptyNetworkFilters, tagSlugs: ["clinch-entry"] }}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: /Tag: Clinch Entry/ })).toBeVisible();
+
+    await user.click(screen.getByRole("button", { name: "Network controls" }));
+    await user.click(await screen.findByRole("button", { name: "Publish fixture taxonomy" }));
+
+    const canonicalChip = await screen.findByRole("button", { name: /Tag: Clinch Gateway/ });
+    expect(screen.queryByRole("button", { name: /Tag: Clinch Entry/ })).not.toBeInTheDocument();
+
+    await user.click(canonicalChip);
+    expect(screen.queryByRole("button", { name: /Tag: Clinch Gateway/ })).not.toBeInTheDocument();
+  });
 });
 
 const drillDetail = {
@@ -203,10 +229,16 @@ const drillDetail = {
   updatedAt: new Date(),
 };
 
-function Harness({ active }: { active: boolean }) {
+function Harness({
+  active,
+  initialFilters = emptyNetworkFilters,
+}: {
+  active: boolean;
+  initialFilters?: typeof emptyNetworkFilters;
+}) {
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchDraft, setSearchDraft] = useState("");
-  const [filters, setFilters] = useState(emptyNetworkFilters);
+  const [filters, setFilters] = useState(initialFilters);
   const [layerOptions, setLayerOptions] = useState<GraphOptions>(defaultNetworkLayerOptions);
 
   return (
@@ -216,7 +248,6 @@ function Harness({ active }: { active: boolean }) {
       filters={filters}
       effectiveFilters={filters}
       layerOptions={layerOptions}
-      taxonomyLoading={false}
       previewKeyword=""
       searchOpen={searchOpen}
       searchDraft={searchDraft}
@@ -226,7 +257,21 @@ function Harness({ active }: { active: boolean }) {
       onSearchDraftChange={setSearchDraft}
       onUpdateFilters={(updater) => setFilters((current) => updater(current))}
       onLayerOptionsChange={setLayerOptions}
-      onRetryTaxonomy={() => undefined}
     />
   );
 }
+
+const taxonomy: TaxonomyResponse = {
+  trainingMethods: [],
+  tagCategories: [],
+  standardTags: [{
+    id: "00000000-0000-4000-8000-000000000003",
+    name: "Clinch Gateway",
+    slug: "clinch-entry",
+    kind: "standard",
+    sortOrder: 1,
+    category: null,
+  }],
+  customTags: [],
+  statusTags: [],
+};

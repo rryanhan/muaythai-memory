@@ -1,15 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
 import type {
   ApiClientOptions,
   DrillFilterInput,
   GraphOptionsInput,
   GraphResponse,
-  TaxonomyResponse,
 } from "@/data/types";
-import { taxonomyQueryKey } from "@/features/shared/query-keys";
 import { useDebouncedValue } from "@/features/shared/use-debounced-value";
 import {
   addPreviewKeyword,
@@ -34,11 +31,10 @@ import styles from "./Network.module.css";
 type NetworkViewProps = {
   active: boolean;
   initialGraph?: GraphResponse;
-  initialTaxonomy?: TaxonomyResponse;
 };
 
 // Owns graph API loading. Graph-local interactions live in NetworkGraphPanel.
-export function NetworkView({ active, initialGraph, initialTaxonomy }: NetworkViewProps) {
+export function NetworkView({ active, initialGraph }: NetworkViewProps) {
   const [filters, setFilters] = useState<NetworkFilters>(emptyNetworkFilters);
   const [layerOptions, setLayerOptions] = useState(defaultNetworkLayerOptions);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -70,13 +66,6 @@ export function NetworkView({ active, initialGraph, initialTaxonomy }: NetworkVi
     () => JSON.parse(serializedRequestFilters) as NetworkFilters,
     [serializedRequestFilters],
   );
-  const taxonomyQuery = useQuery({
-    queryKey: taxonomyQueryKey,
-    queryFn: ({ signal }) => getTaxonomyOnDemand({ requestInit: { signal } }),
-    initialData: initialTaxonomy,
-    staleTime: 10 * 60 * 1000,
-  });
-
   const retryGraph = useCallback(() => {
     setRetryNonce((current) => current + 1);
   }, []);
@@ -169,9 +158,6 @@ export function NetworkView({ active, initialGraph, initialTaxonomy }: NetworkVi
           filters={filters}
           effectiveFilters={effectiveFilters}
           layerOptions={layerOptions}
-          taxonomy={taxonomyQuery.data}
-          taxonomyLoading={taxonomyQuery.isLoading}
-          taxonomyErrorMessage={taxonomyQuery.error ? getNetworkErrorMessage(taxonomyQuery.error) : undefined}
           previewKeyword={previewKeyword}
           searchOpen={searchOpen}
           searchDraft={searchDraft}
@@ -182,7 +168,6 @@ export function NetworkView({ active, initialGraph, initialTaxonomy }: NetworkVi
           onSearchDraftChange={updateSearchDraft}
           onUpdateFilters={updateFilters}
           onLayerOptionsChange={setLayerOptions}
-          onRetryTaxonomy={() => void taxonomyQuery.refetch()}
         />
       )}
     </section>
@@ -196,9 +181,4 @@ async function getGraphOnDemand(
 ): Promise<GraphResponse> {
   const { getGraph } = await import("@/data/graph");
   return getGraph(filters, graphOptions, options);
-}
-
-async function getTaxonomyOnDemand(options: ApiClientOptions): Promise<TaxonomyResponse> {
-  const { getTaxonomy } = await import("@/data/taxonomy");
-  return getTaxonomy(options);
 }

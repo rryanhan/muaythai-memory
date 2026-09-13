@@ -1,11 +1,13 @@
 "use client";
 
-import type { Dispatch, ReactNode, SetStateAction } from "react";
+import { useEffect, type Dispatch, type ReactNode, type SetStateAction } from "react";
 import { CaretDown } from "@phosphor-icons/react/CaretDown";
 import { MagnifyingGlass } from "@phosphor-icons/react/MagnifyingGlass";
+import { useQuery } from "@tanstack/react-query";
 import { Drawer } from "vaul";
-import type { GraphOptions, TaxonomyResponse } from "@/data";
+import type { ApiClientOptions, GraphOptions, TaxonomyResponse } from "@/data";
 import { useDrawerFocus } from "@/features/media/use-drawer-focus";
+import { taxonomyQueryKey } from "@/features/shared/query-keys";
 import { SavedListToken } from "@/features/shared/SavedListToken";
 import {
   filterBuiltInStatuses,
@@ -13,7 +15,7 @@ import {
   filterTags,
   getBuiltInStatusFilters,
 } from "@/features/shared/tag-filter-helpers";
-import { normalizeKeyword } from "./network-helpers";
+import { getNetworkErrorMessage, normalizeKeyword } from "./network-helpers";
 import { defaultNetworkLayerOptions, emptyNetworkFilters, type NetworkFilters } from "./types";
 import styles from "./Network.module.css";
 
@@ -22,16 +24,13 @@ type NetworkControlsSheetProps = {
   onOpenChange: (open: boolean) => void;
   filters: NetworkFilters;
   layerOptions: GraphOptions;
-  taxonomy?: TaxonomyResponse;
-  taxonomyLoading: boolean;
-  taxonomyErrorMessage?: string;
   tagSearch: string;
   tagSelectOpen: boolean;
   onTagSearchChange: (value: string) => void;
   onTagSelectOpenChange: (open: boolean) => void;
   onUpdateFilters: (updater: (current: NetworkFilters) => NetworkFilters) => void;
   onLayerOptionsChange: Dispatch<SetStateAction<GraphOptions>>;
-  onRetryTaxonomy: () => void;
+  onTaxonomyLoaded: (taxonomy: TaxonomyResponse) => void;
 };
 
 export function NetworkControlsSheet({
@@ -39,18 +38,25 @@ export function NetworkControlsSheet({
   onOpenChange,
   filters,
   layerOptions,
-  taxonomy,
-  taxonomyLoading,
-  taxonomyErrorMessage,
   tagSearch,
   tagSelectOpen,
   onTagSearchChange,
   onTagSelectOpenChange,
   onUpdateFilters,
   onLayerOptionsChange,
-  onRetryTaxonomy,
+  onTaxonomyLoaded,
 }: NetworkControlsSheetProps) {
   const contentRef = useDrawerFocus(open);
+  const taxonomyQuery = useQuery({
+    queryKey: taxonomyQueryKey,
+    queryFn: ({ signal }) => getTaxonomyOnDemand({ requestInit: { signal } }),
+    enabled: open && tagSelectOpen,
+    staleTime: 10 * 60 * 1000,
+  });
+  const taxonomy = taxonomyQuery.data;
+  const taxonomyErrorMessage = taxonomyQuery.error
+    ? getNetworkErrorMessage(taxonomyQuery.error)
+    : undefined;
   const normalizedQuery = normalizeKeyword(tagSearch);
   const selectedTagSet = new Set(filters.tagSlugs);
   const selectedStatusSet = new Set(filters.statusTagSlugs);
@@ -74,6 +80,10 @@ export function NetworkControlsSheet({
     layerOptions.showCustomTags !== defaultNetworkLayerOptions.showCustomTags ||
     layerOptions.showStatusTags !== defaultNetworkLayerOptions.showStatusTags ||
     Boolean(tagSearch.trim());
+
+  useEffect(() => {
+    if (taxonomy) onTaxonomyLoaded(taxonomy);
+  }, [onTaxonomyLoaded, taxonomy]);
 
   function toggleTag(tagSlug: string) {
     onUpdateFilters((current) => ({
@@ -161,11 +171,15 @@ export function NetworkControlsSheet({
 
               {tagSelectOpen && (
                 <div className="network-tag-select" aria-label="Selectable graph tags">
-                  {taxonomyLoading && <p className="network-tag-empty">Loading tags</p>}
+                  {taxonomyQuery.isLoading && (
+                    <p className="network-tag-empty" role="status" aria-live="polite">
+                      Loading tags
+                    </p>
+                  )}
                   {taxonomyErrorMessage && (
-                    <div className="network-filter-state">
+                    <div className="network-filter-state" role="alert">
                       <p>{taxonomyErrorMessage}</p>
-                      <button type="button" onClick={onRetryTaxonomy}>
+                      <button type="button" onClick={() => void taxonomyQuery.refetch()}>
                         Retry
                       </button>
                     </div>
@@ -225,6 +239,11 @@ export function NetworkControlsSheet({
       </Drawer.Portal>
     </Drawer.Root>
   );
+}
+
+async function getTaxonomyOnDemand(options: ApiClientOptions): Promise<TaxonomyResponse> {
+  const { getTaxonomy } = await import("@/data/taxonomy");
+  return getTaxonomy(options);
 }
 
 function LayerToggle({

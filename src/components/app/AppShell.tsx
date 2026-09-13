@@ -4,7 +4,7 @@ import { useState } from "react";
 import dynamic from "next/dynamic";
 import { useSearchParams } from "next/navigation";
 import { BottomNav, type AppView } from "@/components/navigation/BottomNav";
-import type { GraphResponse, TaxonomyResponse } from "@/data";
+import type { GraphResponse } from "@/data";
 import type { CurrentAppUser } from "@/modules/auth";
 import styles from "./AppShell.module.css";
 
@@ -30,14 +30,12 @@ const viewLabels: Record<AppView, string> = {
 type AppShellProps = {
   currentUser: CurrentAppUser;
   initialGraph?: GraphResponse;
-  initialTaxonomy?: TaxonomyResponse;
   initialView?: AppView;
 };
 
 export function AppShell({
   currentUser,
   initialGraph,
-  initialTaxonomy,
   initialView = "network",
 }: AppShellProps) {
   const searchParams = useSearchParams();
@@ -63,7 +61,6 @@ export function AppShell({
             <NetworkView
               active={activeView === "network"}
               initialGraph={initialGraph}
-              initialTaxonomy={initialTaxonomy}
             />
           </div>
         )}

@@ -1,26 +1,20 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { GraphResponse, TaxonomyResponse } from "@/data/types";
+import type { GraphResponse } from "@/data/types";
 import type { NetworkFilters } from "./types";
 import { NetworkView } from "./NetworkView";
 
 const mocks = vi.hoisted(() => ({
   getGraph: vi.fn(),
-  getTaxonomy: vi.fn(),
 }));
 
 vi.mock("@/data/graph", () => ({
   getGraph: mocks.getGraph,
 }));
 
-vi.mock("@/data/taxonomy", () => ({
-  getTaxonomy: mocks.getTaxonomy,
-}));
-
 vi.mock("./NetworkGraphPanel", () => ({
   NetworkGraphPanel: ({
-    taxonomy,
     graph,
     searchOpen,
     searchDraft,
@@ -28,7 +22,6 @@ vi.mock("./NetworkGraphPanel", () => ({
     onSearchDraftChange,
     onUpdateFilters,
   }: {
-    taxonomy?: TaxonomyResponse;
     graph: GraphResponse;
     searchOpen: boolean;
     searchDraft: string;
@@ -37,7 +30,7 @@ vi.mock("./NetworkGraphPanel", () => ({
     onUpdateFilters: (updater: (current: NetworkFilters) => NetworkFilters) => void;
   }) => (
     <>
-      <p>{taxonomy?.trainingMethods[0]?.name ?? "No taxonomy"}</p>
+      <p>Graph ready</p>
       <p data-testid="graph-keywords">{graph.filters.keywords.join(",")}</p>
       <button type="button" aria-label="Search network" onClick={() => onSearchOpenChange(!searchOpen)} />
       {searchOpen && (
@@ -74,7 +67,6 @@ vi.mock("./NetworkStates", () => ({
 
 beforeEach(() => {
   mocks.getGraph.mockReset();
-  mocks.getTaxonomy.mockReset();
 });
 
 afterEach(() => {
@@ -82,27 +74,22 @@ afterEach(() => {
 });
 
 describe("NetworkView initial data", () => {
-  it("uses server-provided graph and taxonomy without repeating either API request", async () => {
+  it("uses the server-provided graph without repeating its API request", async () => {
     const queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false } },
     });
 
     render(
       <QueryClientProvider client={queryClient}>
-        <NetworkView
-          active
-          initialGraph={graph}
-          initialTaxonomy={taxonomy}
-        />
+        <NetworkView active initialGraph={graph} />
       </QueryClientProvider>,
     );
 
-    expect(screen.getByText("Boxing")).toBeVisible();
+    expect(screen.getByText("Graph ready")).toBeVisible();
     await act(async () => {
       await new Promise((resolve) => setTimeout(resolve, 0));
     });
     expect(mocks.getGraph).not.toHaveBeenCalled();
-    expect(mocks.getTaxonomy).not.toHaveBeenCalled();
   });
 
   it("waits for rapid preview typing to settle before requesting a graph", async () => {
@@ -114,7 +101,7 @@ describe("NetworkView initial data", () => {
 
     render(
       <QueryClientProvider client={queryClient}>
-        <NetworkView active initialGraph={graph} initialTaxonomy={taxonomy} />
+        <NetworkView active initialGraph={graph} />
       </QueryClientProvider>,
     );
 
@@ -211,24 +198,10 @@ function renderNetwork() {
 
   return render(
     <QueryClientProvider client={queryClient}>
-      <NetworkView active initialGraph={graph} initialTaxonomy={taxonomy} />
+      <NetworkView active initialGraph={graph} />
     </QueryClientProvider>,
   );
 }
-
-const taxonomy: TaxonomyResponse = {
-  trainingMethods: [{
-    id: "11111111-1111-4111-8111-111111111111",
-    name: "Boxing",
-    slug: "boxing",
-    iconKey: "boxing",
-    sortOrder: 1,
-  }],
-  tagCategories: [],
-  standardTags: [],
-  customTags: [],
-  statusTags: [],
-};
 
 const graph: GraphResponse = {
   nodes: [],

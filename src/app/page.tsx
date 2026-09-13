@@ -23,7 +23,6 @@ export default async function HomePage({ searchParams }: HomePageProps) {
     <AppShell
       currentUser={user}
       initialGraph={initialNetworkData?.graph}
-      initialTaxonomy={initialNetworkData?.taxonomy}
       initialView={initialView}
     />
   );

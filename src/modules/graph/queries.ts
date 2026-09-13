@@ -47,27 +47,11 @@ export async function getMuayThaiGraph(
 
 export async function getInitialNetworkData(
   userId: string,
-): Promise<{ graph: GraphResponse; taxonomy: TaxonomyResponse }> {
-  const filters = normalizeDrillFilters();
-  const options: GraphOptions = {
-    showTags: false,
-    showCustomTags: false,
-    showStatusTags: false,
-  };
-  const [taxonomy, drillList] = await Promise.all([
-    // The controls need the complete taxonomy, so provide it with the initial
-    // page instead of making the browser repeat these reference-data queries.
-    getTaxonomy(userId),
-    listDrills(userId, filters, {
-      includeTags: false,
-      includeStatusTags: false,
-    }),
-  ]);
-
-  return {
-    graph: buildMuayThaiGraph(taxonomy, drillList, filters, options),
-    taxonomy,
-  };
+): Promise<{ graph: GraphResponse }> {
+  // Reuse the default graph plan so the initial page reads only Training
+  // Methods and drill-method relations. The complete controls taxonomy should
+  // not cross the server/client boundary until requested.
+  return { graph: await getMuayThaiGraph(userId) };
 }
 
 function buildMuayThaiGraph(

@@ -24,13 +24,6 @@ describe("HomePage resource hints", () => {
     mocks.requireCurrentPageUser.mockResolvedValue({ id: "test-user" });
     mocks.getInitialNetworkData.mockResolvedValue({
       graph: { nodes: [], edges: [] },
-      taxonomy: {
-        trainingMethods: [],
-        tagCategories: [],
-        standardTags: [],
-        customTags: [],
-        statusTags: [],
-      },
     });
   });
 

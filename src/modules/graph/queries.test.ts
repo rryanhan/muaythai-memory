@@ -143,16 +143,21 @@ describe("network graph query planning", () => {
     );
   });
 
-  it("hydrates the initial page with full taxonomy and a lean default graph", async () => {
+  it("hydrates the initial page with the selective default graph plan only", async () => {
     const initialData = await getInitialNetworkData(userId);
 
-    expect(mocks.getTaxonomy).toHaveBeenCalledWith(userId);
+    expect(mocks.getTaxonomy).toHaveBeenCalledWith(userId, {
+      includeTagCategories: false,
+      includeStandardTags: false,
+      includeCustomTags: false,
+      includeStatusTags: false,
+    });
     expect(mocks.listDrills).toHaveBeenCalledWith(
       userId,
-      emptyFilters,
+      {},
       { includeTags: false, includeStatusTags: false },
     );
-    expect(initialData.taxonomy).toBe(taxonomy);
+    expect(initialData).toEqual({ graph: expect.any(Object) });
     expect(initialData.graph.nodes.map((node) => node.type)).toEqual([
       "trainingMethod",
       "drill",

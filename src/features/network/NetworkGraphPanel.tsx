@@ -54,9 +54,6 @@ type NetworkGraphPanelProps = {
   filters: NetworkFilters;
   effectiveFilters: NetworkFilters;
   layerOptions: GraphOptions;
-  taxonomy?: TaxonomyResponse;
-  taxonomyLoading: boolean;
-  taxonomyErrorMessage?: string;
   previewKeyword: string;
   searchOpen: boolean;
   searchDraft: string;
@@ -67,7 +64,6 @@ type NetworkGraphPanelProps = {
   onSearchDraftChange: (value: string) => void;
   onUpdateFilters: (updater: (current: NetworkFilters) => NetworkFilters) => void;
   onLayerOptionsChange: Dispatch<SetStateAction<GraphOptions>>;
-  onRetryTaxonomy: () => void;
 };
 
 // Owns graph-local UI state that should not reset the outer graph fetch loop.
@@ -77,9 +73,6 @@ export function NetworkGraphPanel({
   filters,
   effectiveFilters,
   layerOptions,
-  taxonomy,
-  taxonomyLoading,
-  taxonomyErrorMessage,
   previewKeyword,
   searchOpen,
   searchDraft,
@@ -90,12 +83,12 @@ export function NetworkGraphPanel({
   onSearchDraftChange,
   onUpdateFilters,
   onLayerOptionsChange,
-  onRetryTaxonomy,
 }: NetworkGraphPanelProps) {
   const [controlsOpen, setControlsOpen] = useState(false);
   const [controlsMounted, setControlsMounted] = useState(false);
   const [tagSearch, setTagSearch] = useState("");
   const [tagSelectOpen, setTagSelectOpen] = useState(false);
+  const [taxonomy, setTaxonomy] = useState<TaxonomyResponse>();
   const [selectedDrillId, setSelectedDrillId] = useState<string | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const [detailRetryNonce, setDetailRetryNonce] = useState(0);
@@ -469,16 +462,13 @@ export function NetworkGraphPanel({
             onOpenChange={handleControlsOpenChange}
             filters={filters}
             layerOptions={layerOptions}
-            taxonomy={taxonomy}
-            taxonomyLoading={taxonomyLoading}
-            taxonomyErrorMessage={taxonomyErrorMessage}
             tagSearch={tagSearch}
             tagSelectOpen={tagSelectOpen}
             onTagSearchChange={setTagSearch}
             onTagSelectOpenChange={setTagSelectOpen}
             onUpdateFilters={onUpdateFilters}
             onLayerOptionsChange={onLayerOptionsChange}
-            onRetryTaxonomy={onRetryTaxonomy}
+            onTaxonomyLoaded={setTaxonomy}
           />
         </Suspense>
       )}

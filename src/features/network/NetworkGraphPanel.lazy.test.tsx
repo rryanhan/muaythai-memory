@@ -1,4 +1,5 @@
 import { type ComponentProps, useState } from "react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterAll, describe, expect, it, vi } from "vitest";
@@ -103,7 +104,14 @@ const graph = {
 describe("NetworkGraphPanel cold sheet loading", () => {
   it("keeps both sheets operable and moves focus into each real dialog after its chunk resolves", async () => {
     const user = userEvent.setup();
-    render(<Harness active />);
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    render(
+      <QueryClientProvider client={queryClient}>
+        <Harness active />
+      </QueryClientProvider>,
+    );
 
     const controlsTrigger = screen.getByRole("button", { name: "Network controls" });
     await user.click(controlsTrigger);
@@ -183,7 +191,6 @@ function Harness({ active }: { active: boolean }) {
       filters={filters}
       effectiveFilters={filters}
       layerOptions={layerOptions}
-      taxonomyLoading={false}
       previewKeyword=""
       searchOpen={searchOpen}
       searchDraft={searchDraft}
@@ -193,7 +200,6 @@ function Harness({ active }: { active: boolean }) {
       onSearchDraftChange={setSearchDraft}
       onUpdateFilters={(updater) => setFilters((current) => updater(current))}
       onLayerOptionsChange={setLayerOptions}
-      onRetryTaxonomy={() => undefined}
     />
   );
 }
