@@ -1,20 +1,15 @@
-import { config } from "dotenv";
 import {
   DEPLOYMENT_ENVIRONMENTS,
   type DeploymentEnvironment,
   type DeploymentEnvironmentSummary,
-  verifyDeploymentEnvironment,
 } from "@/config/deployment-environment";
+import { loadKnownDeploymentEnvironment } from "./known-deployment-environment";
 
 type EnvironmentValues = Record<string, string | undefined>;
 
 const DEFAULT_ENVIRONMENT_FILES: Record<DeploymentEnvironment, string> = {
   staging: ".env.staging.local",
   production: ".env.production-maintenance.local",
-};
-const EXPECTED_SUPABASE_PROJECTS: Record<DeploymentEnvironment, string> = {
-  staging: "seiroxntlvyudgvseyss",
-  production: "pbzqwvowkpfhxptvmrny",
 };
 
 export type AccessControlEnvironment = {
@@ -31,37 +26,12 @@ export function loadAccessControlEnvironment(
   const environmentFile =
     options.environmentFile ??
     DEFAULT_ENVIRONMENT_FILES[options.expectedEnvironment];
-  // Start from a safe allowlist rather than merging deployment credentials
-  // from the shell. A missing file value must fail instead of silently falling
-  // back to a potentially different project's ambient secret.
-  const environment: EnvironmentValues = {
-    NODE_ENV: ambientEnvironment.NODE_ENV,
-  };
-
-  const result = config({
-    path: environmentFile,
-    processEnv: environment,
-    override: true,
-    quiet: true,
+  const { environment, summary } = loadKnownDeploymentEnvironment({
+    expectedEnvironment: options.expectedEnvironment,
+    environmentFile,
+    ambientEnvironment,
+    errorContext: "access-control environment",
   });
-  if (result.error) {
-    throw new Error(
-      `Could not load access-control environment file ${environmentFile}.`,
-      { cause: result.error },
-    );
-  }
-
-  const summary = verifyDeploymentEnvironment(
-    options.expectedEnvironment,
-    environment,
-  );
-  const expectedProject =
-    EXPECTED_SUPABASE_PROJECTS[options.expectedEnvironment];
-  if (summary.projectRef !== expectedProject) {
-    throw new Error(
-      `Expected ${options.expectedEnvironment} Supabase project ${expectedProject}, received ${summary.projectRef}.`,
-    );
-  }
 
   return { environment, environmentFile, summary };
 }

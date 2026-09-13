@@ -1,17 +1,16 @@
-import { config } from "dotenv";
 import {
   DEPLOYMENT_ENVIRONMENTS,
   type DeploymentEnvironment,
-  verifyDeploymentEnvironment,
 } from "@/config/deployment-environment";
 import { getEnvironmentFilePath } from "@/config/environment-file";
+import { loadKnownDeploymentEnvironment } from "./known-deployment-environment";
 
 const expectedEnvironment = parseExpectedEnvironment(process.argv.slice(2));
 const environmentFile = getEnvironmentFilePath();
-
-config({ path: environmentFile });
-
-const summary = verifyDeploymentEnvironment(expectedEnvironment);
+const { summary } = loadKnownDeploymentEnvironment({
+  expectedEnvironment,
+  environmentFile,
+});
 
 console.log(`Environment: ${summary.environment}`);
 console.log(`App origin: ${summary.appOrigin}`);

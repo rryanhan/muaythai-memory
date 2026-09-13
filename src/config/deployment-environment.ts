@@ -9,6 +9,13 @@ export const DEPLOYMENT_ENVIRONMENTS = ["staging", "production"] as const;
 export type DeploymentEnvironment =
   (typeof DEPLOYMENT_ENVIRONMENTS)[number];
 
+export const EXPECTED_SUPABASE_PROJECTS: Readonly<
+  Record<DeploymentEnvironment, string>
+> = {
+  staging: "seiroxntlvyudgvseyss",
+  production: "pbzqwvowkpfhxptvmrny",
+};
+
 type EnvironmentValues = Record<string, string | undefined>;
 
 export type DeploymentEnvironmentSummary = {
@@ -19,6 +26,7 @@ export type DeploymentEnvironmentSummary = {
   migrationDatabase: string;
 };
 
+/** Validates configuration consistency without selecting a fixed hosted target. */
 export function verifyDeploymentEnvironment(
   expectedEnvironment: DeploymentEnvironment,
   environment: EnvironmentValues = process.env,
@@ -66,6 +74,23 @@ export function verifyDeploymentEnvironment(
     runtimeDatabase: describeDatabaseUrl(runtime.connectionString),
     migrationDatabase: describeDatabaseUrl(migrationUrl),
   };
+}
+
+/** Verifies a hosted environment against its fixed Supabase project target. */
+export function verifyKnownDeploymentEnvironment(
+  expectedEnvironment: DeploymentEnvironment,
+  environment: EnvironmentValues = process.env,
+): DeploymentEnvironmentSummary {
+  const summary = verifyDeploymentEnvironment(expectedEnvironment, environment);
+  const expectedProject = EXPECTED_SUPABASE_PROJECTS[expectedEnvironment];
+
+  if (summary.projectRef !== expectedProject) {
+    throw new Error(
+      `Expected ${expectedEnvironment} Supabase project ${expectedProject}, received ${summary.projectRef}.`,
+    );
+  }
+
+  return summary;
 }
 
 function requireValue(environment: EnvironmentValues, key: string): string {

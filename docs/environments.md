@@ -30,8 +30,9 @@ npm run env:verify:staging
 npm run env:verify:production
 ```
 
-The verifier rejects mixed Supabase project references and non-HTTPS hosted
-origins.
+The verifier rejects mixed or unexpected Supabase project references and
+non-HTTPS hosted origins; staging and production must match the fixed projects
+listed above.
 
 ## Database Releases
 

@@ -1,20 +1,27 @@
-import { config } from "dotenv";
 import { and, eq, ne } from "drizzle-orm";
 import { z } from "zod";
-import { verifyDeploymentEnvironment } from "@/config/deployment-environment";
 import { getEnvironmentFilePath } from "@/config/environment-file";
-import { db, postgresClient } from "@/db/client";
 import { users } from "@/db/schema";
-import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { profileUsernameSchema } from "@/modules/profile/contracts";
+import {
+  installKnownDeploymentEnvironment,
+  type KnownDeploymentEnvironment,
+  runWithKnownDeploymentEnvironment,
+} from "./known-deployment-environment";
 
-config({ path: getEnvironmentFilePath() });
-verifyDeploymentEnvironment("staging");
+const environmentFile = getEnvironmentFilePath();
 
 const emailSchema = z.string().trim().toLowerCase().email("Enter a valid email address.");
 
-async function main() {
-  const input = parseArguments(process.argv.slice(2), process.env);
+let databaseClient: typeof import("@/db/client") | undefined;
+
+async function main(deployment: KnownDeploymentEnvironment) {
+  const input = parseArguments(process.argv.slice(2), deployment.environment);
+  installKnownDeploymentEnvironment(deployment);
+
+  databaseClient = await import("@/db/client");
+  const { db } = databaseClient;
+  const { createSupabaseAdminClient } = await import("@/lib/supabase/admin");
   const supabase = createSupabaseAdminClient();
   const existingAuthUser = await findAuthUserByEmail(input.email);
 
@@ -131,11 +138,22 @@ function getArgument(args: string[], name: string): string | undefined {
   return index >= 0 ? args[index + 1] : undefined;
 }
 
-main()
+async function run() {
+  await runWithKnownDeploymentEnvironment(
+    {
+      expectedEnvironment: "staging",
+      environmentFile,
+      errorContext: "staging test-user environment",
+    },
+    (deployment) => main(deployment),
+  );
+}
+
+run()
   .catch((error) => {
     console.error(error instanceof Error ? error.message : error);
     process.exitCode = 1;
   })
   .finally(async () => {
-    await postgresClient.end();
+    await databaseClient?.postgresClient.end();
   });
