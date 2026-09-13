@@ -3,6 +3,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { RECOVERY_GRANT_COOKIE } from "@/modules/auth/recovery-cookies";
 
 const mocks = vi.hoisted(() => ({
+  after: vi.fn(),
+  afterCallbacks: [] as Array<() => unknown>,
+  cleanupOldRecoveryGrantRecords: vi.fn(),
   createRecoveryGrant: vi.fn(),
   createSupabaseServerClient: vi.fn(),
   exchangeCodeForSession: vi.fn(),
@@ -15,6 +18,10 @@ const mocks = vi.hoisted(() => ({
   verifyRecoveryIntent: vi.fn(),
 }));
 
+vi.mock("next/server", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("next/server")>();
+  return { ...actual, after: mocks.after };
+});
 vi.mock("@/lib/supabase/server", () => ({
   createSupabaseServerClient: mocks.createSupabaseServerClient,
 }));
@@ -27,6 +34,7 @@ vi.mock("@/modules/auth/recovery-session", () => ({
   getRecoverySessionIdentity: mocks.getRecoverySessionIdentity,
 }));
 vi.mock("@/modules/auth/recovery-store", () => ({
+  cleanupOldRecoveryGrantRecords: mocks.cleanupOldRecoveryGrantRecords,
   issueRecoveryGrantRecord: mocks.issueRecoveryGrantRecord,
 }));
 vi.mock("@/modules/auth/recovery-token", () => ({
@@ -48,6 +56,10 @@ const AUTH_SESSION = { user: AUTH_USER };
 describe("GET /auth/confirm", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.afterCallbacks.length = 0;
+    mocks.after.mockImplementation((callback: () => unknown) => {
+      mocks.afterCallbacks.push(callback);
+    });
     vi.stubEnv("NEXT_PUBLIC_APP_URL", "https://staging.example.com");
     vi.stubEnv("VERCEL_ENV", "production");
     vi.stubEnv("VERCEL_TARGET_ENV", "production");
@@ -77,10 +89,12 @@ describe("GET /auth/confirm", () => {
       token: "signed-grant",
     });
     mocks.issueRecoveryGrantRecord.mockResolvedValue(undefined);
+    mocks.cleanupOldRecoveryGrantRecords.mockResolvedValue(0);
     mocks.signOut.mockResolvedValue({ error: null });
   });
 
   afterEach(() => {
+    vi.restoreAllMocks();
     vi.unstubAllEnvs();
   });
 
@@ -145,6 +159,71 @@ describe("GET /auth/confirm", () => {
     expect(response.cookies.get(RECOVERY_GRANT_COOKIE)?.value).toBe("signed-grant");
     expect(mocks.createSupabaseServerClient).toHaveBeenCalledOnce();
     expect(mocks.synchronizeAppUserFromVerifiedAuthUser).toHaveBeenCalledWith(AUTH_USER);
+    expect(mocks.after).toHaveBeenCalledOnce();
+    expect(mocks.cleanupOldRecoveryGrantRecords).not.toHaveBeenCalled();
+
+    await runAfterCallback();
+
+    expect(mocks.cleanupOldRecoveryGrantRecords).toHaveBeenCalledOnce();
+  });
+
+  it("waits for the durable insert before scheduling cleanup or issuing a grant", async () => {
+    let finishInsert: (() => void) | undefined;
+    mocks.issueRecoveryGrantRecord.mockReturnValue(
+      new Promise<void>((resolve) => {
+        finishInsert = resolve;
+      }),
+    );
+
+    const responsePromise = GET(recoveryRequest());
+    await vi.waitFor(() => {
+      expect(mocks.issueRecoveryGrantRecord).toHaveBeenCalledOnce();
+    });
+
+    expect(mocks.after).not.toHaveBeenCalled();
+    finishInsert?.();
+
+    const response = await responsePromise;
+    expect(response.cookies.get(RECOVERY_GRANT_COOKIE)?.value).toBe("signed-grant");
+    expect(mocks.after).toHaveBeenCalledOnce();
+  });
+
+  it("keeps cleanup rejection from invalidating an issued recovery grant", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    mocks.cleanupOldRecoveryGrantRecords.mockRejectedValue(
+      new Error("cleanup database unavailable"),
+    );
+
+    const response = await GET(recoveryRequest());
+
+    expect(response.headers.get("location")).toBe(
+      "https://staging.example.com/auth/reset-password?next=%2Fdrills",
+    );
+    await expect(runAfterCallback()).resolves.toBeUndefined();
+    expect(response.cookies.get(RECOVERY_GRANT_COOKIE)?.value).toBe("signed-grant");
+    expect(mocks.signOut).not.toHaveBeenCalled();
+    expect(warn).toHaveBeenCalledWith(
+      "Recovery grant retention cleanup could not complete.",
+    );
+  });
+
+  it("keeps after registration failure from invalidating an issued recovery grant", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    mocks.after.mockImplementationOnce(() => {
+      throw new Error("after context unavailable");
+    });
+
+    const response = await GET(recoveryRequest());
+
+    expect(response.headers.get("location")).toBe(
+      "https://staging.example.com/auth/reset-password?next=%2Fdrills",
+    );
+    expect(response.cookies.get(RECOVERY_GRANT_COOKIE)?.value).toBe("signed-grant");
+    expect(mocks.cleanupOldRecoveryGrantRecords).not.toHaveBeenCalled();
+    expect(mocks.signOut).not.toHaveBeenCalled();
+    expect(warn).toHaveBeenCalledWith(
+      "Recovery grant retention cleanup could not complete.",
+    );
   });
 
   it("returns a preview callback to the same trusted host with a host-only grant", async () => {
@@ -251,8 +330,16 @@ describe("GET /auth/confirm", () => {
     );
     expect(response.cookies.get(RECOVERY_GRANT_COOKIE)?.value).toBe("");
     expect(mocks.signOut).toHaveBeenCalledWith({ scope: "local" });
+    expect(mocks.after).not.toHaveBeenCalled();
+    expect(mocks.cleanupOldRecoveryGrantRecords).not.toHaveBeenCalled();
   });
 });
+
+async function runAfterCallback(): Promise<void> {
+  const callback = mocks.afterCallbacks.shift();
+  expect(callback).toBeTypeOf("function");
+  await callback?.();
+}
 
 function recoveryRequest(origin = "http://internal:3000"): NextRequest {
   return new NextRequest(

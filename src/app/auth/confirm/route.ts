@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { after, NextRequest, NextResponse } from "next/server";
 import { safeInternalPath } from "@/lib/safe-internal-path";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import {
@@ -13,7 +13,10 @@ import {
 } from "@/modules/auth/recovery-cookies";
 import { getCanonicalAppOrigin } from "@/modules/auth/request-origin";
 import { getRecoverySessionIdentity } from "@/modules/auth/recovery-session";
-import { issueRecoveryGrantRecord } from "@/modules/auth/recovery-store";
+import {
+  cleanupOldRecoveryGrantRecords,
+  issueRecoveryGrantRecord,
+} from "@/modules/auth/recovery-store";
 import {
   createRecoveryGrant,
   getAuthFlowSecret,
@@ -123,6 +126,7 @@ async function finishRecoveryExchange(
       sessionHash: grant.sessionHash,
       userId: identity.userId,
     });
+    scheduleRecoveryGrantCleanup();
 
     const resetUrl = new URL("/auth/reset-password", requestOrigin);
     resetUrl.searchParams.set("next", nextPath);
@@ -134,6 +138,25 @@ async function finishRecoveryExchange(
     await supabase.auth.signOut({ scope: "local" });
     return recoveryFailureResponse(request, nextPath, requestOrigin);
   }
+}
+
+function scheduleRecoveryGrantCleanup(): void {
+  try {
+    after(async () => {
+      try {
+        await cleanupOldRecoveryGrantRecords();
+      } catch {
+        warnRecoveryGrantCleanupFailure();
+      }
+    });
+  } catch {
+    // Retention maintenance must never invalidate a newly issued recovery grant.
+    warnRecoveryGrantCleanupFailure();
+  }
+}
+
+function warnRecoveryGrantCleanupFailure(): void {
+  console.warn("Recovery grant retention cleanup could not complete.");
 }
 
 function confirmationFailureResponse(nextPath: string, requestOrigin: string): NextResponse {

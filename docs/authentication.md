@@ -48,11 +48,13 @@ short attempt lease prevents concurrent duplicate provider calls while still
 allowing a stale serverless request to recover. A conclusive provider rejection
 safely releases the password binding. Plaintext passwords are never stored.
 
-Expired ledger rows remain available for a 24-hour audit window. New recovery
-grant issuance opportunistically removes at most 100 older rows at a time using
-the expiry index and row locks. Cleanup also checks the terminal or last-update
-timestamp, so active grants and recently consumed, failed, or expired grants are
-never removed.
+Expired ledger rows remain available for a 24-hour audit window. After a new
+recovery grant is durably issued, the confirmation route schedules best-effort
+retention cleanup to run after its response. Cleanup removes at most 100 older
+rows at a time using the expiry index and row locks. A cleanup or scheduling
+failure never invalidates the new grant. Cleanup also checks the terminal or
+last-update timestamp, so active grants and recently consumed, failed, or
+expired grants are never removed.
 
 The reset form posts its rendered jti as well as the HttpOnly cookie, so a
 parallel callback that rotates the cookie invalidates the older tab. After a

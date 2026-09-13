@@ -41,13 +41,6 @@ export async function issueRecoveryGrantRecord(
     sessionHash: input.sessionHash,
     userId: input.userId,
   });
-
-  try {
-    await cleanupOldRecoveryGrantRecords();
-  } catch {
-    // Retention maintenance must never invalidate a newly issued recovery grant.
-    console.warn("Recovery grant retention cleanup could not complete.");
-  }
 }
 
 /**
