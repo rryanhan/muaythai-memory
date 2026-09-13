@@ -68,6 +68,16 @@ type SectionPageRow = {
   occurredAt: Date;
 };
 
+type AuthorizedConnectionPageRow = {
+  ownerId: string;
+  ownerUsername: string;
+  ownerAvatarUrl: string | null;
+  connectionId: string | null;
+  connectionUsername: string | null;
+  connectionAvatarUrl: string | null;
+  occurredAt: Date | string | null;
+};
+
 const emptyDirection = (): FollowDirection => ({
   status: "none",
   requestedAt: null,
@@ -130,25 +140,128 @@ export async function getAuthorizedConnectionPage(
   rawCursor: string | null,
   rawLimit = 20,
 ): Promise<AuthorizedConnectionPageResponse | null> {
-  const owner = await loadFighterProfileByUsername(ownerUsername);
-  if (!owner) return null;
-
-  const isOwner = owner.id === viewerUserId;
-  if (!isOwner && !(await hasReciprocalAcceptedFollows(viewerUserId, owner.id))) {
-    return null;
-  }
-
   const limit = Math.min(Math.max(Math.trunc(rawLimit), 1), 50);
-  const cursor = decodeSectionCursor(rawCursor);
-  const rows = await loadFollowPage(
-    owner.id,
-    section,
-    cursor,
-    limit,
-    isOwner ? undefined : reciprocalAuthorizationCondition(viewerUserId, owner.id),
-  );
-  const page = toSectionPage(section, rows, limit);
-  return { owner, ...page, section };
+  const decodedCursor = tryDecodeSectionCursor(rawCursor);
+  const profileId = section === "followers" ? follows.followerId : follows.followingId;
+  const ownerCondition = section === "followers"
+    ? sql`${follows.followingId} = authorized_owner."id"`
+    : sql`${follows.followerId} = authorized_owner."id"`;
+  const pageCursorCondition = decodedCursor.error
+    ? sql`false`
+    : authorizedPageCursorCondition(decodedCursor.cursor);
+
+  const rows = await db.execute<AuthorizedConnectionPageRow>(sql`
+    with request_context as (
+      select
+        ${viewerUserId}::uuid as "viewerId",
+        ${ownerUsername}::text as "ownerUsername"
+    ),
+    authorized_owner as materialized (
+      select
+        ${users.id} as "id",
+        ${users.username} as "username",
+        ${users.avatarUrl} as "avatarUrl",
+        request_context."viewerId" as "viewerId"
+      from request_context
+      inner join ${users}
+        on ${users.username} = request_context."ownerUsername"
+        and ${users.profileOnboardedAt} is not null
+      where ${users.id} = request_context."viewerId"
+        or (
+          not exists (
+            select 1
+            from ${userBlocks} as owner_block
+            where (
+              owner_block."blocker_id" = request_context."viewerId"
+              and owner_block."blocked_id" = ${users.id}
+            ) or (
+              owner_block."blocker_id" = ${users.id}
+              and owner_block."blocked_id" = request_context."viewerId"
+            )
+          )
+          and exists (
+            select 1
+            from ${follows} as viewer_follow
+            where viewer_follow."follower_id" = request_context."viewerId"
+              and viewer_follow."following_id" = ${users.id}
+              and viewer_follow."status" = 'accepted'
+          )
+          and exists (
+            select 1
+            from ${follows} as owner_follow
+            where owner_follow."follower_id" = ${users.id}
+              and owner_follow."following_id" = request_context."viewerId"
+              and owner_follow."status" = 'accepted'
+          )
+        )
+      limit 1
+    )
+    select
+      authorized_owner."id" as "ownerId",
+      authorized_owner."username" as "ownerUsername",
+      authorized_owner."avatarUrl" as "ownerAvatarUrl",
+      connection_page."id" as "connectionId",
+      connection_page."username" as "connectionUsername",
+      connection_page."avatarUrl" as "connectionAvatarUrl",
+      connection_page."occurredAt" as "occurredAt"
+    from authorized_owner
+    left join lateral (
+      select
+        ${users.id} as "id",
+        ${users.username} as "username",
+        ${users.avatarUrl} as "avatarUrl",
+        coalesce(${follows.respondedAt}, ${follows.updatedAt}) as "occurredAt"
+      from ${follows}
+      inner join ${users} on ${users.id} = ${profileId}
+      where ${ownerCondition}
+        and ${follows.status} = 'accepted'
+        and ${users.username} is not null
+        and ${users.profileOnboardedAt} is not null
+        and not exists (
+          select 1
+          from ${userBlocks} as connection_block
+          where (
+            connection_block."blocker_id" = authorized_owner."id"
+            and connection_block."blocked_id" = ${users.id}
+          ) or (
+            connection_block."blocker_id" = ${users.id}
+            and connection_block."blocked_id" = authorized_owner."id"
+          ) or (
+            connection_block."blocker_id" = authorized_owner."viewerId"
+            and connection_block."blocked_id" = ${users.id}
+          ) or (
+            connection_block."blocker_id" = ${users.id}
+            and connection_block."blocked_id" = authorized_owner."viewerId"
+          )
+        )
+        and ${pageCursorCondition}
+      order by ${users.username}, ${users.id}
+      limit ${limit + 1}
+    ) as connection_page on true
+    order by connection_page."username", connection_page."id"
+  `);
+  const first = rows[0];
+  if (!first) return null;
+  if (decodedCursor.error) throw decodedCursor.error;
+
+  const owner = {
+    id: first.ownerId,
+    username: first.ownerUsername,
+    avatarUrl: first.ownerAvatarUrl,
+  };
+  const pageRows = rows.flatMap((row): SectionPageRow[] => {
+    if (!row.connectionId) return [];
+    if (!row.connectionUsername || !row.occurredAt) {
+      throw new Error("Authorized connection query returned an incomplete profile.");
+    }
+    return [{
+      id: row.connectionId,
+      username: row.connectionUsername,
+      avatarUrl: row.connectionAvatarUrl,
+      occurredAt: toConnectionDate(row.occurredAt),
+    }];
+  });
+  return { owner, ...toSectionPage(section, pageRows, limit), section };
 }
 
 export async function getReciprocalConnectionPage(
@@ -375,31 +488,6 @@ export async function getFighterProfileByUsername(
   };
 }
 
-export async function hasReciprocalAcceptedFollows(
-  firstUserId: string,
-  secondUserId: string,
-): Promise<boolean> {
-  if (firstUserId === secondUserId) return true;
-  const rows = await db
-    .select({ followerId: follows.followerId })
-    .from(follows)
-    .where(and(
-      eq(follows.status, "accepted"),
-      or(
-        and(
-          eq(follows.followerId, firstUserId),
-          eq(follows.followingId, secondUserId),
-        ),
-        and(
-          eq(follows.followerId, secondUserId),
-          eq(follows.followingId, firstUserId),
-        ),
-      ),
-    ))
-    .limit(2);
-  return rows.length === 2;
-}
-
 function toSnapshotDirection(
   status: "pending" | "accepted" | null,
   requestedAt: Date | string | null,
@@ -467,26 +555,11 @@ function toFighterTrainingStats(snapshot: FighterProfileSnapshotRow): FighterTra
   };
 }
 
-async function loadFighterProfileByUsername(
-  username: string,
-): Promise<FighterSummary | null> {
-  const [row] = await db
-    .select({ id: users.id, username: users.username, avatarUrl: users.avatarUrl })
-    .from(users)
-    .where(and(
-      eq(users.username, username),
-      isNotNull(users.profileOnboardedAt),
-    ))
-    .limit(1);
-  return toFighterSummary(row);
-}
-
 async function loadFollowPage(
   currentUserId: string,
   section: Exclude<ConnectionSection, "blocked">,
   cursor: SectionCursor | null,
   limit: number,
-  authorizationCondition?: ReturnType<typeof or>,
 ): Promise<SectionPageRow[]> {
   const profileId = section === "followers" || section === "incoming"
     ? follows.followerId
@@ -517,7 +590,6 @@ async function loadFollowPage(
       isNotNull(users.profileOnboardedAt),
       noBlockCondition(currentUserId, users.id),
       cursorCondition(cursor),
-      authorizationCondition,
     ))
     .orderBy(asc(users.username), asc(users.id))
     .limit(limit + 1);
@@ -577,26 +649,6 @@ function reverseAcceptedCondition(
   )`;
 }
 
-function reciprocalAuthorizationCondition(viewerUserId: string, ownerUserId: string) {
-  return or(
-    sql<boolean>`${viewerUserId}::uuid = ${ownerUserId}::uuid`,
-    sql<boolean>`(
-      exists (
-        select 1 from "follows" as "viewer_follow"
-        where "viewer_follow"."follower_id" = ${viewerUserId}::uuid
-          and "viewer_follow"."following_id" = ${ownerUserId}::uuid
-          and "viewer_follow"."status" = 'accepted'
-      )
-      and exists (
-        select 1 from "follows" as "owner_follow"
-        where "owner_follow"."follower_id" = ${ownerUserId}::uuid
-          and "owner_follow"."following_id" = ${viewerUserId}::uuid
-          and "owner_follow"."status" = 'accepted'
-      )
-    )`,
-  );
-}
-
 function cursorCondition(cursor: SectionCursor | null) {
   if (!cursor) return undefined;
   return or(
@@ -630,19 +682,42 @@ function encodeSectionCursor(cursor: SectionCursor): string {
 }
 
 function decodeSectionCursor(rawCursor: string | null): SectionCursor | null {
-  if (!rawCursor) return null;
+  const decoded = tryDecodeSectionCursor(rawCursor);
+  if (decoded.error) throw decoded.error;
+  return decoded.cursor;
+}
+
+function tryDecodeSectionCursor(rawCursor: string | null): {
+  cursor: SectionCursor | null;
+  error: z.ZodError | null;
+} {
+  if (!rawCursor) return { cursor: null, error: null };
   try {
-    return sectionCursorSchema.parse(
-      JSON.parse(Buffer.from(rawCursor, "base64url").toString("utf8")),
-    );
+    return {
+      cursor: sectionCursorSchema.parse(
+        JSON.parse(Buffer.from(rawCursor, "base64url").toString("utf8")),
+      ),
+      error: null,
+    };
   } catch {
-    throw new z.ZodError([{
-      code: "custom",
-      path: ["cursor"],
-      message: "Invalid connections cursor.",
-      input: rawCursor,
-    }]);
+    return {
+      cursor: null,
+      error: new z.ZodError([{
+        code: "custom",
+        path: ["cursor"],
+        message: "Invalid connections cursor.",
+        input: rawCursor,
+      }]),
+    };
   }
+}
+
+function authorizedPageCursorCondition(cursor: SectionCursor | null) {
+  if (!cursor) return sql`true`;
+  return sql`(
+    ${users.username} > ${cursor.username}
+    or (${users.username} = ${cursor.username} and ${users.id} > ${cursor.userId})
+  )`;
 }
 
 function toFighterSummary(row: FighterProfileRow | undefined): FighterSummary | null {

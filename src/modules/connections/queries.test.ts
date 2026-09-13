@@ -16,12 +16,14 @@ vi.mock("@/db/client", () => ({
 
 import {
   findFighterByUsername,
+  getAuthorizedConnectionPage,
   getConnectionsSummary,
   getFighterProfileByUsername,
 } from "./queries";
 
 const userId = "11111111-1111-4111-8111-111111111111";
 const viewerId = "22222222-2222-4222-8222-222222222222";
+const connectionId = "33333333-3333-4333-8333-333333333333";
 
 describe("findFighterByUsername", () => {
   beforeEach(() => {
@@ -168,6 +170,211 @@ describe("findFighterByUsername", () => {
     await expect(findFighterByUsername(viewerId, "missing_fighter")).resolves.toBeNull();
     expect(mocks.execute).toHaveBeenCalledOnce();
     expect(mocks.select).not.toHaveBeenCalled();
+  });
+});
+
+describe("getAuthorizedConnectionPage", () => {
+  beforeEach(() => {
+    mocks.execute.mockReset();
+    mocks.select.mockReset();
+  });
+
+  it("authorizes the owner and loads a privacy-filtered follower page in one statement", async () => {
+    const occurredAt = "2026-05-01T02:03:04.000Z";
+    mocks.execute.mockImplementationOnce(async (query) => {
+      const compiled = new PgDialect().sqlToQuery(query);
+      const normalizedSql = compiled.sql.replace(/\s+/g, " ").trim();
+
+      expect(normalizedSql).toContain(`authorized_owner as materialized (`);
+      expect(normalizedSql).toContain(
+        `inner join "users" on "users"."username" = request_context."ownerUsername" ` +
+          `and "users"."profile_onboarded_at" is not null`,
+      );
+      expect(normalizedSql).toContain(
+        `where "users"."id" = request_context."viewerId" or (`,
+      );
+      expect(normalizedSql).toContain(
+        `owner_block."blocker_id" = request_context."viewerId" ` +
+          `and owner_block."blocked_id" = "users"."id"`,
+      );
+      expect(normalizedSql).toContain(
+        `owner_block."blocker_id" = "users"."id" ` +
+          `and owner_block."blocked_id" = request_context."viewerId"`,
+      );
+      expect(normalizedSql).toContain(
+        `viewer_follow."follower_id" = request_context."viewerId" ` +
+          `and viewer_follow."following_id" = "users"."id" ` +
+          `and viewer_follow."status" = 'accepted'`,
+      );
+      expect(normalizedSql).toContain(
+        `owner_follow."follower_id" = "users"."id" ` +
+          `and owner_follow."following_id" = request_context."viewerId" ` +
+          `and owner_follow."status" = 'accepted'`,
+      );
+      expect(normalizedSql).toContain(`left join lateral (`);
+      expect(normalizedSql).toContain(
+        `inner join "users" on "users"."id" = "follows"."follower_id" ` +
+          `where "follows"."following_id" = authorized_owner."id" ` +
+          `and "follows"."status" = 'accepted'`,
+      );
+      expect(normalizedSql).toContain(
+        `connection_block."blocker_id" = authorized_owner."id" ` +
+          `and connection_block."blocked_id" = "users"."id"`,
+      );
+      expect(normalizedSql).toContain(
+        `connection_block."blocker_id" = "users"."id" ` +
+          `and connection_block."blocked_id" = authorized_owner."id"`,
+      );
+      expect(normalizedSql).toContain(
+        `connection_block."blocker_id" = authorized_owner."viewerId" ` +
+          `and connection_block."blocked_id" = "users"."id"`,
+      );
+      expect(normalizedSql).toContain(
+        `connection_block."blocker_id" = "users"."id" ` +
+          `and connection_block."blocked_id" = authorized_owner."viewerId"`,
+      );
+      expect(normalizedSql).toContain(
+        `order by "users"."username", "users"."id" limit $3`,
+      );
+      expect(compiled.params).toEqual([viewerId, "target_fighter", 21]);
+
+      return [{
+        ownerId: userId,
+        ownerUsername: "target_fighter",
+        ownerAvatarUrl: null,
+        connectionId,
+        connectionUsername: "connected_fighter",
+        connectionAvatarUrl: "https://example.com/connected.png",
+        occurredAt,
+      }];
+    });
+
+    await expect(
+      getAuthorizedConnectionPage(viewerId, "target_fighter", "followers", null),
+    ).resolves.toEqual({
+      owner: { id: userId, username: "target_fighter", avatarUrl: null },
+      section: "followers",
+      items: [{
+        profile: {
+          id: connectionId,
+          username: "connected_fighter",
+          avatarUrl: "https://example.com/connected.png",
+        },
+        occurredAt: new Date(occurredAt),
+      }],
+      nextCursor: null,
+    });
+    expect(mocks.execute).toHaveBeenCalledOnce();
+    expect(mocks.select).not.toHaveBeenCalled();
+  });
+
+  it("uses the outgoing relationship direction for following pages", async () => {
+    mocks.execute.mockResolvedValueOnce([authorizedConnectionSentinel()]);
+
+    await getAuthorizedConnectionPage(viewerId, "target_fighter", "following", null);
+
+    const compiled = new PgDialect().sqlToQuery(mocks.execute.mock.calls[0]![0]);
+    const normalizedSql = compiled.sql.replace(/\s+/g, " ").trim();
+    expect(normalizedSql).toContain(
+      `inner join "users" on "users"."id" = "follows"."following_id" ` +
+        `where "follows"."follower_id" = authorized_owner."id"`,
+    );
+    expect(mocks.execute).toHaveBeenCalledOnce();
+  });
+
+  it("returns an empty page from an authorized-owner sentinel row", async () => {
+    mocks.execute.mockResolvedValueOnce([authorizedConnectionSentinel()]);
+
+    await expect(
+      getAuthorizedConnectionPage(viewerId, "target_fighter", "followers", null),
+    ).resolves.toEqual({
+      owner: { id: userId, username: "target_fighter", avatarUrl: null },
+      section: "followers",
+      items: [],
+      nextCursor: null,
+    });
+    expect(mocks.execute).toHaveBeenCalledOnce();
+  });
+
+  it("returns null for an inaccessible owner before reporting an invalid cursor", async () => {
+    mocks.execute.mockResolvedValueOnce([]);
+
+    await expect(
+      getAuthorizedConnectionPage(viewerId, "hidden_fighter", "followers", "not-a-cursor"),
+    ).resolves.toBeNull();
+    const compiled = new PgDialect().sqlToQuery(mocks.execute.mock.calls[0]![0]);
+    expect(compiled.sql.replace(/\s+/g, " ")).toContain(`and false`);
+    expect(mocks.execute).toHaveBeenCalledOnce();
+  });
+
+  it("reports an invalid cursor after confirming access in the same statement", async () => {
+    mocks.execute.mockResolvedValueOnce([authorizedConnectionSentinel()]);
+
+    await expect(
+      getAuthorizedConnectionPage(viewerId, "target_fighter", "followers", "not-a-cursor"),
+    ).rejects.toMatchObject({
+      issues: [expect.objectContaining({ path: ["cursor"] })],
+    });
+    const compiled = new PgDialect().sqlToQuery(mocks.execute.mock.calls[0]![0]);
+    expect(compiled.sql.replace(/\s+/g, " ")).toContain(`and false`);
+    expect(mocks.execute).toHaveBeenCalledOnce();
+  });
+
+  it("applies a valid cursor within the lateral page query", async () => {
+    const cursor = Buffer.from(JSON.stringify({
+      username: "after_fighter",
+      userId: connectionId,
+    })).toString("base64url");
+    mocks.execute.mockResolvedValueOnce([authorizedConnectionSentinel()]);
+
+    await getAuthorizedConnectionPage(
+      viewerId,
+      "target_fighter",
+      "followers",
+      cursor,
+    );
+
+    const compiled = new PgDialect().sqlToQuery(mocks.execute.mock.calls[0]![0]);
+    const normalizedSql = compiled.sql.replace(/\s+/g, " ").trim();
+    expect(normalizedSql).toContain(
+      `and ( "users"."username" > $3 ` +
+        `or ("users"."username" = $4 and "users"."id" > $5) )`,
+    );
+    expect(compiled.params).toEqual([
+      viewerId,
+      "target_fighter",
+      "after_fighter",
+      "after_fighter",
+      connectionId,
+      21,
+    ]);
+    expect(mocks.execute).toHaveBeenCalledOnce();
+  });
+
+  it("returns the requested page size and encodes its final row as the next cursor", async () => {
+    mocks.execute.mockResolvedValueOnce(Array.from({ length: 21 }, (_, index) => ({
+      ownerId: userId,
+      ownerUsername: "target_fighter",
+      ownerAvatarUrl: null,
+      connectionId: `00000000-0000-4000-8000-${String(index).padStart(12, "0")}`,
+      connectionUsername: `fighter_${String(index).padStart(2, "0")}`,
+      connectionAvatarUrl: null,
+      occurredAt: new Date("2026-05-01T00:00:00.000Z"),
+    })));
+
+    const page = await getAuthorizedConnectionPage(
+      viewerId,
+      "target_fighter",
+      "followers",
+      null,
+    );
+
+    expect(page?.items).toHaveLength(20);
+    expect(JSON.parse(Buffer.from(page!.nextCursor!, "base64url").toString("utf8"))).toEqual({
+      username: "fighter_19",
+      userId: "00000000-0000-4000-8000-000000000019",
+    });
+    expect(mocks.execute).toHaveBeenCalledOnce();
   });
 });
 
@@ -389,3 +596,15 @@ describe("connection count queries", () => {
     expect(mocks.select).not.toHaveBeenCalled();
   });
 });
+
+function authorizedConnectionSentinel() {
+  return {
+    ownerId: userId,
+    ownerUsername: "target_fighter",
+    ownerAvatarUrl: null,
+    connectionId: null,
+    connectionUsername: null,
+    connectionAvatarUrl: null,
+    occurredAt: null,
+  };
+}

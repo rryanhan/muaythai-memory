@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
-import { and, asc, eq, inArray, or } from "drizzle-orm";
+import { and, asc, eq, inArray, or, sql } from "drizzle-orm";
 import { db, postgresClient } from "@/db/client";
 import {
   drillShares,
@@ -140,6 +140,51 @@ async function main() {
       "Non-reciprocal users must not open another fighter's lists.",
     );
 
+    const candidateAcceptedAt = new Date();
+    await db.insert(follows).values([
+      {
+        followerId: userB.id,
+        followingId: userC.id,
+        status: "accepted",
+        respondedAt: candidateAcceptedAt,
+      },
+      {
+        followerId: userC.id,
+        followingId: userB.id,
+        status: "accepted",
+        respondedAt: candidateAcceptedAt,
+      },
+    ]);
+    for (const section of ["followers", "following"] as const) {
+      assert.ok(
+        (await getAuthorizedConnectionPage(userA.id, userB.username, section, null))
+          ?.items.some((item) => item.profile.id === userC.id),
+        `The owner's ${section} page should initially include the candidate.`,
+      );
+    }
+
+    await blockFighter(userC.id, userA.id);
+    for (const section of ["followers", "following"] as const) {
+      assert.equal(
+        (await getAuthorizedConnectionPage(userA.id, userB.username, section, null))
+          ?.items.some((item) => item.profile.id === userC.id),
+        false,
+        `A candidate who blocked the viewer must be hidden from the owner's ${section} page.`,
+      );
+    }
+    await unblockFighter(userC.id, userA.id);
+
+    await blockFighter(userA.id, userC.id);
+    for (const section of ["followers", "following"] as const) {
+      assert.equal(
+        (await getAuthorizedConnectionPage(userA.id, userB.username, section, null))
+          ?.items.some((item) => item.profile.id === userC.id),
+        false,
+        `A candidate blocked by the viewer must be hidden from the owner's ${section} page.`,
+      );
+    }
+    await unblockFighter(userA.id, userC.id);
+
     const unsharedRecipientPage = await getDrillShareRecipientPage(
       userB.id,
       fighterDrill.id,
@@ -160,12 +205,56 @@ async function main() {
     assert.equal((await getSharedDrillById(userA.id, fighterDrill.id))?.owner.id, userB.id);
     assert.equal(await getSharedDrillById(userC.id, fighterDrill.id), null);
 
+    const paginationDrills = await db
+      .insert(drills)
+      .values(Array.from({ length: 11 }, (_, index) => ({
+        userId: userB.id,
+        title: `Shared drill page ${String(index + 1).padStart(2, "0")}`,
+        summary: "",
+      })))
+      .returning({ id: drills.id });
+    const sharedDrillIds = [fighterDrill.id, ...paginationDrills.map((drill) => drill.id)];
+    await db.insert(drillShares).values(paginationDrills.map((drill) => ({
+      drillId: drill.id,
+      recipientUserId: userA.id,
+    })));
+    const sharedAtValues = [
+      "2030-01-01T00:00:02.000009Z",
+      "2030-01-01T00:00:02.000008Z",
+      "2030-01-01T00:00:02.000007Z",
+      "2030-01-01T00:00:02.000006Z",
+      "2030-01-01T00:00:02.000005Z",
+      "2030-01-01T00:00:02.000004Z",
+      "2030-01-01T00:00:02.000003Z",
+      "2030-01-01T00:00:02.000002Z",
+      "2030-01-01T00:00:02.000001Z",
+      "2030-01-01T00:00:01.000900Z",
+      "2030-01-01T00:00:01.000800Z",
+      "2030-01-01T00:00:01.000700Z",
+    ];
+    await Promise.all(sharedDrillIds.map((sharedDrillId, index) => db.execute(sql`
+      update ${drillShares}
+      set created_at = ${sharedAtValues[index]!}::timestamptz
+      where ${drillShares.drillId} = ${sharedDrillId}
+        and ${drillShares.recipientUserId} = ${userA.id}
+    `)));
+    assert.deepEqual(
+      await collectSharedDrillPages(userA.id, userB.username, sharedAtValues[9]!),
+      sharedDrillIds,
+      "Shared drills must remain ordered and unique across a sub-millisecond cursor boundary.",
+    );
+
     await cancelOrUnfollow(userA.id, userB.id);
     assert.equal((await loadPairRows(userA.id, userB.id)).length, 1);
     assert.equal(
       (await db.select().from(drillShares).where(eq(drillShares.drillId, fighterDrill.id))).length,
       0,
       "Losing reciprocal status must revoke pair shares.",
+    );
+    await assert.rejects(
+      () => listSharedDrills(userA.id, null, userB.username),
+      /Fighter not found\./,
+      "Losing reciprocal status must also make the filtered shared-drill page unavailable.",
     );
     assert.equal(
       (await getFighterProfileByUsername(userA.id, userB.username))?.stats,
@@ -184,6 +273,11 @@ async function main() {
     );
     assert.equal(await findFighterByUsername(userA.id, userB.username), null);
     assert.equal(await findFighterByUsername(userB.id, userA.username), null);
+    assert.equal(
+      await getAuthorizedConnectionPage(userA.id, userB.username, "followers", null),
+      null,
+      "Blocked fighters must not retain access to connection lists.",
+    );
     assert.equal(
       (await db.select().from(userBlocks).where(and(
         eq(userBlocks.blockerId, userA.id),
@@ -252,6 +346,16 @@ async function main() {
     const followingPages = await collectSectionPages(userA.id, "following");
     assert.equal(followerPages, 52);
     assert.equal(followingPages, 52);
+    assert.equal(
+      await collectAuthorizedSectionPages(userA.id, userA.username, "followers"),
+      52,
+      "Self-authorized follower pages must retain real cursor pagination.",
+    );
+    assert.equal(
+      await collectAuthorizedSectionPages(userA.id, userA.username, "following"),
+      52,
+      "Self-authorized following pages must retain real cursor pagination.",
+    );
     const [paginationDrill] = await db
       .insert(drills)
       .values({ userId: userA.id, title: "Share pagination drill", summary: "" })
@@ -271,6 +375,25 @@ async function main() {
     ));
     auxiliaryUserIds.push(...cappedUsers.map((user) => user.id));
     await db.insert(users).values(cappedUsers);
+    assert.deepEqual(
+      await getAuthorizedConnectionPage(
+        cappedUsers[50]!.id,
+        cappedUsers[50]!.username,
+        "followers",
+        null,
+      ),
+      {
+        owner: {
+          id: cappedUsers[50]!.id,
+          username: cappedUsers[50]!.username,
+          avatarUrl: null,
+        },
+        section: "followers",
+        items: [],
+        nextCursor: null,
+      },
+      "An empty self-authorized page must survive the lateral sentinel path.",
+    );
     await db.insert(follows).values(cappedUsers.slice(0, 50).map((user) => ({
       followerId: userA.id,
       followingId: user.id,
@@ -289,7 +412,7 @@ async function main() {
     );
 
     console.log(
-      "Follow verification passed: directed requests, crossed requests, accepted-only counts, pagination, limits, private stats, reciprocal sharing, revocation, blocking, and reports are isolated.",
+      "Follow verification passed: directed requests, crossed requests, accepted-only counts, pagination, limits, private stats, privacy-filtered authorized lists, reciprocal sharing, revocation, blocking, and reports are isolated.",
     );
   } finally {
     await db.delete(users).where(inArray(users.id, [userA.id, userB.id, userC.id]));
@@ -326,6 +449,56 @@ async function collectDrillShareRecipientPages(ownerUserId: string, drillId: str
     cursor = page.nextCursor;
   } while (cursor);
   return recipientIds;
+}
+
+async function collectAuthorizedSectionPages(
+  viewerUserId: string,
+  ownerUsername: string,
+  section: "followers" | "following",
+) {
+  let cursor: string | null = null;
+  let total = 0;
+  do {
+    const page = await getAuthorizedConnectionPage(
+      viewerUserId,
+      ownerUsername,
+      section,
+      cursor,
+    );
+    assert.ok(page, "The authorized owner must remain visible across cursor pages.");
+    total += page.items.length;
+    cursor = page.nextCursor;
+  } while (cursor);
+  return total;
+}
+
+async function collectSharedDrillPages(
+  viewerUserId: string,
+  ownerUsername: string,
+  expectedFirstCursorSharedAt: string,
+) {
+  const drillIds: string[] = [];
+  let cursor: string | null = null;
+  let pageNumber = 0;
+  do {
+    const page = await listSharedDrills(viewerUserId, cursor, ownerUsername);
+    drillIds.push(...page.items.map((item) => item.drill.id));
+    cursor = page.nextCursor;
+    pageNumber += 1;
+    if (pageNumber === 1) {
+      assert.ok(cursor, "Twelve shared drills must produce a second page.");
+      const decodedCursor = JSON.parse(
+        Buffer.from(cursor, "base64url").toString("utf8"),
+      ) as { sharedAt?: unknown };
+      assert.equal(
+        decodedCursor.sharedAt,
+        expectedFirstCursorSharedAt,
+        "The shared-drill cursor must preserve PostgreSQL microsecond precision.",
+      );
+    }
+  } while (cursor);
+  assert.equal(pageNumber, 2, "Twelve shared drills must resolve in exactly two pages.");
+  return drillIds;
 }
 
 function loadPairRows(firstUserId: string, secondUserId: string) {

@@ -1,10 +1,8 @@
 import {
   and,
-  desc,
   eq,
   exists,
   isNotNull,
-  lt,
   notExists,
   or,
   sql,
@@ -13,22 +11,22 @@ import {
 import { z } from "zod";
 import { db } from "@/db/client";
 import {
+  drillTags,
+  drillTrainingMethods,
   drillShares,
   drills,
   follows,
+  tagCategories,
+  tags,
+  trainingMethods,
   userBlocks,
   users,
 } from "@/db/schema";
-import {
-  getDrillById,
-  getDrillSummariesByOwnerPairs,
-} from "@/modules/drills/queries";
-import {
-  findFighterByUsername,
-} from "@/modules/connections/queries";
+import { getDrillById } from "@/modules/drills/queries";
 import type {
   DrillShareRecipientPage,
   SharedDrillDetailResponse,
+  SharedDrillListItem,
   SharedDrillListResponse,
 } from "./contracts";
 import { DrillShareError } from "./errors";
@@ -53,6 +51,23 @@ type DrillShareRecipientQueryRow = {
   recipientAvatarUrl: string | null;
   occurredAt: Date | string | null;
   shared: boolean | null;
+};
+
+type SharedDrillListQueryRow = {
+  ownerAuthorized: boolean;
+  drillId: string | null;
+  drillTitle: string | null;
+  drillSummary: string | null;
+  trainingMethods: SharedDrillListItem["drill"]["trainingMethods"];
+  tags: SharedDrillListItem["drill"]["tags"];
+  customTags: SharedDrillListItem["drill"]["customTags"];
+  drillCreatedAt: Date | string | null;
+  drillUpdatedAt: Date | string | null;
+  ownerId: string | null;
+  ownerUsername: string | null;
+  ownerAvatarUrl: string | null;
+  sharedAt: Date | string | null;
+  sharedAtCursor: string | null;
 };
 
 export async function getDrillShareRecipientPage(
@@ -199,83 +214,276 @@ export async function listSharedDrills(
   ownerUsername?: string,
 ): Promise<SharedDrillListResponse> {
   const cursor = decodeSharedCursor(rawCursor);
-  let ownerUserId: string | null = null;
-  if (ownerUsername) {
-    const owner = await findFighterByUsername(viewerUserId, ownerUsername);
-    if (!owner || !owner.mutual) {
-      throw new DrillShareError("Fighter not found.", 404);
-    }
-    ownerUserId = owner.profile.id;
+  const requestedOwnerUsername = ownerUsername || null;
+
+  // Keep authorization, pagination, and relation hydration in one MVCC
+  // snapshot so a concurrent share revocation cannot leak a hydrated drill.
+  const rows = await db.execute<SharedDrillListQueryRow>(sql`
+    with request_context as (
+      select
+        ${viewerUserId}::uuid as "viewerId",
+        ${requestedOwnerUsername}::text as "ownerUsername",
+        ${cursor?.sharedAt ?? null}::timestamptz as "cursorSharedAt",
+        ${cursor?.drillId ?? null}::uuid as "cursorDrillId"
+    ),
+    authorized_owner as materialized (
+      select ${users.id} as "id"
+      from request_context
+      inner join ${users}
+        on ${users.username} = request_context."ownerUsername"
+        and ${users.profileOnboardedAt} is not null
+      where request_context."ownerUsername" is not null
+        and ${users.id} <> request_context."viewerId"
+        and exists (
+          select 1
+          from ${follows} as viewer_follow
+          where viewer_follow."follower_id" = request_context."viewerId"
+            and viewer_follow."following_id" = ${users.id}
+            and viewer_follow."status" = 'accepted'
+        )
+        and exists (
+          select 1
+          from ${follows} as owner_follow
+          where owner_follow."follower_id" = ${users.id}
+            and owner_follow."following_id" = request_context."viewerId"
+            and owner_follow."status" = 'accepted'
+        )
+        and not exists (
+          select 1
+          from ${userBlocks} as owner_block
+          where (
+            owner_block."blocker_id" = request_context."viewerId"
+            and owner_block."blocked_id" = ${users.id}
+          ) or (
+            owner_block."blocker_id" = ${users.id}
+            and owner_block."blocked_id" = request_context."viewerId"
+          )
+        )
+      limit 1
+    ),
+    shared_page as materialized (
+      select
+        ${drills.id} as "drillId",
+        ${drills.userId} as "ownerId",
+        ${drills.title} as "drillTitle",
+        ${drills.summary} as "drillSummary",
+        ${drills.createdAt} as "drillCreatedAt",
+        ${drills.updatedAt} as "drillUpdatedAt",
+        ${users.username} as "ownerUsername",
+        ${users.avatarUrl} as "ownerAvatarUrl",
+        ${drillShares.createdAt} as "sharedAt",
+        to_char(
+          ${drillShares.createdAt} at time zone 'UTC',
+          'YYYY-MM-DD"T"HH24:MI:SS.US"Z"'
+        ) as "sharedAtCursor"
+      from request_context
+      inner join ${drillShares}
+        on ${drillShares.recipientUserId} = request_context."viewerId"
+      inner join ${drills} on ${drills.id} = ${drillShares.drillId}
+      inner join ${users} on ${users.id} = ${drills.userId}
+      where ${users.username} is not null
+        and ${users.profileOnboardedAt} is not null
+        and (
+          request_context."ownerUsername" is null
+          or ${drills.userId} = (select "id" from authorized_owner)
+        )
+        and exists (
+          select 1
+          from ${follows} as viewer_follow
+          where viewer_follow."follower_id" = request_context."viewerId"
+            and viewer_follow."following_id" = ${drills.userId}
+            and viewer_follow."status" = 'accepted'
+        )
+        and exists (
+          select 1
+          from ${follows} as owner_follow
+          where owner_follow."follower_id" = ${drills.userId}
+            and owner_follow."following_id" = request_context."viewerId"
+            and owner_follow."status" = 'accepted'
+        )
+        and not exists (
+          select 1
+          from ${userBlocks} as pair_block
+          where (
+            pair_block."blocker_id" = request_context."viewerId"
+            and pair_block."blocked_id" = ${drills.userId}
+          ) or (
+            pair_block."blocker_id" = ${drills.userId}
+            and pair_block."blocked_id" = request_context."viewerId"
+          )
+        )
+        and (
+          request_context."cursorSharedAt" is null
+          or ${drillShares.createdAt} < request_context."cursorSharedAt"
+          or (
+            ${drillShares.createdAt} = request_context."cursorSharedAt"
+            and ${drillShares.drillId} < request_context."cursorDrillId"
+          )
+        )
+      order by ${drillShares.createdAt} desc, ${drillShares.drillId} desc
+      limit 11
+    ),
+    method_payload as (
+      select
+        ${drillTrainingMethods.drillId} as "drillId",
+        jsonb_agg(
+          jsonb_build_object(
+            'id', ${trainingMethods.id},
+            'name', ${trainingMethods.name},
+            'slug', ${trainingMethods.slug},
+            'iconKey', ${trainingMethods.iconKey},
+            'sortOrder', ${trainingMethods.sortOrder}
+          )
+          order by ${trainingMethods.sortOrder}, ${trainingMethods.name}
+        ) as "trainingMethods"
+      from shared_page
+      inner join ${drillTrainingMethods}
+        on ${drillTrainingMethods.drillId} = shared_page."drillId"
+      inner join ${trainingMethods}
+        on ${trainingMethods.id} = ${drillTrainingMethods.trainingMethodId}
+      where ${trainingMethods.active} = true
+      group by ${drillTrainingMethods.drillId}
+    ),
+    tag_rows as (
+      select
+        ${drillTags.drillId} as "drillId",
+        case when ${tags.kind} = 'custom' then 'custom' else 'standard' end as "kind",
+        jsonb_build_object(
+          'id', ${tags.id},
+          'name', ${tags.name},
+          'slug', ${tags.slug},
+          'kind', case when ${tags.kind} = 'custom' then 'custom' else 'standard' end,
+          'sortOrder', ${tags.sortOrder},
+          'category', case
+            when ${tagCategories.id} is not null
+              and ${tagCategories.name} <> ''
+              and ${tagCategories.slug} <> ''
+            then jsonb_build_object(
+              'id', ${tagCategories.id},
+              'name', ${tagCategories.name},
+              'slug', ${tagCategories.slug}
+            )
+            else null
+          end
+        ) as "tag",
+        ${tagCategories.sortOrder} as "categorySortOrder",
+        ${tags.sortOrder} as "sortOrder",
+        ${tags.name} as "name"
+      from shared_page
+      inner join ${drillTags} on ${drillTags.drillId} = shared_page."drillId"
+      inner join ${tags} on ${tags.id} = ${drillTags.tagId}
+      left join ${tagCategories} on ${tagCategories.id} = ${tags.categoryId}
+      where ${tags.active} = true
+        and (${tags.userId} is null or ${tags.userId} = shared_page."ownerId")
+    ),
+    tag_payload as (
+      select
+        tag_rows."drillId",
+        coalesce(
+          jsonb_agg(
+            tag_rows."tag"
+            order by tag_rows."categorySortOrder", tag_rows."sortOrder", tag_rows."name"
+          ) filter (where tag_rows."kind" = 'standard'),
+          '[]'::jsonb
+        ) as "tags",
+        coalesce(
+          jsonb_agg(
+            tag_rows."tag"
+            order by tag_rows."categorySortOrder", tag_rows."sortOrder", tag_rows."name"
+          ) filter (where tag_rows."kind" = 'custom'),
+          '[]'::jsonb
+        ) as "customTags"
+      from tag_rows
+      group by tag_rows."drillId"
+    )
+    select
+      (
+        request_context."ownerUsername" is null
+        or authorized_owner."id" is not null
+      ) as "ownerAuthorized",
+      shared_page."drillId",
+      shared_page."drillTitle",
+      shared_page."drillSummary",
+      coalesce(method_payload."trainingMethods", '[]'::jsonb) as "trainingMethods",
+      coalesce(tag_payload."tags", '[]'::jsonb) as "tags",
+      coalesce(tag_payload."customTags", '[]'::jsonb) as "customTags",
+      shared_page."drillCreatedAt",
+      shared_page."drillUpdatedAt",
+      shared_page."ownerId",
+      shared_page."ownerUsername",
+      shared_page."ownerAvatarUrl",
+      shared_page."sharedAt",
+      shared_page."sharedAtCursor"
+    from request_context
+    left join authorized_owner on true
+    left join shared_page on true
+    left join method_payload on method_payload."drillId" = shared_page."drillId"
+    left join tag_payload on tag_payload."drillId" = shared_page."drillId"
+    order by shared_page."sharedAt" desc nulls last, shared_page."drillId" desc nulls last
+  `);
+  const contextRow = rows[0];
+  if (!contextRow) throw new Error("Shared drill query returned no request context.");
+  if (requestedOwnerUsername && !contextRow.ownerAuthorized) {
+    throw new DrillShareError("Fighter not found.", 404);
   }
 
-  const relationshipExists = reciprocalFollowCondition(viewerUserId, drills.userId);
-  const pairIsUnblocked = notExists(
-    db
-      .select({ value: sql`1` })
-      .from(userBlocks)
-      .where(or(
-        and(
-          eq(userBlocks.blockerId, viewerUserId),
-          eq(userBlocks.blockedId, drills.userId),
-        ),
-        and(
-          eq(userBlocks.blockerId, drills.userId),
-          eq(userBlocks.blockedId, viewerUserId),
-        ),
-      )),
-  );
-  const rows = await db
-    .select({
-      drillId: drills.id,
-      ownerId: users.id,
-      ownerUsername: sql<string>`${users.username}`,
-      ownerAvatarUrl: users.avatarUrl,
-      sharedAt: drillShares.createdAt,
-    })
-    .from(drillShares)
-    .innerJoin(drills, eq(drills.id, drillShares.drillId))
-    .innerJoin(users, eq(users.id, drills.userId))
-    .where(and(
-      eq(drillShares.recipientUserId, viewerUserId),
-      ownerUserId ? eq(drills.userId, ownerUserId) : undefined,
-      isNotNull(users.username),
-      isNotNull(users.profileOnboardedAt),
-      relationshipExists,
-      pairIsUnblocked,
-      cursor
-        ? or(
-            lt(drillShares.createdAt, new Date(cursor.sharedAt)),
-            and(
-              eq(drillShares.createdAt, new Date(cursor.sharedAt)),
-              lt(drillShares.drillId, cursor.drillId),
-            ),
-          )
-        : undefined,
-    ))
-    .orderBy(desc(drillShares.createdAt), desc(drillShares.drillId))
-    .limit(11);
-  const hasMore = rows.length > 10;
-  const pageRows = hasMore ? rows.slice(0, 10) : rows;
-  const summaries = await getSummariesByOwner(pageRows);
+  const sharedRows = rows.flatMap((row) => {
+    if (!row.drillId) return [];
+    if (
+      row.drillTitle === null
+      || row.drillSummary === null
+      || row.drillCreatedAt === null
+      || row.drillUpdatedAt === null
+      || row.ownerId === null
+      || row.ownerUsername === null
+      || row.sharedAt === null
+      || row.sharedAtCursor === null
+    ) {
+      throw new Error("Shared drill query returned an incomplete drill.");
+    }
+    return [{
+      drillId: row.drillId,
+      drillTitle: row.drillTitle,
+      drillSummary: row.drillSummary,
+      trainingMethods: row.trainingMethods,
+      tags: row.tags,
+      customTags: row.customTags,
+      drillCreatedAt: toDate(row.drillCreatedAt),
+      drillUpdatedAt: toDate(row.drillUpdatedAt),
+      ownerId: row.ownerId,
+      ownerUsername: row.ownerUsername,
+      ownerAvatarUrl: row.ownerAvatarUrl,
+      sharedAt: toDate(row.sharedAt),
+      sharedAtCursor: row.sharedAtCursor,
+    }];
+  });
+  const hasMore = sharedRows.length > 10;
+  const pageRows = hasMore ? sharedRows.slice(0, 10) : sharedRows;
   const last = pageRows.at(-1);
 
   return {
-    items: pageRows.flatMap((row) => {
-      const drill = summaries.get(row.drillId);
-      if (!drill) return [];
-      return [{
-        drill: { ...drill, statusTags: [] },
-        owner: {
-          id: row.ownerId,
-          username: row.ownerUsername,
-          avatarUrl: row.ownerAvatarUrl,
-        },
-        sharedAt: row.sharedAt,
-      }];
-    }),
+    items: pageRows.map((row) => ({
+      drill: {
+        id: row.drillId,
+        title: row.drillTitle,
+        summary: row.drillSummary,
+        trainingMethods: row.trainingMethods,
+        tags: row.tags,
+        customTags: row.customTags,
+        statusTags: [],
+        createdAt: row.drillCreatedAt,
+        updatedAt: row.drillUpdatedAt,
+      },
+      owner: {
+        id: row.ownerId,
+        username: row.ownerUsername,
+        avatarUrl: row.ownerAvatarUrl,
+      },
+      sharedAt: row.sharedAt,
+    })),
     nextCursor: hasMore && last
       ? encodeSharedCursor({
-          sharedAt: last.sharedAt.toISOString(),
+          sharedAt: last.sharedAtCursor,
           drillId: last.drillId,
         })
       : null,
@@ -371,20 +579,12 @@ function reciprocalFollowCondition(
   );
 }
 
-async function getSummariesByOwner(
-  rows: Array<{ drillId: string; ownerId: string }>,
-) {
-  const summaries = await getDrillSummariesByOwnerPairs(rows, {
-    includeStatusTags: false,
-  });
-
-  return new Map(
-    summaries.map((drill) => [drill.id, drill] as const),
-  );
-}
-
 function encodeSharedCursor(cursor: SharedCursor) {
   return Buffer.from(JSON.stringify(cursor)).toString("base64url");
+}
+
+function toDate(value: Date | string): Date {
+  return value instanceof Date ? value : new Date(value);
 }
 
 function decodeSharedCursor(rawCursor: string | null): SharedCursor | null {
