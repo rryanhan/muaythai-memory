@@ -1,7 +1,8 @@
 import type { ComponentProps } from "react";
 import { useState } from "react";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { LibraryIndexFrame } from "./LibraryIndexFrame";
 import { LibraryIndexPanel } from "./LibraryIndexPanel";
 
 const routes = {
@@ -59,6 +60,49 @@ describe("LibraryIndexPanel", () => {
     ]);
   });
 
+  it("isolates the portaled dialog, traps focus, and restores the opener", async () => {
+    function Harness() {
+      const [open, setOpen] = useState(false);
+
+      return (
+        <>
+          <button type="button" onClick={() => setOpen(true)}>
+            Open index
+          </button>
+          {open ? <Panel onClose={() => setOpen(false)} /> : null}
+        </>
+      );
+    }
+
+    const { container } = render(<Harness />);
+    const opener = screen.getByRole("button", { name: "Open index" });
+    opener.focus();
+    fireEvent.click(opener);
+
+    const dialog = screen.getByRole("dialog", { name: "Training Method index" });
+    const close = screen.getByRole("button", { name: "Close" });
+    const lastMethod = screen.getByRole("button", { name: "All Drills" });
+    expect(dialog.parentElement).toBe(document.body);
+    expect(container).toHaveAttribute("inert", "");
+    expect(container).toHaveAttribute("aria-hidden", "true");
+    expect(document.body.style.getPropertyValue("overflow")).toBe("hidden");
+    expect(document.body.style.getPropertyPriority("overflow")).toBe("important");
+    await waitFor(() => expect(close).toHaveFocus());
+
+    fireEvent.keyDown(dialog, { key: "Tab", shiftKey: true });
+    expect(lastMethod).toHaveFocus();
+    fireEvent.keyDown(dialog, { key: "Tab" });
+    expect(close).toHaveFocus();
+    fireEvent.keyDown(dialog, { key: "Escape" });
+
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog", { name: "Training Method index" })).not.toBeInTheDocument();
+      expect(opener).toHaveFocus();
+    });
+    expect(container).not.toHaveAttribute("inert");
+    expect(container).not.toHaveAttribute("aria-hidden");
+  });
+
   it.each([
     ["pointer intent", "Capture Drill", "pointerEnter", routes.capture],
     ["keyboard focus", "Add Drill", "focus", routes.add],
@@ -75,22 +119,23 @@ describe("LibraryIndexPanel", () => {
 
 function Panel({ onClose = vi.fn() }: { onClose?: () => void }) {
   return (
-    <LibraryIndexPanel
-      methods={[]}
-      selectedMethodSlug={null}
-      taxonomyState={{
-        status: "loaded",
-        taxonomy: {
-          trainingMethods: [],
-          tagCategories: [],
-          standardTags: [],
-          customTags: [],
-          statusTags: [],
-        },
-      }}
-      onSelectMethod={vi.fn()}
-      onClose={onClose}
-      onRetry={vi.fn()}
-    />
+    <LibraryIndexFrame onClose={onClose}>
+      <LibraryIndexPanel
+        methods={[]}
+        selectedMethodSlug={null}
+        taxonomyState={{
+          status: "loaded",
+          taxonomy: {
+            trainingMethods: [],
+            tagCategories: [],
+            standardTags: [],
+            customTags: [],
+            statusTags: [],
+          },
+        }}
+        onSelectMethod={vi.fn()}
+        onRetry={vi.fn()}
+      />
+    </LibraryIndexFrame>
   );
 }

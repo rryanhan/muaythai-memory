@@ -342,6 +342,13 @@
   background: rgba(23, 23, 23, 0.28);
 }
 
+.detailFallbackBackdrop {
+  position: fixed;
+  inset: 0 0 var(--nav-height);
+  z-index: 90;
+  background: rgba(23, 23, 23, 0.32);
+}
+
 .controlsSheet {
   position: fixed;
   z-index: 100;
@@ -358,6 +365,26 @@
   border: 1px solid var(--border);
   border-radius: 8px 8px 0 0;
   padding: 10px 18px 22px;
+  background: var(--surface);
+  box-shadow: 0 -18px 48px rgba(23, 23, 23, 0.14);
+  outline: none;
+}
+
+.detailFallbackSheet {
+  position: fixed;
+  z-index: 100;
+  left: 0;
+  right: 0;
+  bottom: var(--nav-height);
+  display: grid;
+  width: min(100%, 480px);
+  min-height: 260px;
+  max-height: calc(88dvh - var(--nav-height));
+  margin: 0 auto;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 18px 18px 0 0;
+  padding: 10px 20px max(28px, env(safe-area-inset-bottom));
   background: var(--surface);
   box-shadow: 0 -18px 48px rgba(23, 23, 23, 0.14);
   outline: none;

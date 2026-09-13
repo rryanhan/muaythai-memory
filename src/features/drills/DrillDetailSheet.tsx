@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Drawer } from "vaul";
 import type { DrillDetail, UpdateSavedListResponse } from "@/data";
 import { DrillDetailContent } from "@/features/drills/DrillDetailContent";
+import { useDrawerFocus } from "@/features/media/use-drawer-focus";
 import { SavedListActions } from "@/features/shared/SavedListActions";
 import styles from "./DrillDetail.module.css";
 
@@ -32,6 +33,7 @@ export function DrillDetailSheet({
   onRetry,
   onSavedListChange,
 }: DrillDetailSheetProps) {
+  const contentRef = useDrawerFocus(open);
   const handleDragStartYRef = useRef<number | null>(null);
 
   function handlePointerDownCapture(event: PointerEvent<HTMLDivElement>) {
@@ -70,6 +72,7 @@ export function DrillDetailSheet({
       <Drawer.Portal>
         <Drawer.Overlay className={styles.backdrop} />
         <Drawer.Content
+          ref={contentRef}
           className={styles.sheet}
           aria-label="Drill detail"
           onPointerDown={(event) => event.stopPropagation()}
@@ -85,7 +88,7 @@ export function DrillDetailSheet({
           </div>
           <header className="drill-detail-sheet-header">
             <Drawer.Title asChild>
-              <p className="eyebrow">Drill Detail</p>
+              <p className="eyebrow" tabIndex={-1} data-drawer-initial-focus>Drill Detail</p>
             </Drawer.Title>
             {state.status === "loaded" && (
               <div className={styles.sheetHeaderActions}>

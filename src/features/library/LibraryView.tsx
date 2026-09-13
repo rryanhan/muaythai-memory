@@ -3,17 +3,18 @@
 import { FunnelSimple } from "@phosphor-icons/react/FunnelSimple";
 import { MagnifyingGlass } from "@phosphor-icons/react/MagnifyingGlass";
 import { DRILL_LIMITS } from "@/config/domain-limits";
-import { lazy, Suspense, useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import Image from "next/image";
 import { badgeByIconKey } from "@/components/shared/context-badges";
+import { SheetLoadingFallback } from "@/components/shared/SheetLoadingFallback";
 import { getDrills } from "@/data/drills";
 import { getTaxonomy } from "@/data/taxonomy";
 import type { TagDto } from "@/data/types";
 import { taxonomyQueryKey } from "@/features/shared/query-keys";
 import { useDebouncedValue } from "@/features/shared/use-debounced-value";
 import { LibraryDrillRow, LibraryLoadingList, LibraryStatePanel } from "./LibraryDrillList";
-import { LibraryIndexPanel } from "./LibraryIndexPanel";
+import { LibraryIndexFrame } from "./LibraryIndexFrame";
 import {
   formatDrillCount,
   getBuiltInStatusFilters,
@@ -30,6 +31,9 @@ import styles from "./Library.module.css";
 const LibraryFilterSheet = lazy(
   () => import("./LibraryFilterSheet").then((module) => ({ default: module.LibraryFilterSheet })),
 );
+const LibraryIndexPanel = lazy(
+  () => import("./LibraryIndexPanel").then((module) => ({ default: module.LibraryIndexPanel })),
+);
 
 // Owns Training Log query/filter state. Child components own index, sheet, and row presentation.
 export function LibraryView() {
@@ -40,6 +44,8 @@ export function LibraryView() {
   const [draftTagSlugs, setDraftTagSlugs] = useState<string[]>([]);
   const [draftStatusTagSlugs, setDraftStatusTagSlugs] = useState<string[]>([]);
   const [tagSearch, setTagSearch] = useState("");
+  const indexTriggerRef = useRef<HTMLButtonElement>(null);
+  const tagPanelTriggerRef = useRef<HTMLButtonElement>(null);
   const {
     debouncedValue: requestKeyword,
     deferValue: deferRequestKeyword,
@@ -101,35 +107,6 @@ export function LibraryView() {
   const pageTitle = selectedMethod?.name ?? "All Drills";
   const pageSubtitle = drillListState.status === "loading" ? "Loading drills" : formatDrillCount(total);
   const pageBadge = selectedMethod?.iconKey ? badgeByIconKey[selectedMethod.iconKey] : undefined;
-
-  useEffect(() => {
-    if (!indexOpen) return;
-
-    const root = document.documentElement;
-    const body = document.body;
-    const previousRootOverflow = root.style.overflow;
-    const previousBodyOverflow = body.style.overflow;
-    const previousRootOverscroll = root.style.overscrollBehavior;
-    const previousBodyOverscroll = body.style.overscrollBehavior;
-
-    root.style.overflow = "hidden";
-    body.style.overflow = "hidden";
-    root.style.overscrollBehavior = "none";
-    body.style.overscrollBehavior = "none";
-
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") setIndexOpen(false);
-    }
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-      root.style.overflow = previousRootOverflow;
-      body.style.overflow = previousBodyOverflow;
-      root.style.overscrollBehavior = previousRootOverscroll;
-      body.style.overscrollBehavior = previousBodyOverscroll;
-    };
-  }, [indexOpen]);
 
   function setKeyword(keyword: string) {
     setFilters((current) => ({ ...current, keyword }));
@@ -207,6 +184,7 @@ export function LibraryView() {
   return (
     <section className={styles.view} aria-label="Training Log">
       <button
+        ref={indexTriggerRef}
         type="button"
         className="index-spine"
         aria-label="Open Training Method index"
@@ -217,22 +195,26 @@ export function LibraryView() {
       </button>
 
       {indexOpen && (
-        <>
-          <button
-            type="button"
-            className="library-index-backdrop"
-            aria-label="Close Training Method index"
-            onClick={() => setIndexOpen(false)}
-          />
-          <LibraryIndexPanel
-            methods={methods}
-            selectedMethodSlug={filters.methodSlug}
-            taxonomyState={taxonomyState}
-            onSelectMethod={setMethod}
-            onClose={() => setIndexOpen(false)}
-            onRetry={() => void taxonomyQuery.refetch()}
-          />
-        </>
+        <LibraryIndexFrame
+          onClose={() => setIndexOpen(false)}
+          returnFocusRef={indexTriggerRef}
+        >
+          <Suspense
+            fallback={(
+              <p className="library-muted" role="status" aria-live="polite">
+                Loading method index…
+              </p>
+            )}
+          >
+            <LibraryIndexPanel
+              methods={methods}
+              selectedMethodSlug={filters.methodSlug}
+              taxonomyState={taxonomyState}
+              onSelectMethod={setMethod}
+              onRetry={() => void taxonomyQuery.refetch()}
+            />
+          </Suspense>
+        </LibraryIndexFrame>
       )}
 
       <header className="library-header">
@@ -258,6 +240,7 @@ export function LibraryView() {
             />
           </label>
           <button
+            ref={tagPanelTriggerRef}
             type="button"
             aria-label="Filter by tags"
             data-active={tagPanelOpen || filters.tagSlugs.length > 0 || filters.statusTagSlugs.length > 0}
@@ -302,12 +285,22 @@ export function LibraryView() {
       {tagPanelMounted && (
         <Suspense
           fallback={tagPanelOpen
-            ? <span className="sr-only" role="status">Loading filters…</span>
+            ? (
+                <SheetLoadingFallback
+                  backdropClassName={styles.filterBackdrop}
+                  sheetClassName={styles.filterSheet}
+                  title="Filter Drills"
+                  description="Tag filters are still loading."
+                  statusMessage="Loading filters…"
+                  onClose={() => handleTagPanelOpenChange(false)}
+                />
+              )
             : null}
         >
           <LibraryFilterSheet
             open={tagPanelOpen}
             onOpenChange={handleTagPanelOpenChange}
+            returnFocusRef={tagPanelTriggerRef}
             taxonomyState={taxonomyState}
             tagCategories={standardTagCategories}
             customTags={customTags}

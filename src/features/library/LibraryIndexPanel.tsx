@@ -7,7 +7,6 @@ import { Plus } from "@phosphor-icons/react/Plus";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef } from "react";
 import type { TrainingMethodDto } from "@/data";
 import { badgeByIconKey } from "@/components/shared/context-badges";
 import type { TaxonomyLoadState } from "./types";
@@ -17,7 +16,6 @@ type LibraryIndexPanelProps = {
   selectedMethodSlug: string | null;
   taxonomyState: TaxonomyLoadState;
   onSelectMethod: (methodSlug: string | null) => void;
-  onClose: () => void;
   onRetry: () => void;
 };
 
@@ -26,11 +24,9 @@ export function LibraryIndexPanel({
   selectedMethodSlug,
   taxonomyState,
   onSelectMethod,
-  onClose,
   onRetry,
 }: LibraryIndexPanelProps) {
   const router = useRouter();
-  const panelRef = useRef<HTMLElement>(null);
 
   function prefetchAddDrill() {
     router.prefetch("/drills/new");
@@ -44,29 +40,8 @@ export function LibraryIndexPanel({
     router.prefetch("/onboarding/first-drill?replay=1&next=%2F%3Fview%3Dlibrary");
   }
 
-  useEffect(() => {
-    const panel = panelRef.current;
-    if (!panel) return;
-
-    panel.scrollTop = 0;
-    panel.querySelector<HTMLButtonElement>("button")?.focus({ preventScroll: true });
-  }, []);
-
   return (
-    <aside
-      ref={panelRef}
-      className="library-index-panel"
-      role="dialog"
-      aria-modal="true"
-      aria-label="Training Method index"
-    >
-      <header>
-        <p className="eyebrow">Index</p>
-        <button type="button" onClick={onClose}>
-          Close
-        </button>
-      </header>
-
+    <>
       {taxonomyState.status === "loading" && <p className="library-muted">Loading methods</p>}
       {taxonomyState.status === "error" && (
         <div className="library-filter-state">
@@ -155,6 +130,6 @@ export function LibraryIndexPanel({
           </section>
         </>
       )}
-    </aside>
+    </>
   );
 }

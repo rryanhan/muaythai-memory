@@ -14,7 +14,7 @@ type HomePageProps = {
 export default async function HomePage({ searchParams }: HomePageProps) {
   const initialView = getInitialView(searchParams ? await searchParams : undefined);
   const user = await requireCurrentPageUser(initialView === "network" ? "/" : `/?view=${initialView}`);
-  preloadContextBadges();
+  if (initialView !== "library") preloadContextBadges();
   const initialNetworkData = initialView === "network"
     ? await getSafeInitialNetworkData(user.id)
     : undefined;

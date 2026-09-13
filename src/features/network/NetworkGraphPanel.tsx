@@ -16,6 +16,7 @@ import { MagnifyingGlass } from "@phosphor-icons/react/MagnifyingGlass";
 import { Microphone } from "@phosphor-icons/react/Microphone";
 import { SlidersHorizontal } from "@phosphor-icons/react/SlidersHorizontal";
 import { badgeByIconKey } from "@/components/shared/context-badges";
+import { SheetLoadingFallback } from "@/components/shared/SheetLoadingFallback";
 import { DRILL_LIMITS } from "@/config/domain-limits";
 import type {
   GraphOptions,
@@ -38,6 +39,7 @@ import {
 } from "./network-helpers";
 import { type DrillDetailLoadState, type NetworkFilters } from "./types";
 import { NetworkStatePanel } from "./NetworkStates";
+import styles from "./Network.module.css";
 
 const NetworkControlsSheet = lazy(
   () => import("./NetworkControlsSheet").then((module) => ({ default: module.NetworkControlsSheet })),
@@ -133,6 +135,7 @@ export function NetworkGraphPanel({
     queueMicrotask(() => {
       if (cancelled) return;
       setControlsOpen(false);
+      setTagSearch("");
       setTagSelectOpen(false);
       onSearchOpenChange(false);
       setDetailOpen(false);
@@ -274,6 +277,20 @@ export function NetworkGraphPanel({
     if (!selectedDrillId) return;
     setDetailLoadState({ status: "loading", drillId: selectedDrillId });
     setDetailRetryNonce((current) => current + 1);
+  }
+
+  function handleControlsOpenChange(open: boolean) {
+    setControlsOpen(open);
+    if (!open) {
+      setTagSearch("");
+      setTagSelectOpen(false);
+    }
+  }
+
+  function closeDeferredDrillDetail() {
+    setDetailOpen(false);
+    setSelectedDrillId(null);
+    setDetailLoadState({ status: "idle" });
   }
 
   function handleDetailAnimationEnd(open: boolean) {
@@ -434,19 +451,22 @@ export function NetworkGraphPanel({
 
       {controlsMounted && (
         <Suspense
-          fallback={controlsOpen
-            ? <span className="sr-only" role="status">Loading network controls…</span>
+          fallback={active && controlsOpen
+            ? (
+                <SheetLoadingFallback
+                  backdropClassName={styles.controlsBackdrop}
+                  sheetClassName={styles.controlsSheet}
+                  title="Network Controls"
+                  description="Graph controls are still loading."
+                  statusMessage="Loading network controls…"
+                  onClose={() => handleControlsOpenChange(false)}
+                />
+              )
             : null}
         >
           <NetworkControlsSheet
             open={active && controlsOpen}
-            onOpenChange={(open) => {
-              setControlsOpen(open);
-              if (!open) {
-                setTagSearch("");
-                setTagSelectOpen(false);
-              }
-            }}
+            onOpenChange={handleControlsOpenChange}
             filters={filters}
             layerOptions={layerOptions}
             taxonomy={taxonomy}
@@ -495,7 +515,20 @@ export function NetworkGraphPanel({
       </div>
 
       {active && selectedDrillId && visibleDetailState.status !== "idle" && (
-        <Suspense fallback={<span className="sr-only" role="status">Loading drill details…</span>}>
+        <Suspense
+          fallback={detailOpen
+            ? (
+                <SheetLoadingFallback
+                  backdropClassName={styles.detailFallbackBackdrop}
+                  sheetClassName={styles.detailFallbackSheet}
+                  title="Drill Detail"
+                  description="Preparing the selected drill."
+                  statusMessage="Loading drill details…"
+                  onClose={closeDeferredDrillDetail}
+                />
+              )
+            : null}
+        >
           <DrillDetailSheet
             state={visibleDetailState}
             badgeByIconKey={badgeByIconKey}

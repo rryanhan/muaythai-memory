@@ -185,6 +185,7 @@
 .view :global(.library-active-filters) button,
 .view :global(.library-inline-error),
 .view :global(.library-state-panel) button,
+.indexPanel :global(.library-filter-state) button,
 .filterSheet :global(.library-filter-state) button {
   border: 1px solid rgba(209, 74, 50, 0.35);
   border-radius: 8px;
@@ -238,13 +239,15 @@
 
 .view :global(.library-state-panel) p:not(:global(.eyebrow)),
 .view :global(.library-muted),
+.indexPanel :global(.library-muted),
+.indexPanel :global(.library-filter-state) p,
 .filterSheet :global(.library-filter-state) p {
   color: var(--muted);
   font-size: 16px;
   line-height: 1.35;
 }
 
-.view :global(.library-index-backdrop) {
+.indexBackdrop {
   position: fixed;
   z-index: 70;
   inset: 0;
@@ -257,7 +260,7 @@
   touch-action: none;
 }
 
-.view :global(.library-index-panel) {
+.indexPanel {
   position: fixed;
   z-index: 80;
   left: max(0px, calc(50% - 240px));
@@ -275,7 +278,7 @@
   box-shadow: 18px 0 44px rgba(23, 23, 23, 0.12);
 }
 
-.view :global(.library-index-panel) header {
+.indexPanel header {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -283,11 +286,11 @@
   margin-bottom: 14px;
 }
 
-.view :global(.library-index-panel) header p {
+.indexPanel header p {
   margin: 0;
 }
 
-.view :global(.library-index-panel) header button {
+.indexPanel header button {
   border: 0;
   background: transparent;
   color: var(--muted);
@@ -295,20 +298,20 @@
   cursor: pointer;
 }
 
-.view :global(.library-index-action-block) {
+.indexPanel :global(.library-index-action-block) {
   display: grid;
   gap: 8px;
   border-bottom: 1px solid rgba(216, 214, 204, 0.78);
   padding-bottom: 14px;
 }
 
-.view :global(.library-index-section) {
+.indexPanel :global(.library-index-section) {
   display: grid;
   gap: 8px;
   padding-top: 14px;
 }
 
-.view :global(.library-index-section-label) {
+.indexPanel :global(.library-index-section-label) {
   margin: 0;
   color: var(--muted);
   font-family: "IBM Plex Mono", ui-monospace, monospace;
@@ -318,13 +321,13 @@
   text-transform: uppercase;
 }
 
-.view :global(.library-method-list) {
+.indexPanel :global(.library-method-list) {
   display: grid;
   gap: 8px;
 }
 
-.view :global(.library-method-list) button,
-.view :global(.library-add-drill-link) {
+.indexPanel :global(.library-method-list) button,
+.indexPanel :global(.library-add-drill-link) {
   display: grid;
   grid-template-columns: 42px minmax(0, 1fr);
   align-items: center;
@@ -342,51 +345,51 @@
   cursor: pointer;
 }
 
-.view :global(.library-add-drill-link) {
+.indexPanel :global(.library-add-drill-link) {
   border-color: rgba(209, 74, 50, 0.3);
   background: rgba(255, 255, 255, 0.58);
   color: var(--accent);
 }
 
-.view :global(.library-index-action-icon),
-.view :global(.library-index-utility-icon) {
+.indexPanel :global(.library-index-action-icon),
+.indexPanel :global(.library-index-utility-icon) {
   display: grid;
   place-items: center;
   width: 42px;
   height: 42px;
 }
 
-.view :global(.library-index-action-icon) {
+.indexPanel :global(.library-index-action-icon) {
   border: 1px solid rgba(209, 74, 50, 0.5);
   border-radius: 8px;
   color: var(--accent);
   background: rgba(244, 216, 208, 0.28);
 }
 
-.view :global(.library-index-utility-icon) {
+.indexPanel :global(.library-index-utility-icon) {
   border: 1px solid rgba(216, 214, 204, 0.9);
   border-radius: 8px;
   color: var(--muted);
   background: rgba(255, 255, 255, 0.62);
 }
 
-.view :global(.library-method-list) button[data-selected="true"] {
+.indexPanel :global(.library-method-list) button[data-selected="true"] {
   border-color: rgba(209, 74, 50, 0.4);
   background: rgba(244, 216, 208, 0.58);
   color: var(--accent);
 }
 
-.view :global(.library-method-list) button[data-kind="all"][data-selected="true"] {
+.indexPanel :global(.library-method-list) button[data-kind="all"][data-selected="true"] {
   background: rgba(255, 255, 255, 0.7);
 }
 
-.view :global(.library-method-list) button[data-kind="all"][data-selected="true"] :global(.library-index-utility-icon) {
+.indexPanel :global(.library-method-list) button[data-kind="all"][data-selected="true"] :global(.library-index-utility-icon) {
   border-color: rgba(209, 74, 50, 0.45);
   color: var(--accent);
   background: rgba(244, 216, 208, 0.24);
 }
 
-.view :global(.library-method-list) img {
+.indexPanel :global(.library-method-list) img {
   width: 42px;
   height: 42px;
 }

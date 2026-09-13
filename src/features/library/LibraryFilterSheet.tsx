@@ -1,6 +1,7 @@
 "use client";
 
 import { MagnifyingGlass } from "@phosphor-icons/react/MagnifyingGlass";
+import { useRef, type RefObject } from "react";
 import { Drawer } from "vaul";
 import type { TagDto, TaxonomyResponse } from "@/data";
 import { SavedListToken } from "@/features/shared/SavedListToken";
@@ -18,6 +19,7 @@ import styles from "./Library.module.css";
 type LibraryFilterSheetProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  returnFocusRef: RefObject<HTMLElement | null>;
   taxonomyState: TaxonomyLoadState;
   tagCategories: TaxonomyResponse["tagCategories"];
   customTags: TagDto[];
@@ -40,6 +42,7 @@ type LibraryFilterSheetProps = {
 export function LibraryFilterSheet({
   open,
   onOpenChange,
+  returnFocusRef,
   taxonomyState,
   tagCategories,
   customTags,
@@ -58,6 +61,7 @@ export function LibraryFilterSheet({
   onRetry,
   onRetryPreview,
 }: LibraryFilterSheetProps) {
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
   const normalizedQuery = normalizeKeyword(tagSearch);
   const draftTagSet = new Set(draftTagSlugs);
   const draftStatusSet = new Set(draftStatusTagSlugs);
@@ -77,10 +81,21 @@ export function LibraryFilterSheet({
   const draftFilterCount = draftTagSlugs.length + draftStatusTagSlugs.length;
 
   return (
-    <Drawer.Root open={open} onOpenChange={onOpenChange} direction="bottom" modal dismissible autoFocus={false}>
+    <Drawer.Root open={open} onOpenChange={onOpenChange} direction="bottom" modal dismissible autoFocus>
       <Drawer.Portal>
         <Drawer.Overlay className={styles.filterBackdrop} />
-        <Drawer.Content className={styles.filterSheet} aria-label="Library filters">
+        <Drawer.Content
+          className={styles.filterSheet}
+          aria-label="Library filters"
+          onOpenAutoFocus={(event) => {
+            event.preventDefault();
+            closeButtonRef.current?.focus();
+          }}
+          onCloseAutoFocus={(event) => {
+            event.preventDefault();
+            returnFocusRef.current?.focus();
+          }}
+        >
           <Drawer.Handle className="sheet-handle" />
           <header className="library-filter-sheet-header">
             <div>
@@ -92,7 +107,7 @@ export function LibraryFilterSheet({
               </Drawer.Description>
             </div>
             <Drawer.Close asChild>
-              <button type="button">Close</button>
+              <button ref={closeButtonRef} type="button">Close</button>
             </Drawer.Close>
           </header>
 

@@ -5,6 +5,7 @@ import { CaretDown } from "@phosphor-icons/react/CaretDown";
 import { MagnifyingGlass } from "@phosphor-icons/react/MagnifyingGlass";
 import { Drawer } from "vaul";
 import type { GraphOptions, TaxonomyResponse } from "@/data";
+import { useDrawerFocus } from "@/features/media/use-drawer-focus";
 import { SavedListToken } from "@/features/shared/SavedListToken";
 import {
   filterBuiltInStatuses,
@@ -49,6 +50,7 @@ export function NetworkControlsSheet({
   onLayerOptionsChange,
   onRetryTaxonomy,
 }: NetworkControlsSheetProps) {
+  const contentRef = useDrawerFocus(open);
   const normalizedQuery = normalizeKeyword(tagSearch);
   const selectedTagSet = new Set(filters.tagSlugs);
   const selectedStatusSet = new Set(filters.statusTagSlugs);
@@ -102,14 +104,14 @@ export function NetworkControlsSheet({
     <Drawer.Root open={open} onOpenChange={onOpenChange} direction="bottom" modal dismissible autoFocus={false}>
       <Drawer.Portal>
         <Drawer.Overlay className={styles.controlsBackdrop} />
-        <Drawer.Content className={styles.controlsSheet} aria-label="Network controls">
+        <Drawer.Content ref={contentRef} className={styles.controlsSheet} aria-label="Network controls">
           <Drawer.Handle className="sheet-handle" />
           <header className="network-controls-sheet-header">
             <Drawer.Title asChild>
               <h2>Network Controls</h2>
             </Drawer.Title>
             <Drawer.Close asChild>
-              <button type="button">Close</button>
+              <button type="button" data-drawer-initial-focus>Close</button>
             </Drawer.Close>
           </header>
 

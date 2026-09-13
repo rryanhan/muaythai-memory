@@ -1,5 +1,5 @@
 import { type ComponentProps, useState } from "react";
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { GraphOptions, GraphResponse } from "@/data/types";
@@ -27,13 +27,40 @@ vi.mock("./NetworkForceGraph", () => ({
     onDrillSelect: (id: string) => void;
   }) => (
     <div data-testid="force-graph" data-active={String(active)}>
-      <button type="button" onClick={() => onDrillSelect(drillId)}>Open fixture drill</button>
+      <svg aria-label="Fixture graph">
+        <g data-testid="fixture-drill-node" onPointerUp={() => onDrillSelect(drillId)}>
+          <circle cx="10" cy="10" r="8" />
+        </g>
+      </svg>
     </div>
   ),
 }));
 vi.mock("./NetworkControlsSheet", () => ({
-  NetworkControlsSheet: ({ open }: { open: boolean }) => (
-    <div data-testid="controls-sheet" data-open={String(open)} />
+  NetworkControlsSheet: ({
+    open,
+    onOpenChange,
+    tagSearch,
+    onTagSearchChange,
+  }: {
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    tagSearch: string;
+    onTagSearchChange: (value: string) => void;
+  }) => (
+    <div data-testid="controls-sheet" data-open={String(open)} data-tag-search={tagSearch}>
+      {open && (
+        <>
+          <input
+            aria-label="Fixture tag search"
+            value={tagSearch}
+            onChange={(event) => onTagSearchChange(event.target.value)}
+          />
+          <button type="button" onClick={() => onOpenChange(false)}>
+            Close loaded controls
+          </button>
+        </>
+      )}
+    </div>
   ),
 }));
 vi.mock("@/features/drills/DrillDetailSheet", () => ({
@@ -89,7 +116,7 @@ describe("NetworkGraphPanel hidden lifecycle", () => {
     mocks.getDrill.mockResolvedValue(drillDetail);
   });
 
-  it("closes every portaled surface when Network becomes inactive", async () => {
+  it("closes every portaled surface and clears transient controls state when Network becomes inactive", async () => {
     const user = userEvent.setup();
     const { rerender } = render(<Harness active />);
 
@@ -97,10 +124,14 @@ describe("NetworkGraphPanel hidden lifecycle", () => {
     expect(screen.queryByTestId("detail-sheet")).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Network controls" }));
+    await screen.findByTestId("controls-sheet");
+    await user.type(screen.getByRole("textbox", { name: "Fixture tag search" }), "guard");
     await user.click(screen.getByRole("button", { name: "Search network" }));
-    await user.click(screen.getByRole("button", { name: "Open fixture drill" }));
+    fireEvent.pointerUp(screen.getByTestId("fixture-drill-node"));
+    await screen.findByTestId("detail-sheet");
 
     expect(screen.getByTestId("controls-sheet")).toHaveAttribute("data-open", "true");
+    expect(screen.getByTestId("controls-sheet")).toHaveAttribute("data-tag-search", "guard");
     expect(screen.getByRole("textbox", { name: "Search keyword" })).toBeInTheDocument();
     expect(screen.getByTestId("detail-sheet")).toHaveAttribute("data-open", "true");
 
@@ -108,6 +139,7 @@ describe("NetworkGraphPanel hidden lifecycle", () => {
 
     await waitFor(() => {
       expect(screen.getByTestId("controls-sheet")).toHaveAttribute("data-open", "false");
+      expect(screen.getByTestId("controls-sheet")).toHaveAttribute("data-tag-search", "");
       expect(screen.queryByRole("textbox", { name: "Search keyword" })).not.toBeInTheDocument();
       expect(screen.queryByTestId("detail-sheet")).not.toBeInTheDocument();
       expect(screen.getByTestId("force-graph")).toHaveAttribute("data-active", "false");
@@ -127,8 +159,8 @@ describe("NetworkGraphPanel hidden lifecycle", () => {
       }));
     render(<Harness active />);
 
-    await user.click(screen.getByRole("button", { name: "Open fixture drill" }));
-    expect(screen.getByTestId("detail-sheet")).toHaveAttribute("data-status", "loading");
+    fireEvent.pointerUp(screen.getByTestId("fixture-drill-node"));
+    expect(await screen.findByTestId("detail-sheet")).toHaveAttribute("data-status", "loading");
 
     rejectFirstRequest(new Error("Connection lost"));
     await waitFor(() => {

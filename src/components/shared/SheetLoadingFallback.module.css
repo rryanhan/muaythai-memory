@@ -1,0 +1,50 @@
+.sheet.sheet {
+  grid-template-rows: auto auto minmax(0, 1fr);
+}
+
+.header {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.header h2,
+.header p,
+.loadingState p {
+  margin: 0;
+}
+
+.header h2 {
+  font-size: 23px;
+  line-height: 1;
+}
+
+.header p {
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.header button {
+  border: 0;
+  padding: 2px 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.loadingState {
+  display: grid;
+  min-height: 120px;
+  align-content: center;
+}
+
+.loadingState p {
+  color: var(--muted);
+  font-size: 16px;
+  line-height: 1.35;
+}
