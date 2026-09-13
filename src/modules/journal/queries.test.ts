@@ -23,6 +23,7 @@ vi.mock("@/lib/supabase/admin", () => ({
 import {
   decodeJournalCursor,
   encodeJournalCursor,
+  getJournalEntryById,
   getJournalPreviewForDrill,
   JournalCursorError,
   listJournalEntries,
@@ -234,6 +235,113 @@ describe("getJournalPreviewForDrill", () => {
     expect(preview?.entry?.occurredOn).toBe("2026-08-09");
     expect(preview?.entry?.createdAt).toEqual(mediaBackedCreatedAt);
   });
+
+  it("signs playback and poster URLs concurrently while keeping poster failure best-effort", async () => {
+    const posterPath = `${userId}/${entryId}/poster.webp`;
+    mocks.execute.mockResolvedValueOnce([
+      readySnapshot({
+        createdAt: new Date("2026-08-10T12:00:00.000Z"),
+        posterPath,
+        total: 1,
+      }),
+    ]);
+    const playbackSigning = deferred<{
+      data: { signedUrl: string };
+      error: null;
+    }>();
+    const posterSigning = deferred<{
+      data: null;
+      error: { message: string };
+    }>();
+    mocks.createSignedUrl.mockImplementation((path: string) => (
+      path === posterPath ? posterSigning.promise : playbackSigning.promise
+    ));
+
+    const preview = getJournalPreviewForDrill(userId, drillId);
+    await vi.waitFor(() => expect(mocks.createSignedUrl).toHaveBeenCalledTimes(2));
+
+    posterSigning.resolve({ data: null, error: { message: "Poster signing failed." } });
+    playbackSigning.resolve({
+      data: { signedUrl: "https://storage.test/playback" },
+      error: null,
+    });
+
+    await expect(preview).resolves.toMatchObject({
+      entry: {
+        playbackUrl: "https://storage.test/playback",
+        posterUrl: null,
+      },
+    });
+  });
+
+  it("rejects the preview when required playback signing fails", async () => {
+    const posterPath = `${userId}/${entryId}/poster.webp`;
+    mocks.execute.mockResolvedValueOnce([
+      readySnapshot({
+        createdAt: new Date("2026-08-10T12:00:00.000Z"),
+        posterPath,
+        total: 1,
+      }),
+    ]);
+    mocks.createSignedUrl
+      .mockResolvedValueOnce({
+        data: null,
+        error: { message: "Playback signing failed." },
+      })
+      .mockResolvedValueOnce({
+        data: { signedUrl: "https://storage.test/poster" },
+        error: null,
+      });
+
+    await expect(getJournalPreviewForDrill(userId, drillId))
+      .rejects.toThrow("Journal playback URL failed: Playback signing failed.");
+  });
+});
+
+describe("getJournalEntryById", () => {
+  beforeEach(() => {
+    mocks.createSignedUrl.mockReset();
+    mocks.from.mockReset().mockReturnValue({ createSignedUrl: mocks.createSignedUrl });
+    mocks.createSupabaseAdminClient.mockReset().mockReturnValue({
+      storage: { from: mocks.from },
+    });
+    mocks.select.mockReset();
+  });
+
+  it("starts detail playback and poster signing before either request settles", async () => {
+    const posterPath = `${userId}/${entryId}/poster.webp`;
+    const query = chainBuilder();
+    query.limit.mockResolvedValueOnce([ownedReadyRow(posterPath)]);
+    mocks.select.mockReturnValueOnce(query);
+    const playbackSigning = deferred<{
+      data: { signedUrl: string };
+      error: null;
+    }>();
+    const posterSigning = deferred<{
+      data: { signedUrl: string };
+      error: null;
+    }>();
+    mocks.createSignedUrl.mockImplementation((path: string) => (
+      path === posterPath ? posterSigning.promise : playbackSigning.promise
+    ));
+
+    const detail = getJournalEntryById(userId, entryId);
+    await vi.waitFor(() => expect(mocks.createSignedUrl).toHaveBeenCalledTimes(2));
+
+    posterSigning.resolve({
+      data: { signedUrl: "https://storage.test/poster" },
+      error: null,
+    });
+    playbackSigning.resolve({
+      data: { signedUrl: "https://storage.test/playback" },
+      error: null,
+    });
+
+    await expect(detail).resolves.toMatchObject({
+      playbackUrl: "https://storage.test/playback",
+      posterUrl: "https://storage.test/poster",
+    });
+  });
 });
 
 function emptySnapshot(total: number) {
@@ -255,10 +363,12 @@ function emptySnapshot(total: number) {
 function readySnapshot({
   createdAt,
   occurredOn = "2026-08-10",
+  posterPath = null,
   total,
 }: {
   createdAt: Date;
   occurredOn?: string;
+  posterPath?: string | null;
   total: number;
 }) {
   return {
@@ -272,6 +382,46 @@ function readySnapshot({
     durationMs: 42_000,
     mimeType: "video/mp4",
     storagePath: `${userId}/${entryId}/clip.mp4`,
-    posterPath: null,
+    posterPath,
   };
+}
+
+function ownedReadyRow(posterPath: string | null) {
+  return {
+    ...readySnapshot({
+      createdAt: new Date("2026-08-10T12:00:00.000Z"),
+      posterPath,
+      total: 1,
+    }),
+    mediaId: "44444444-4444-4444-8444-444444444444",
+    sizeBytes: 10,
+    status: "ready",
+    userId,
+  };
+}
+
+function chainBuilder() {
+  const chain = {
+    from: vi.fn(),
+    innerJoin: vi.fn(),
+    leftJoin: vi.fn(),
+    where: vi.fn(),
+    limit: vi.fn(),
+  };
+  chain.from.mockReturnValue(chain);
+  chain.innerJoin.mockReturnValue(chain);
+  chain.leftJoin.mockReturnValue(chain);
+  chain.where.mockReturnValue(chain);
+  return chain;
+}
+
+function deferred<T>(): {
+  promise: Promise<T>;
+  resolve: (value: T) => void;
+} {
+  let resolve: (value: T) => void = () => {};
+  const promise = new Promise<T>((nextResolve) => {
+    resolve = nextResolve;
+  });
+  return { promise, resolve };
 }
