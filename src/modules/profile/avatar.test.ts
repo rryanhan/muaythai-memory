@@ -1,9 +1,33 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { imageFile, pngBytes } from "@/modules/media/test-image-fixtures";
 import type { SupportedImageMime } from "@/modules/media/image-metadata";
-import { getOwnedProfileAvatarPath, validateAvatarFile } from "./avatar";
+
+const storageMocks = vi.hoisted(() => ({
+  createSupabaseAdminClient: vi.fn(),
+  from: vi.fn(),
+  remove: vi.fn(),
+}));
+
+vi.mock("@/lib/supabase/admin", () => ({
+  createSupabaseAdminClient: storageMocks.createSupabaseAdminClient,
+}));
+
+import {
+  getOwnedProfileAvatarPath,
+  PROFILE_AVATAR_BUCKET,
+  removeUploadedAvatars,
+  validateAvatarFile,
+} from "./avatar";
 
 const avatarMimes: SupportedImageMime[] = ["image/jpeg", "image/png", "image/webp"];
+
+beforeEach(() => {
+  storageMocks.remove.mockReset().mockResolvedValue({ data: null, error: null });
+  storageMocks.from.mockReset().mockReturnValue({ remove: storageMocks.remove });
+  storageMocks.createSupabaseAdminClient.mockReset().mockReturnValue({
+    storage: { from: storageMocks.from },
+  });
+});
 
 describe("validateAvatarFile image boundaries", () => {
   it("rejects a 24-byte PNG dimension header without image data", async () => {
@@ -50,6 +74,29 @@ describe("getOwnedProfileAvatarPath", () => {
     expect(getOwnedProfileAvatarPath(userId, avatarUrl(path))).toBe(path);
     expect(getOwnedProfileAvatarPath(userId, avatarUrl(otherUserPath))).toBeNull();
     expect(getOwnedProfileAvatarPath(userId, avatarUrl(`${userId}/nested/avatar.jpg`))).toBeNull();
+  });
+});
+
+describe("removeUploadedAvatars", () => {
+  it("does not construct a Storage client for an empty cleanup", async () => {
+    await expect(removeUploadedAvatars([])).resolves.toBeUndefined();
+
+    expect(storageMocks.createSupabaseAdminClient).not.toHaveBeenCalled();
+    expect(storageMocks.remove).not.toHaveBeenCalled();
+  });
+
+  it("uses one Storage client and chunks removals at 100 objects", async () => {
+    const paths = Array.from({ length: 205 }, (_, index) => `user/avatar-${index}.jpg`);
+
+    await removeUploadedAvatars(paths);
+
+    expect(storageMocks.createSupabaseAdminClient).toHaveBeenCalledOnce();
+    expect(storageMocks.from).toHaveBeenCalledOnce();
+    expect(storageMocks.from).toHaveBeenCalledWith(PROFILE_AVATAR_BUCKET);
+    expect(storageMocks.remove.mock.calls.map(([batch]) => (batch as string[]).length))
+      .toEqual([100, 100, 5]);
+    expect(storageMocks.remove.mock.calls.flatMap(([batch]) => batch as string[]))
+      .toEqual(paths);
   });
 });
 

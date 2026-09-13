@@ -128,6 +128,7 @@ function renderForm() {
     <ProfileEditForm
       initialProfile={currentUser}
       onDirtyChange={vi.fn()}
+      onSavePendingChange={vi.fn()}
       onCancel={vi.fn()}
       onSaved={vi.fn()}
     />,

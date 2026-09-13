@@ -8,6 +8,7 @@ import {
   listProfileAvatarPaths,
   prepareProfileAvatarUpload,
   removeUploadedAvatar,
+  removeUploadedAvatars,
   uploadPreparedProfileAvatar,
   type PreparedAvatarUpload,
 } from "./avatar";
@@ -308,7 +309,18 @@ async function cleanupCommittedProfileAvatars(
 
 async function reconcileProfileAvatarObjects(userId: string): Promise<void> {
   const paths = await listProfileAvatarPaths(userId);
-  for (const path of paths) await removeAvatarPathIfUnprotected(userId, path);
+  const avatarUrl = await getCurrentProfileAvatarUrl(userId);
+  if (avatarUrl === undefined) return;
+
+  // Read the protected state after listing. A concurrent avatar claim is
+  // stored before its randomly named object is uploaded, so this ordering
+  // protects both sides of an in-flight claim without one user-row read per
+  // listed object.
+  const protectedPaths = getProtectedProfileAvatarPaths(userId, avatarUrl);
+  const unprotectedPaths = paths.filter((path) => (
+    path.startsWith(`${userId}/`) && !protectedPaths.has(path)
+  ));
+  await removeUploadedAvatars(unprotectedPaths);
 }
 
 async function removeAvatarPathIfUnprotected(userId: string, path: string): Promise<void> {

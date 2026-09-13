@@ -15,6 +15,8 @@ export const PROFILE_AVATAR_BUCKET = "profile-avatars";
 export const PROFILE_AVATAR_MAX_BYTES = 5 * 1024 * 1024;
 export const PROFILE_AVATAR_MIME_TYPES = AVATAR_IMAGE_MIME_TYPES;
 
+const PROFILE_AVATAR_REMOVE_BATCH_SIZE = 100;
+
 const extensionByMime: Record<AvatarImageMime, string> = {
   "image/jpeg": "jpg",
   "image/png": "png",
@@ -74,9 +76,19 @@ export async function uploadPreparedProfileAvatar(
 }
 
 export async function removeUploadedAvatar(path: string): Promise<void> {
-  const supabase = createSupabaseAdminClient();
-  const { error } = await supabase.storage.from(PROFILE_AVATAR_BUCKET).remove([path]);
-  if (error) throw new Error(`Avatar cleanup failed: ${error.message}`);
+  await removeUploadedAvatars([path]);
+}
+
+export async function removeUploadedAvatars(paths: string[]): Promise<void> {
+  if (paths.length === 0) return;
+
+  const bucket = createSupabaseAdminClient().storage.from(PROFILE_AVATAR_BUCKET);
+  for (let index = 0; index < paths.length; index += PROFILE_AVATAR_REMOVE_BATCH_SIZE) {
+    const { error } = await bucket.remove(
+      paths.slice(index, index + PROFILE_AVATAR_REMOVE_BATCH_SIZE),
+    );
+    if (error) throw new Error(`Avatar cleanup failed: ${error.message}`);
+  }
 }
 
 export function getOwnedProfileAvatarPath(userId: string, publicUrl: string | null): string | null {
@@ -118,15 +130,9 @@ export async function listProfileAvatarPaths(userId: string): Promise<string[]> 
 }
 
 export async function removeOtherUserAvatars(userId: string, keepPath: string | null): Promise<void> {
-  const supabase = createSupabaseAdminClient();
-  const bucket = supabase.storage.from(PROFILE_AVATAR_BUCKET);
   const pathsToRemove = (await listProfileAvatarPaths(userId))
     .filter((path) => path !== keepPath);
-
-  for (let index = 0; index < pathsToRemove.length; index += 100) {
-    const { error } = await bucket.remove(pathsToRemove.slice(index, index + 100));
-    if (error) throw new Error(`Avatar cleanup failed: ${error.message}`);
-  }
+  await removeUploadedAvatars(pathsToRemove);
 }
 
 export async function validateAvatarFile(file: File): Promise<{ bytes: Uint8Array; mime: AvatarImageMime }> {

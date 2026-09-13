@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { MagnifyingGlassMinus } from "@phosphor-icons/react/MagnifyingGlassMinus";
 import { MagnifyingGlassPlus } from "@phosphor-icons/react/MagnifyingGlassPlus";
 import Cropper, { type Area, type Point } from "react-easy-crop";
@@ -11,11 +11,12 @@ import styles from "./ProfileEdit.module.css";
 
 type AvatarCropSheetProps = {
   imageUrl: string;
+  disabled?: boolean;
   onCancel: () => void;
   onUsePhoto: (file: File) => void;
 };
 
-export function AvatarCropSheet({ imageUrl, onCancel, onUsePhoto }: AvatarCropSheetProps) {
+export function AvatarCropSheet({ imageUrl, disabled = false, onCancel, onUsePhoto }: AvatarCropSheetProps) {
   const contentRef = useDrawerFocus(true);
   const [crop, setCrop] = useState<Point>({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
@@ -23,16 +24,38 @@ export function AvatarCropSheet({ imageUrl, onCancel, onUsePhoto }: AvatarCropSh
   const [imageDecoded, setImageDecoded] = useState(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const disabledRef = useRef(disabled);
+  const mountedRef = useRef(false);
+  const controlsDisabled = disabled || pending;
+
+  useEffect(() => {
+    disabledRef.current = disabled;
+  }, [disabled]);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   async function confirmCrop() {
-    if (!imageUrl || !cropPixels || pending) return;
+    if (!imageUrl || !cropPixels || controlsDisabled) return;
     const confirmedCrop = { ...cropPixels };
     setPending(true);
     setError(null);
     try {
-      onUsePhoto(await createCroppedAvatar(imageUrl, confirmedCrop));
+      const croppedAvatar = await createCroppedAvatar(imageUrl, confirmedCrop);
+      if (!mountedRef.current) return;
+      if (disabledRef.current) {
+        setPending(false);
+        return;
+      }
+      onUsePhoto(croppedAvatar);
     } catch (caught) {
+      if (!mountedRef.current) return;
       setPending(false);
+      if (disabledRef.current) return;
       setError(caught instanceof Error ? caught.message : "Profile photo could not be prepared.");
     }
   }
@@ -41,10 +64,10 @@ export function AvatarCropSheet({ imageUrl, onCancel, onUsePhoto }: AvatarCropSh
     <Drawer.Root
       open
       direction="bottom"
-      dismissible={!pending}
+      dismissible={!controlsDisabled}
       autoFocus={false}
       onOpenChange={(open) => {
-        if (!open && !pending) onCancel();
+        if (!open && !controlsDisabled) onCancel();
       }}
     >
       <Drawer.Portal>
@@ -65,7 +88,7 @@ export function AvatarCropSheet({ imageUrl, onCancel, onUsePhoto }: AvatarCropSh
             </Drawer.Description>
           </header>
 
-          <div className={styles.cropStage} data-exporting={pending}>
+          <div className={styles.cropStage} data-exporting={controlsDisabled}>
             <Cropper
               image={imageUrl}
               crop={crop}
@@ -77,25 +100,28 @@ export function AvatarCropSheet({ imageUrl, onCancel, onUsePhoto }: AvatarCropSh
               cropShape="round"
               showGrid={false}
               onCropChange={(nextCrop) => {
-                if (!pending) setCrop(nextCrop);
+                if (!controlsDisabled) setCrop(nextCrop);
               }}
               onZoomChange={(nextZoom) => {
-                if (!pending) setZoom(nextZoom);
+                if (!controlsDisabled) setZoom(nextZoom);
               }}
               onCropComplete={(_area, pixels) => {
-                if (!pending) setCropPixels(pixels);
+                if (!controlsDisabled) setCropPixels(pixels);
               }}
-              onMediaLoaded={() => setImageDecoded(true)}
+              onMediaLoaded={() => {
+                if (!disabledRef.current) setImageDecoded(true);
+              }}
               mediaProps={{
                 onError: () => {
+                  if (disabledRef.current) return;
                   setImageDecoded(false);
                   setCropPixels(null);
                   setError("Profile photo could not be decoded. Choose another image.");
                 },
               }}
-              onTouchRequest={() => !pending}
-              onWheelRequest={() => !pending}
-              cropperProps={pending
+              onTouchRequest={() => !controlsDisabled}
+              onWheelRequest={() => !controlsDisabled}
+              cropperProps={controlsDisabled
                 ? {
                     tabIndex: -1,
                     "aria-disabled": true,
@@ -114,7 +140,7 @@ export function AvatarCropSheet({ imageUrl, onCancel, onUsePhoto }: AvatarCropSh
               max="3"
               step="0.01"
               value={zoom}
-              disabled={pending}
+              disabled={controlsDisabled}
               aria-label="Profile photo zoom"
               onChange={(event) => setZoom(Number(event.target.value))}
             />
@@ -124,10 +150,10 @@ export function AvatarCropSheet({ imageUrl, onCancel, onUsePhoto }: AvatarCropSh
           {error && <p className={styles.cropError} role="alert">{error}</p>}
 
           <div className={styles.cropActions}>
-            <button type="button" disabled={pending} data-drawer-initial-focus onClick={onCancel}>Cancel</button>
+            <button type="button" disabled={controlsDisabled} data-drawer-initial-focus onClick={onCancel}>Cancel</button>
             <button
               type="button"
-              disabled={pending || !cropPixels || !imageDecoded || Boolean(error)}
+              disabled={controlsDisabled || !cropPixels || !imageDecoded || Boolean(error)}
               onClick={() => void confirmCrop()}
             >
               {pending ? "Preparing..." : "Use Photo"}

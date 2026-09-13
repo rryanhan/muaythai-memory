@@ -19,10 +19,11 @@ const navItems: NavItem[] = [
 
 type BottomNavProps = {
   activeView: AppView;
+  disabled?: boolean;
   onChange: (view: AppView) => void;
 };
 
-export function BottomNav({ activeView, onChange }: BottomNavProps) {
+export function BottomNav({ activeView, disabled = false, onChange }: BottomNavProps) {
   return (
     <nav className={`${styles.root} bottom-nav`} aria-label="Primary app views">
       {navItems.map((item) => {
@@ -34,6 +35,7 @@ export function BottomNav({ activeView, onChange }: BottomNavProps) {
             type="button"
             className={styles.button}
             data-active={isActive}
+            disabled={disabled}
             aria-current={isActive ? "page" : undefined}
             aria-label={item.label}
             onClick={() => onChange(item.id)}

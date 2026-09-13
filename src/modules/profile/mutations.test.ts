@@ -22,6 +22,7 @@ const mocks = vi.hoisted(() => ({
   preparedUploads: [] as PreparedAvatarUpload[],
   removeFailures: new Map<string, number>(),
   removeUploadedAvatar: vi.fn(),
+  removeUploadedAvatars: vi.fn(),
   row: null as ProfileRow | null,
   select: vi.fn(),
   storageCallsDuringTransaction: [] as string[],
@@ -44,6 +45,7 @@ vi.mock("./avatar", async (importOriginal) => {
     listProfileAvatarPaths: mocks.listProfileAvatarPaths,
     prepareProfileAvatarUpload: mocks.prepareProfileAvatarUpload,
     removeUploadedAvatar: mocks.removeUploadedAvatar,
+    removeUploadedAvatars: mocks.removeUploadedAvatars,
     uploadPreparedProfileAvatar: mocks.uploadPreparedProfileAvatar,
   };
 });
@@ -86,6 +88,18 @@ beforeEach(() => {
       throw new Error("storage unavailable");
     }
     mocks.storageObjects.delete(path);
+  });
+  mocks.removeUploadedAvatars.mockReset().mockImplementation(async (paths: string[]) => {
+    if (paths.length === 0) return;
+    recordStorageCall("remove-batch");
+    for (const path of paths) {
+      const failures = mocks.removeFailures.get(path) ?? 0;
+      if (failures > 0) {
+        mocks.removeFailures.set(path, failures - 1);
+        throw new Error("storage unavailable");
+      }
+    }
+    for (const path of paths) mocks.storageObjects.delete(path);
   });
   mocks.listProfileAvatarPaths.mockReset().mockImplementation(async (requestedUserId: string) => {
     recordStorageCall("list");
@@ -316,6 +330,24 @@ describe("updateProfile avatar claims and reconciliation", () => {
     expect(mocks.listProfileAvatarPaths).not.toHaveBeenCalledWith(otherUserId);
   });
 
+  it("reconciles many avatar objects with bounded state reads and one batched-removal handoff", async () => {
+    const orphanPaths = Array.from(
+      { length: 205 },
+      (_, index) => `${userId}/${String(index).padStart(12, "0")}.jpg`,
+    );
+    for (const path of orphanPaths) mocks.storageObjects.add(path);
+
+    await updateProfile(currentUser(), input({ username: "bounded_reconcile" }));
+
+    // One direct read checks for an expired claim; one post-list read protects
+    // the current avatar. The number of Storage objects does not add DB reads.
+    expect(mocks.select).toHaveBeenCalledTimes(2);
+    expect(mocks.removeUploadedAvatar).not.toHaveBeenCalled();
+    expect(mocks.removeUploadedAvatars).toHaveBeenCalledOnce();
+    expect(mocks.removeUploadedAvatars).toHaveBeenCalledWith(orphanPaths);
+    expect(mocks.storageObjects).toEqual(new Set([originalPath, otherUserPath]));
+  });
+
   it("rolls back a failed upload and deletes its object outside the transaction", async () => {
     mocks.uploadPreparedProfileAvatar.mockImplementationOnce(
       async (upload: PreparedAvatarUpload) => {
@@ -502,7 +534,10 @@ function seededAvatarClaim(
 }
 
 function removedPaths(): string[] {
-  return mocks.removeUploadedAvatar.mock.calls.map(([path]) => path as string);
+  return [
+    ...mocks.removeUploadedAvatar.mock.calls.map(([path]) => path as string),
+    ...mocks.removeUploadedAvatars.mock.calls.flatMap(([paths]) => paths as string[]),
+  ];
 }
 
 function deferred<T>(): {

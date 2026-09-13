@@ -103,15 +103,70 @@ describe("ProfileEditForm object URL ownership", () => {
   });
 });
 
-function renderForm({ onSaved = vi.fn() }: { onSaved?: () => void } = {}) {
+describe("ProfileEditForm save lifecycle", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it.each(["resolve", "reject"] as const)(
+    "does not publish stale save callbacks when a pending request %s after unmount",
+    async (settlement) => {
+      const save = deferred<void>();
+      mocks.updateProfile.mockReturnValueOnce(save.promise);
+      const onDirtyChange = vi.fn();
+      const onSavePendingChange = vi.fn();
+      const onSaved = vi.fn();
+      const { unmount } = renderForm({ onDirtyChange, onSavePendingChange, onSaved });
+
+      fireEvent.change(screen.getByRole("textbox", { name: "Username" }), {
+        target: { value: "updated_fighter" },
+      });
+      fireEvent.click(screen.getByRole("button", { name: "Save profile" }));
+      expect(onSavePendingChange).toHaveBeenCalledOnce();
+      expect(onSavePendingChange).toHaveBeenLastCalledWith(true);
+
+      unmount();
+      await act(async () => {
+        if (settlement === "resolve") save.resolve();
+        else save.reject(new Error("Save failed after unmount."));
+        await Promise.resolve();
+      });
+
+      expect(onSavePendingChange).toHaveBeenCalledOnce();
+      expect(onDirtyChange).toHaveBeenLastCalledWith(true);
+      expect(onSaved).not.toHaveBeenCalled();
+    },
+  );
+});
+
+function renderForm({
+  onDirtyChange = vi.fn(),
+  onSavePendingChange = vi.fn(),
+  onSaved = vi.fn(),
+}: {
+  onDirtyChange?: (dirty: boolean) => void;
+  onSavePendingChange?: (pending: boolean) => void;
+  onSaved?: () => void;
+} = {}) {
   return render(
     <ProfileEditForm
       initialProfile={currentUser}
-      onDirtyChange={vi.fn()}
+      onDirtyChange={onDirtyChange}
+      onSavePendingChange={onSavePendingChange}
       onCancel={vi.fn()}
       onSaved={onSaved}
     />,
   );
+}
+
+function deferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((promiseResolve, promiseReject) => {
+    resolve = promiseResolve;
+    reject = promiseReject;
+  });
+  return { promise, reject, resolve };
 }
 
 function chooseFile(container: HTMLElement, file: File) {

@@ -69,6 +69,17 @@
   clip: rect(0, 0, 0, 0);
 }
 
+.fileButton:has(input:disabled),
+.photoActions button:disabled {
+  cursor: wait;
+  opacity: 0.46;
+}
+
+.fields input:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
 .photoActions > p {
   flex-basis: 100%;
   margin: 0;

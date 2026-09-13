@@ -19,11 +19,18 @@ const maxAvatarBytes = 5 * 1024 * 1024;
 type ProfileEditFormProps = {
   initialProfile: CurrentAppUser;
   onDirtyChange: (dirty: boolean) => void;
+  onSavePendingChange: (pending: boolean) => void;
   onCancel: () => void;
   onSaved: () => void;
 };
 
-export function ProfileEditForm({ initialProfile, onDirtyChange, onCancel, onSaved }: ProfileEditFormProps) {
+export function ProfileEditForm({
+  initialProfile,
+  onDirtyChange,
+  onSavePendingChange,
+  onCancel,
+  onSaved,
+}: ProfileEditFormProps) {
   const [username, setUsername] = useState(initialProfile.username ?? initialProfile.displayName);
   const [firstName, setFirstName] = useState(initialProfile.firstName ?? "");
   const [lastName, setLastName] = useState(initialProfile.lastName ?? "");
@@ -35,6 +42,8 @@ export function ProfileEditForm({ initialProfile, onDirtyChange, onCancel, onSav
   const [pending, setPending] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const mountedRef = useRef(false);
+  const savePendingRef = useRef(false);
   const avatarPreparationAbortRef = useRef<AbortController | null>(null);
   const previewUrlRef = useRef<string | null>(null);
   const cropSourceUrlRef = useRef<string | null>(null);
@@ -56,7 +65,9 @@ export function ProfileEditForm({ initialProfile, onDirtyChange, onCancel, onSav
   useEffect(() => onDirtyChange(dirty), [dirty, onDirtyChange]);
 
   useEffect(() => {
+    mountedRef.current = true;
     return () => {
+      mountedRef.current = false;
       const preparation = avatarPreparationAbortRef.current;
       avatarPreparationAbortRef.current = null;
       preparation?.abort();
@@ -66,7 +77,7 @@ export function ProfileEditForm({ initialProfile, onDirtyChange, onCancel, onSav
   }, []);
 
   async function chooseAvatar(file: File | undefined) {
-    if (!file) return;
+    if (savePendingRef.current || !file) return;
     if (!acceptedAvatarTypes.has(file.type)) {
       setErrorMessage("Use a JPEG, PNG, or WebP image.");
       resetFileInput();
@@ -88,7 +99,11 @@ export function ProfileEditForm({ initialProfile, onDirtyChange, onCancel, onSav
         maxDecodeEdge: 4_096,
         signal: controller.signal,
       });
-      if (!controller.signal.aborted && avatarPreparationAbortRef.current === controller) {
+      if (
+        !controller.signal.aborted
+        && !savePendingRef.current
+        && avatarPreparationAbortRef.current === controller
+      ) {
         replaceCropSourceUrl(preparedFile);
       }
     } catch (error) {
@@ -102,6 +117,7 @@ export function ProfileEditForm({ initialProfile, onDirtyChange, onCancel, onSav
   }
 
   function removePhoto() {
+    if (savePendingRef.current) return;
     avatarPreparationAbortRef.current?.abort();
     avatarPreparationAbortRef.current = null;
     setAvatar(null);
@@ -112,6 +128,7 @@ export function ProfileEditForm({ initialProfile, onDirtyChange, onCancel, onSav
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (savePendingRef.current) return;
     const normalizedUsername = username.trim().toLowerCase();
     if (!/^[a-z0-9_]{3,30}$/.test(normalizedUsername)) {
       setErrorMessage("Use 3–30 lowercase letters, numbers, or underscores for your username.");
@@ -119,13 +136,24 @@ export function ProfileEditForm({ initialProfile, onDirtyChange, onCancel, onSav
     }
 
     setPending(true);
+    savePendingRef.current = true;
+    avatarPreparationAbortRef.current?.abort();
+    avatarPreparationAbortRef.current = null;
+    onSavePendingChange(true);
     setErrorMessage(null);
     try {
       await updateProfile({ username: normalizedUsername, firstName, lastName, location, avatar, removeAvatar });
+      if (!mountedRef.current) return;
+      savePendingRef.current = false;
+      setPending(false);
+      onSavePendingChange(false);
       onDirtyChange(false);
       onSaved();
     } catch (error) {
+      if (!mountedRef.current) return;
+      savePendingRef.current = false;
       setPending(false);
+      onSavePendingChange(false);
       setErrorMessage(error instanceof Error ? error.message : "Profile could not be saved. Try again.");
     }
   }
@@ -151,13 +179,14 @@ export function ProfileEditForm({ initialProfile, onDirtyChange, onCancel, onSav
   }
 
   function cancelCrop() {
+    if (savePendingRef.current) return;
     replaceCropSourceUrl(null);
     resetFileInput();
     fileInputRef.current?.focus();
   }
 
   return (
-    <form className={styles.form} onSubmit={(event) => void submit(event)}>
+    <form className={styles.form} aria-busy={pending} onSubmit={(event) => void submit(event)}>
       <section className={styles.photoSection} aria-labelledby="profile-photo-heading">
         <div>
           <p className="eyebrow" id="profile-photo-heading">Profile Photo</p>
@@ -169,12 +198,13 @@ export function ProfileEditForm({ initialProfile, onDirtyChange, onCancel, onSav
             <input
               ref={fileInputRef}
               type="file"
+              disabled={pending}
               accept="image/jpeg,image/png,image/webp"
               onChange={(event) => void chooseAvatar(event.target.files?.[0])}
             />
           </label>
           {(initialProfile.avatarUrl || avatar) && (
-            <button type="button" onClick={removePhoto}>Remove</button>
+            <button type="button" disabled={pending} onClick={removePhoto}>Remove</button>
           )}
           <p>JPEG, PNG, or WebP. 5 MB maximum.</p>
         </div>
@@ -189,20 +219,21 @@ export function ProfileEditForm({ initialProfile, onDirtyChange, onCancel, onSav
             autoCapitalize="none"
             autoCorrect="off"
             autoComplete="username"
+            disabled={pending}
             onChange={(event) => setUsername(event.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ""))}
           />
         </label>
         <label>
           <span>First name <small>(optional)</small></span>
-          <input value={firstName} maxLength={80} autoComplete="given-name" onChange={(event) => setFirstName(event.target.value)} />
+          <input value={firstName} maxLength={80} autoComplete="given-name" disabled={pending} onChange={(event) => setFirstName(event.target.value)} />
         </label>
         <label>
           <span>Last name <small>(optional)</small></span>
-          <input value={lastName} maxLength={80} autoComplete="family-name" onChange={(event) => setLastName(event.target.value)} />
+          <input value={lastName} maxLength={80} autoComplete="family-name" disabled={pending} onChange={(event) => setLastName(event.target.value)} />
         </label>
         <label>
           <span>Location <small>(optional)</small></span>
-          <input value={location} maxLength={120} autoComplete="address-level2" onChange={(event) => setLocation(event.target.value)} />
+          <input value={location} maxLength={120} autoComplete="address-level2" disabled={pending} onChange={(event) => setLocation(event.target.value)} />
         </label>
         <label>
           <span>Email</span>
@@ -218,12 +249,14 @@ export function ProfileEditForm({ initialProfile, onDirtyChange, onCancel, onSav
       </div>
 
       {cropSourceUrl && (
-        <Suspense fallback={<AvatarCropSheetLoading onCancel={cancelCrop} />}>
+        <Suspense fallback={<AvatarCropSheetLoading disabled={pending} onCancel={cancelCrop} />}>
           <AvatarCropSheet
             key={cropSourceUrl}
             imageUrl={cropSourceUrl}
+            disabled={pending}
             onCancel={cancelCrop}
             onUsePhoto={(croppedAvatar) => {
+              if (savePendingRef.current) return;
               setAvatar(croppedAvatar);
               replacePreviewUrl(croppedAvatar);
               setRemoveAvatar(false);
@@ -237,7 +270,7 @@ export function ProfileEditForm({ initialProfile, onDirtyChange, onCancel, onSav
   );
 }
 
-function AvatarCropSheetLoading({ onCancel }: { onCancel: () => void }) {
+function AvatarCropSheetLoading({ disabled, onCancel }: { disabled: boolean; onCancel: () => void }) {
   const backdropRef = useRef<HTMLDivElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
   const cancelButtonRef = useRef<HTMLButtonElement>(null);
@@ -245,7 +278,9 @@ function AvatarCropSheetLoading({ onCancel }: { onCancel: () => void }) {
     backdropRef,
     dialogRef,
     initialFocusRef: cancelButtonRef,
-    onEscape: onCancel,
+    onEscape: () => {
+      if (!disabled) onCancel();
+    },
   });
 
   return createPortal(
@@ -271,7 +306,7 @@ function AvatarCropSheetLoading({ onCancel }: { onCancel: () => void }) {
           </p>
         </header>
         <div className={styles.cropActions}>
-          <button ref={cancelButtonRef} type="button" onClick={onCancel}>
+          <button ref={cancelButtonRef} type="button" disabled={disabled} onClick={onCancel}>
             Cancel
           </button>
         </div>

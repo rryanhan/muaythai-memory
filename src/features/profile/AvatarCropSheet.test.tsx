@@ -67,6 +67,31 @@ beforeEach(() => {
 });
 
 describe("AvatarCropSheet", () => {
+  it("locks crop, zoom, dismiss, and action controls while the profile save is pending", async () => {
+    const onCancel = vi.fn();
+    render(
+      <AvatarCropSheet
+        imageUrl="blob:avatar-source"
+        disabled
+        onCancel={onCancel}
+        onUsePhoto={vi.fn()}
+      />,
+    );
+
+    await waitFor(() => expect(cropperMock.props).not.toBeNull());
+    expect(screen.getByRole("slider", { name: "Profile photo zoom" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Cancel" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Use Photo" })).toBeDisabled();
+    expect((cropperMock.props?.onTouchRequest as () => boolean)()).toBe(false);
+    expect((cropperMock.props?.onWheelRequest as () => boolean)()).toBe(false);
+    expect(cropperMock.props?.cropperProps).toMatchObject({
+      "aria-disabled": true,
+      tabIndex: -1,
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(onCancel).not.toHaveBeenCalled();
+  });
+
   it("locks crop interaction during export and restores focus when it closes", async () => {
     let resolveExport: ((file: File) => void) | null = null;
     avatarMock.createCroppedAvatar.mockReturnValue(new Promise<File>((resolve) => {
