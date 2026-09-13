@@ -1,4 +1,5 @@
 import { spawnSync } from "node:child_process";
+import { resolve } from "node:path";
 import { config } from "dotenv";
 import {
   DEPLOYMENT_ENVIRONMENTS,
@@ -27,10 +28,8 @@ if (options.environment === "production" && !options.confirmProduction) {
 }
 
 const result = spawnSync(
-  process.platform === "win32"
-    ? "node_modules/.bin/drizzle-kit.cmd"
-    : "node_modules/.bin/drizzle-kit",
-  ["migrate"],
+  process.execPath,
+  [resolve("node_modules/drizzle-kit/bin.cjs"), "migrate"],
   {
     env: process.env,
     stdio: "inherit",
