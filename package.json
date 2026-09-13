@@ -11,7 +11,7 @@
     "build": "next build",
     "lint": "eslint .",
     "test": "vitest run",
-    "test:postgres": "node -e \"if (!process.env.JOURNAL_TEST_DATABASE_URL) { console.error('JOURNAL_TEST_DATABASE_URL is required'); process.exit(1); }\" && vitest run postgres.test.ts",
+    "test:postgres": "node -e \"if (!process.env.POSTGRES_TEST_DATABASE_URL?.trim() && !process.env.JOURNAL_TEST_DATABASE_URL?.trim()) { console.error('POSTGRES_TEST_DATABASE_URL is required (JOURNAL_TEST_DATABASE_URL remains a legacy fallback)'); process.exit(1); }\" && vitest run postgres.test.ts",
     "typecheck": "tsc --noEmit",
     "db:describe": "python3 scripts/check_db_connection.py --env DATABASE_POOLER_URL --describe",
     "db:check": "python3 scripts/check_db_connection.py --env DATABASE_POOLER_URL",

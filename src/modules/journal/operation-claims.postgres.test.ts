@@ -2,8 +2,12 @@ import { drizzle } from "drizzle-orm/postgres-js";
 import postgres, { type Sql } from "postgres";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import * as schema from "@/db/schema";
+import {
+  assertLoopbackPostgresTestDatabase,
+  resolvePostgresTestDatabaseUrl,
+} from "@/test-support/postgres-test-database";
 
-const databaseUrl = process.env.JOURNAL_TEST_DATABASE_URL;
+const databaseUrl = resolvePostgresTestDatabaseUrl();
 const describePostgres = databaseUrl ? describe : describe.skip;
 
 const userA = "10000000-0000-4000-8000-000000000001";
@@ -26,7 +30,7 @@ let mutations: MutationModule;
 
 describePostgres("journal operation claims with PostgreSQL", () => {
   beforeAll(async () => {
-    assertLoopbackTestDatabase(databaseUrl!);
+    assertLoopbackPostgresTestDatabase(databaseUrl!);
     connectionA = postgres(databaseUrl!, { max: 1, prepare: false });
     connectionB = postgres(databaseUrl!, { max: 1, prepare: false });
     databaseA = drizzle(connectionA, { schema });
@@ -388,14 +392,4 @@ async function resetFixture(sql: Sql): Promise<void> {
       ${initialPosterPath}
     )
   `;
-}
-
-function assertLoopbackTestDatabase(value: string): void {
-  const url = new URL(value);
-  const loopback = url.hostname === "127.0.0.1" || url.hostname === "localhost" || url.hostname === "::1";
-  if (!loopback || !url.pathname.includes("muaythai_pr6_test")) {
-    throw new Error(
-      "JOURNAL_TEST_DATABASE_URL must target a loopback database whose name contains muaythai_pr6_test.",
-    );
-  }
 }

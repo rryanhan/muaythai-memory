@@ -69,7 +69,7 @@ jobs:
       DATABASE_DIRECT_URL: postgresql://postgres:postgres@127.0.0.1:5432/muaythai_pr6_test_ci
       DATABASE_POOLER_URL: postgresql://postgres:postgres@127.0.0.1:5432/muaythai_pr6_test_ci
       DATABASE_POOL_MAX: "3"
-      JOURNAL_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/muaythai_pr6_test_ci
+      POSTGRES_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/muaythai_pr6_test_ci
 
     services:
       postgres:

@@ -34,6 +34,25 @@ The verifier rejects mixed or unexpected Supabase project references and
 non-HTTPS hosted origins; staging and production must match the fixed projects
 listed above.
 
+## Local PostgreSQL Integration Tests
+
+The real PostgreSQL suites require a disposable local database named
+`muaythai_pr6_test` (an underscore suffix such as `_ci` is also allowed). They
+reject non-PostgreSQL URLs, non-loopback hosts, and unrelated database names
+before modifying fixtures. Export its URL under the generic variable and run
+the full suite:
+
+```bash
+export POSTGRES_TEST_DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/muaythai_pr6_test
+npm run test:postgres
+```
+
+`JOURNAL_TEST_DATABASE_URL` remains supported as a legacy fallback so existing
+local setups continue to work, but new configuration should use
+`POSTGRES_TEST_DATABASE_URL`. The test setup also pins `DATABASE_POOLER_URL` to
+the same validated URL before application modules load, so an unrelated
+`.env.local` database cannot receive integration-test fixture traffic.
+
 ## Database Releases
 
 Apply every migration to staging first. Additive, backward-compatible

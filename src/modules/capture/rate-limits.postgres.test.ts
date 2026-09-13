@@ -3,11 +3,15 @@ import postgres, { type Sql } from "postgres";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import * as schema from "@/db/schema";
 import {
+  assertLoopbackPostgresTestDatabase,
+  resolvePostgresTestDatabaseUrl,
+} from "@/test-support/postgres-test-database";
+import {
   CaptureRateLimitError,
   consumeCaptureRateLimit,
 } from "./rate-limits";
 
-const databaseUrl = process.env.JOURNAL_TEST_DATABASE_URL;
+const databaseUrl = resolvePostgresTestDatabaseUrl();
 const describePostgres = databaseUrl ? describe : describe.skip;
 const userId = "60000000-0000-4000-8000-000000000001";
 
@@ -18,7 +22,7 @@ let databaseB: ReturnType<typeof drizzle<typeof schema>>;
 
 describePostgres("capture rate limits with PostgreSQL", () => {
   beforeAll(async () => {
-    assertLoopbackTestDatabase(databaseUrl!);
+    assertLoopbackPostgresTestDatabase(databaseUrl!);
     connectionA = postgres(databaseUrl!, { max: 1, prepare: false });
     connectionB = postgres(databaseUrl!, { max: 1, prepare: false });
     databaseA = drizzle(connectionA, { schema });
@@ -122,13 +126,3 @@ describePostgres("capture rate limits with PostgreSQL", () => {
     })).rejects.toMatchObject({ windowKind: "daily" });
   });
 });
-
-function assertLoopbackTestDatabase(value: string): void {
-  const url = new URL(value);
-  const loopback = url.hostname === "127.0.0.1" || url.hostname === "localhost" || url.hostname === "::1";
-  if (!loopback || !url.pathname.includes("muaythai_pr6_test")) {
-    throw new Error(
-      "JOURNAL_TEST_DATABASE_URL must target a loopback database whose name contains muaythai_pr6_test.",
-    );
-  }
-}

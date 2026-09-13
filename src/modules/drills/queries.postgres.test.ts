@@ -3,12 +3,16 @@ import postgres, { type Sql } from "postgres";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import * as schema from "@/db/schema";
 import {
+  assertLoopbackPostgresTestDatabase,
+  resolvePostgresTestDatabaseUrl,
+} from "@/test-support/postgres-test-database";
+import {
   getDrillById,
   getDrillSummariesByOwnerPairs,
   listDrills,
 } from "./queries";
 
-const databaseUrl = process.env.JOURNAL_TEST_DATABASE_URL;
+const databaseUrl = resolvePostgresTestDatabaseUrl();
 const describePostgres = databaseUrl ? describe : describe.skip;
 
 const ownerId = "71000000-0000-4000-8000-000000000001";
@@ -41,7 +45,7 @@ let database: ReturnType<typeof drizzle<typeof schema>>;
 
 describePostgres("drill query aggregation with PostgreSQL", () => {
   beforeAll(() => {
-    assertLoopbackTestDatabase(databaseUrl!);
+    assertLoopbackPostgresTestDatabase(databaseUrl!);
     connection = postgres(databaseUrl!, { max: 1, prepare: false });
     database = drizzle(connection, { schema });
   });
@@ -408,14 +412,4 @@ async function clearFixture(sql: Sql): Promise<void> {
     where id in (${learningStatusId}, ${favouriteStatusId}, ${inactiveStatusId})
   `;
   await sql`delete from tag_categories where id = ${categoryId}`;
-}
-
-function assertLoopbackTestDatabase(value: string): void {
-  const url = new URL(value);
-  const loopback = url.hostname === "127.0.0.1" || url.hostname === "localhost" || url.hostname === "::1";
-  if (!loopback || !url.pathname.includes("muaythai_pr6_test")) {
-    throw new Error(
-      "JOURNAL_TEST_DATABASE_URL must target a loopback database whose name contains muaythai_pr6_test.",
-    );
-  }
 }
