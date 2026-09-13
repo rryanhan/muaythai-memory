@@ -92,8 +92,14 @@ export function VoiceCapturePanel({
       clearTranscriptionTimeout();
       stopTimer();
       const recorder = recorderRef.current;
-      if (recorder && recorder.state !== "inactive") recorder.stop();
-      stopStream();
+      try {
+        if (recorder && recorder.state !== "inactive") recorder.stop();
+      } catch {
+        // The recorder may already be stopping while the component tears down.
+      } finally {
+        recorderRef.current = null;
+        stopStream();
+      }
     };
   }, []);
 
