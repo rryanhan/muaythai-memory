@@ -36,12 +36,13 @@ export async function createJournalUploadIntent(
   rawInput: CreateJournalUploadInput,
 ): Promise<JournalUploadIntentResponse> {
   const input = createJournalUploadInputSchema.parse(rawInput);
-  if (input.drillId) await assertOwnedDrill(userId, input.drillId);
 
   const entryId = randomUUID();
   const path = `${userId}/${entryId}/${randomUUID()}.${journalVideoExtension(input.mimeType)}`;
 
   await db.transaction(async (tx) => {
+    if (input.drillId) await lockOwnedDrillReference(tx, userId, input.drillId);
+
     await tx.insert(journalEntries).values({
       id: entryId,
       userId,
@@ -254,25 +255,38 @@ export async function updateJournalEntry(
   rawInput: UpdateJournalEntryInput,
 ): Promise<JournalEntryDetail> {
   const input = updateJournalEntryInputSchema.parse(rawInput);
-  const current = await getOwnedJournalRow(userId, entryId);
-  if (!current) throw new JournalMutationError("Journal entry not found.", 404);
-  if (current.status === "deleted") throw new JournalMutationError("Journal entry not found.", 404);
-  if (current.status !== "ready") {
-    throw new JournalMutationError("Finish the video upload before editing this entry.", 409);
-  }
-  if (input.drillId) await assertOwnedDrill(userId, input.drillId);
+  await db.transaction(async (tx) => {
+    // Keep the existing entry-state error precedence without taking a row lock
+    // before the referenced drill. PostgreSQL's drill deletion locks the drill
+    // before applying its ON DELETE SET NULL update to journal rows.
+    assertJournalEntryIsEditable(await getJournalEditState(tx, userId, entryId));
 
-  const [updated] = await db
-    .update(journalEntries)
-    .set({
-      occurredOn: input.occurredOn,
-      caption: input.caption,
-      drillId: input.drillId ?? null,
-      updatedAt: new Date(),
-    })
-    .where(and(eq(journalEntries.id, entryId), eq(journalEntries.userId, userId)))
-    .returning({ id: journalEntries.id });
-  if (!updated) throw new JournalMutationError("Journal entry not found.", 404);
+    if (input.drillId) {
+      await lockOwnedDrillReference(tx, userId, input.drillId);
+    }
+
+    const [updated] = await tx
+      .update(journalEntries)
+      .set({
+        occurredOn: input.occurredOn,
+        caption: input.caption,
+        drillId: input.drillId ?? null,
+        updatedAt: new Date(),
+      })
+      .where(and(
+        eq(journalEntries.id, entryId),
+        eq(journalEntries.userId, userId),
+        eq(journalEntries.status, "ready"),
+      ))
+      .returning({ id: journalEntries.id });
+    if (updated) return;
+
+    // A concurrent journal mutation can change the row after the initial read.
+    // Reclassify that state with the same domain errors instead of surfacing a
+    // database result mismatch.
+    assertJournalEntryIsEditable(await getJournalEditState(tx, userId, entryId));
+    throw new JournalMutationError("Journal entry not found.", 404);
+  });
 
   const entry = await getJournalEntryById(userId, entryId);
   if (!entry) throw new JournalMutationError("Updated journal entry could not be loaded.", 404);
@@ -436,11 +450,16 @@ export async function cleanupAbandonedJournalUploads(
   };
 }
 
-async function assertOwnedDrill(userId: string, drillId: string): Promise<void> {
-  const [drill] = await db
+async function lockOwnedDrillReference(
+  tx: JournalTransaction,
+  userId: string,
+  drillId: string,
+): Promise<void> {
+  const [drill] = await tx
     .select({ id: drills.id })
     .from(drills)
     .where(and(eq(drills.id, drillId), eq(drills.userId, userId)))
+    .for("key share", { of: drills })
     .limit(1);
   if (!drill) throw new JournalMutationError("Linked drill not found.", 404);
 }
@@ -463,6 +482,29 @@ const JOURNAL_CLEANUP_MAX_BATCH_SIZE = 100;
 const JOURNAL_CLEANUP_CONCURRENCY = 3;
 const JOURNAL_POSTER_OBJECT_NAME =
   /^poster-[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.(?:jpg|webp)$/i;
+
+async function getJournalEditState(
+  tx: JournalTransaction,
+  userId: string,
+  entryId: string,
+): Promise<{ status: string } | undefined> {
+  const [current] = await tx
+    .select({ status: journalEntries.status })
+    .from(journalEntries)
+    .innerJoin(journalMedia, eq(journalMedia.journalEntryId, journalEntries.id))
+    .where(and(eq(journalEntries.id, entryId), eq(journalEntries.userId, userId)))
+    .limit(1);
+  return current;
+}
+
+function assertJournalEntryIsEditable(current: { status: string } | undefined): void {
+  if (!current || current.status === "deleted") {
+    throw new JournalMutationError("Journal entry not found.", 404);
+  }
+  if (current.status !== "ready") {
+    throw new JournalMutationError("Finish the video upload before editing this entry.", 409);
+  }
+}
 
 function normalizeJournalCleanupBatchSize(batchSize: number | undefined): number {
   if (batchSize === undefined || !Number.isFinite(batchSize) || batchSize < 1) {
