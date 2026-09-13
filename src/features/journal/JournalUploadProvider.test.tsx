@@ -186,6 +186,40 @@ describe("JournalUploadProvider draft date baseline", () => {
   });
 });
 
+describe("JournalUploadProvider unload guard", () => {
+  let addEventListenerSpy: ReturnType<typeof vi.spyOn>;
+  let removeEventListenerSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    addEventListenerSpy = vi.spyOn(window, "addEventListener");
+    removeEventListenerSpy = vi.spyOn(window, "removeEventListener");
+  });
+
+  afterEach(() => {
+    addEventListenerSpy.mockRestore();
+    removeEventListenerSpy.mockRestore();
+  });
+
+  it("attaches beforeunload only while work exists", async () => {
+    renderProvider(<UnloadGuardHarness />);
+
+    expect(beforeUnloadCalls(addEventListenerSpy)).toHaveLength(0);
+
+    fireEvent.click(screen.getByRole("button", { name: "Start draft" }));
+
+    await waitFor(() => expect(beforeUnloadCalls(addEventListenerSpy)).toHaveLength(1));
+    expect(screen.getByTestId("has-work")).toHaveTextContent("yes");
+    const handler = beforeUnloadCalls(addEventListenerSpy)[0][1];
+
+    fireEvent.click(screen.getByRole("button", { name: "Clear draft" }));
+
+    await waitFor(() => {
+      expect(removeEventListenerSpy).toHaveBeenCalledWith("beforeunload", handler);
+    });
+    expect(screen.getByTestId("has-work")).toHaveTextContent("no");
+  });
+});
+
 describe("JournalUploadProvider poster replacement", () => {
   it("aborts the stale decoder and cannot commit its poster after the replacement", async () => {
     const queryClient = new QueryClient({
@@ -490,6 +524,21 @@ function DraftStateHarness() {
       <output data-testid="has-work">{upload.hasWork ? "yes" : "no"}</output>
     </>
   );
+}
+
+function UnloadGuardHarness() {
+  const upload = useJournalUpload();
+  return (
+    <>
+      <button type="button" onClick={() => upload.setCaption("Round notes")}>Start draft</button>
+      <button type="button" onClick={() => upload.setCaption("")}>Clear draft</button>
+      <output data-testid="has-work">{upload.hasWork ? "yes" : "no"}</output>
+    </>
+  );
+}
+
+function beforeUnloadCalls(spy: ReturnType<typeof vi.spyOn>) {
+  return (spy.mock.calls as unknown[][]).filter(([type]) => type === "beforeunload");
 }
 
 function renderProvider(children: React.ReactNode): QueryClient {

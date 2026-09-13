@@ -95,8 +95,9 @@ export function JournalUploadProvider({ children }: { children: ReactNode }) {
   }, [pathname]);
 
   useEffect(() => {
+    if (!hasWork) return;
+
     function handleBeforeUnload(event: BeforeUnloadEvent) {
-      if (!hasWork) return;
       event.preventDefault();
       event.returnValue = "";
     }
