@@ -3,7 +3,7 @@
 import { Trash } from "@phosphor-icons/react/Trash";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Drawer } from "vaul";
 import type { ApiError } from "@/data/api-core";
 import { deleteDrill } from "@/data/drills";
@@ -12,13 +12,25 @@ import styles from "./DrillForm.module.css";
 type DeleteDrillSectionProps = {
   drillId: string;
   drillTitle: string;
+  disabled?: boolean;
+  onPendingChange?: (pending: boolean) => void;
+  onDeleted?: (deletedId: string) => void;
 };
 
 /** Keeps irreversible deletion isolated from the routine edit form actions. */
-export function DeleteDrillSection({ drillId, drillTitle }: DeleteDrillSectionProps) {
+export function DeleteDrillSection({
+  drillId,
+  drillTitle,
+  disabled = false,
+  onPendingChange,
+  onDeleted,
+}: DeleteDrillSectionProps) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [confirmationOpen, setConfirmationOpen] = useState(false);
+  // TanStack mutation option callbacks continue after their observer unmounts.
+  const mountedRef = useRef(false);
+  const deletePendingRef = useRef(false);
   const deleteMutation = useMutation({
     mutationFn: () => deleteDrill(drillId),
     onSuccess: async (deletedId) => {
@@ -28,24 +40,53 @@ export function DeleteDrillSection({ drillId, drillTitle }: DeleteDrillSectionPr
         queryClient.invalidateQueries({ queryKey: ["graph"] }),
         queryClient.invalidateQueries({ queryKey: ["profile", "overview"] }),
       ]);
+      if (!mountedRef.current) return;
+      if (onDeleted) {
+        onDeleted(deletedId);
+        return;
+      }
       router.replace("/?view=library");
       router.refresh();
     },
+    onSettled: () => {
+      deletePendingRef.current = false;
+      if (mountedRef.current) onPendingChange?.(false);
+    },
   });
 
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
   function closeConfirmation() {
-    if (!deleteMutation.isPending) setConfirmationOpen(false);
+    if (!deletePendingRef.current && !disabled) setConfirmationOpen(false);
+  }
+
+  function confirmDelete() {
+    if (disabled || deletePendingRef.current) return;
+    deletePendingRef.current = true;
+    onPendingChange?.(true);
+    deleteMutation.mutate();
   }
 
   return (
-    <section className={styles.dangerSection} aria-labelledby="delete-drill-heading">
+    <section
+      className={styles.dangerSection}
+      aria-labelledby="delete-drill-heading"
+      aria-busy={deleteMutation.isPending}
+    >
       <div>
         <h2 id="delete-drill-heading">Delete Drill</h2>
       </div>
       <button
         type="button"
         className={styles.deleteTrigger}
+        disabled={disabled || deleteMutation.isPending}
         onClick={() => {
+          if (disabled || deleteMutation.isPending) return;
           deleteMutation.reset();
           setConfirmationOpen(true);
         }}
@@ -62,7 +103,7 @@ export function DeleteDrillSection({ drillId, drillTitle }: DeleteDrillSectionPr
         }}
         direction="bottom"
         modal
-        dismissible={!deleteMutation.isPending}
+        dismissible={!deleteMutation.isPending && !disabled}
         autoFocus={false}
       >
         <Drawer.Portal>
@@ -86,13 +127,17 @@ export function DeleteDrillSection({ drillId, drillTitle }: DeleteDrillSectionPr
             )}
 
             <div className={styles.deleteActions}>
-              <button type="button" onClick={closeConfirmation} disabled={deleteMutation.isPending}>
+              <button
+                type="button"
+                onClick={closeConfirmation}
+                disabled={disabled || deleteMutation.isPending}
+              >
                 Keep Drill
               </button>
               <button
                 type="button"
-                onClick={() => deleteMutation.mutate()}
-                disabled={deleteMutation.isPending}
+                onClick={confirmDelete}
+                disabled={disabled || deleteMutation.isPending}
               >
                 {deleteMutation.isPending ? "Deleting..." : "Delete Drill"}
               </button>

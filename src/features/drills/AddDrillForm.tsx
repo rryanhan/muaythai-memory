@@ -46,6 +46,7 @@ type AddDrillFormProps = {
   initialValues?: DrillFormInitialValues;
   cleanupState?: DrillFormCleanupState;
   textFieldsPending?: boolean;
+  disabled?: boolean;
   onBeforeSave?: () => void;
   onCancel?: () => void;
   onSaveSuccess?: (drillId: string) => void;
@@ -63,6 +64,7 @@ export function AddDrillForm({
   initialValues,
   cleanupState,
   textFieldsPending = false,
+  disabled = false,
   onBeforeSave,
   onCancel,
   onSaveSuccess,
@@ -92,6 +94,9 @@ export function AddDrillForm({
   const [formMessage, setFormMessage] = useState<string | null>(null);
   const [pendingCleanup, setPendingCleanup] = useState<PendingDrillCleanup>({});
   const errorRef = useRef<HTMLParagraphElement>(null);
+  // TanStack mutation option callbacks continue after their observer unmounts.
+  const mountedRef = useRef(false);
+  const savePendingRef = useRef(false);
   const lastCleanupRevision = useRef<number | null>(null);
   const dirtyFields = useRef<DrillDirtyFields>({
     title: false,
@@ -123,6 +128,7 @@ export function AddDrillForm({
         queryClient.invalidateQueries({ queryKey: ["drill", drill.id] }),
         queryClient.invalidateQueries({ queryKey: ["profile", "overview"] }),
       ]);
+      if (!mountedRef.current) return;
       onDirtyChange?.(false);
       if (onSaveSuccess) {
         onSaveSuccess(drill.id);
@@ -132,7 +138,8 @@ export function AddDrillForm({
       router.refresh();
     },
     onSettled: () => {
-      onCreationCommitChange?.(false);
+      savePendingRef.current = false;
+      if (mountedRef.current) onCreationCommitChange?.(false);
     },
   });
   const taxonomy = taxonomyQuery.data;
@@ -142,6 +149,14 @@ export function AddDrillForm({
   const selectedMethods = useMemo(() => new Set(trainingMethodSlugs), [trainingMethodSlugs]);
   const selectedTags = useMemo(() => new Set(tagSlugs), [tagSlugs]);
   const selectedStatuses = useMemo(() => new Set(statusTagSlugs), [statusTagSlugs]);
+  const interactionLocked = disabled || saveMutation.isPending;
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (formMessage || saveMutation.isError) {
@@ -151,6 +166,7 @@ export function AddDrillForm({
 
   useLayoutEffect(() => {
     if (
+      interactionLocked ||
       cleanupState?.status !== "ready" ||
       cleanupState.revision === undefined ||
       !cleanupState.values ||
@@ -176,7 +192,7 @@ export function AddDrillForm({
     // A cleanup revision is a one-time event. Including live form state here
     // would re-run the merge after each keystroke and risk overwriting edits.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cleanupState?.revision]);
+  }, [cleanupState?.revision, interactionLocked]);
 
   function markDirty(field: DrillCleanupField) {
     dirtyFields.current[field] = true;
@@ -188,11 +204,13 @@ export function AddDrillForm({
   }
 
   function updateStep(index: number, value: string) {
+    if (interactionLocked) return;
     markDirty("steps");
     setSteps((current) => current.map((step, stepIndex) => (stepIndex === index ? value : step)));
   }
 
   function addStep() {
+    if (interactionLocked) return;
     if (steps.length >= DRILL_LIMITS.steps) {
       setFormMessage(`A drill can have up to ${DRILL_LIMITS.steps} steps.`);
       return;
@@ -202,11 +220,13 @@ export function AddDrillForm({
   }
 
   function removeStep(index: number) {
+    if (interactionLocked) return;
     markDirty("steps");
     setSteps((current) => (current.length === 1 ? current : current.filter((_, stepIndex) => stepIndex !== index)));
   }
 
   function applyCleanupField(field: DrillCleanupField) {
+    if (interactionLocked) return;
     const value = pendingCleanup[field];
     if (value === undefined) return;
 
@@ -225,6 +245,7 @@ export function AddDrillForm({
   }
 
   function applyAllCleanup() {
+    if (interactionLocked) return;
     for (const field of [
       "title",
       "summary",
@@ -239,6 +260,7 @@ export function AddDrillForm({
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (interactionLocked || savePendingRef.current) return;
     const trimmedSteps = steps.map((step) => step.trim()).filter(Boolean);
     const validationMessage = getValidationMessage({
       title,
@@ -256,6 +278,7 @@ export function AddDrillForm({
     }
 
     setFormMessage(null);
+    savePendingRef.current = true;
     onBeforeSave?.();
     onCreationCommitChange?.(true);
     saveMutation.mutate({
@@ -276,7 +299,11 @@ export function AddDrillForm({
   if (taxonomyQuery.isError) {
     return (
       <AddDrillState title="Couldn’t load form" body="The taxonomy request failed.">
-        <button type="button" onClick={() => void taxonomyQuery.refetch()}>
+        <button
+          type="button"
+          disabled={interactionLocked}
+          onClick={() => void taxonomyQuery.refetch()}
+        >
           Retry
         </button>
       </AddDrillState>
@@ -286,7 +313,7 @@ export function AddDrillForm({
   return (
     <form
       className={`${styles.form} ${cleanupState ? captureStyles.scope : ""}`}
-      aria-busy={saveMutation.isPending}
+      aria-busy={interactionLocked}
       onSubmit={handleSubmit}
     >
       <section className="add-drill-section add-drill-saved-list-section">
@@ -297,6 +324,7 @@ export function AddDrillForm({
               key={option.id}
               option={option}
               selected={selectedStatuses.has(option.slug)}
+              disabled={interactionLocked}
               onToggle={(slug) => {
                 markFormDirty();
                 setStatusTagSlugs((current) => toggleSlug(current, slug));
@@ -316,6 +344,7 @@ export function AddDrillForm({
               <span>Title</span>
               <input
                 value={title}
+                disabled={interactionLocked}
                 onChange={(event) => {
                   markDirty("title");
                   setTitle(event.target.value);
@@ -328,6 +357,7 @@ export function AddDrillForm({
               <span>Summary <small>(optional)</small></span>
               <textarea
                 value={summary}
+                disabled={interactionLocked}
                 onChange={(event) => {
                   markDirty("summary");
                   setSummary(event.target.value);
@@ -341,6 +371,7 @@ export function AddDrillForm({
               <span>Notes</span>
               <textarea
                 value={notes}
+                disabled={interactionLocked}
                 onChange={(event) => {
                   markDirty("notes");
                   setNotes(event.target.value);
@@ -360,11 +391,16 @@ export function AddDrillForm({
                   <span>{index + 1}</span>
                   <input
                     value={step}
+                    disabled={interactionLocked}
                     onChange={(event) => updateStep(index, event.target.value)}
                     placeholder={index === 0 ? "Start with..." : "Next step"}
                     maxLength={DRILL_LIMITS.stepCharacters}
                   />
-                  <button type="button" disabled={steps.length === 1} onClick={() => removeStep(index)}>
+                  <button
+                    type="button"
+                    disabled={interactionLocked || steps.length === 1}
+                    onClick={() => removeStep(index)}
+                  >
                     Remove
                   </button>
                 </div>
@@ -373,7 +409,7 @@ export function AddDrillForm({
             <button
               type="button"
               className="add-drill-secondary-button"
-              disabled={steps.length >= DRILL_LIMITS.steps}
+              disabled={interactionLocked || steps.length >= DRILL_LIMITS.steps}
               aria-describedby="add-drill-step-limit"
               onClick={addStep}
             >
@@ -394,6 +430,7 @@ export function AddDrillForm({
               key={method.id}
               method={method}
               selected={selectedMethods.has(method.slug)}
+              disabled={interactionLocked}
               onToggle={() => {
                 markDirty("trainingMethodSlugs");
                 setTrainingMethodSlugs((current) => toggleSlug(current, method.slug));
@@ -415,6 +452,7 @@ export function AddDrillForm({
                     key={tag.id}
                     label={tag.name}
                     selected={selectedTags.has(tag.slug)}
+                    disabled={interactionLocked}
                     onToggle={() => {
                       markDirty("tagSlugs");
                       setTagSlugs((current) => toggleSlug(current, tag.slug));
@@ -433,6 +471,7 @@ export function AddDrillForm({
                     key={tag.id}
                     label={tag.name}
                     selected={selectedTags.has(tag.slug)}
+                    disabled={interactionLocked}
                     onToggle={() => {
                       markDirty("tagSlugs");
                       setTagSlugs((current) => toggleSlug(current, tag.slug));
@@ -449,7 +488,7 @@ export function AddDrillForm({
         <CleanupState
           state={cleanupState}
           pending={pendingCleanup}
-          disabled={saveMutation.isPending}
+          disabled={interactionLocked}
           onApplyField={applyCleanupField}
           onApplyAll={applyAllCleanup}
         />
@@ -469,12 +508,12 @@ export function AddDrillForm({
       <div className="add-drill-actions">
         <button
           type="button"
-          disabled={saveMutation.isPending}
+          disabled={interactionLocked}
           onClick={() => (onCancel ? onCancel() : router.back())}
         >
           Cancel
         </button>
-        <button type="submit" disabled={saveMutation.isPending || textFieldsPending}>
+        <button type="submit" disabled={interactionLocked || textFieldsPending}>
           {textFieldsPending
             ? "Cleaning up"
             : saveMutation.isPending
@@ -493,14 +532,16 @@ export function AddDrillForm({
 function MethodToken({
   method,
   selected,
+  disabled,
   onToggle,
 }: {
   method: TrainingMethodDto;
   selected: boolean;
+  disabled: boolean;
   onToggle: () => void;
 }) {
   return (
-    <button type="button" data-selected={selected} onClick={onToggle}>
+    <button type="button" data-selected={selected} disabled={disabled} onClick={onToggle}>
       <Image
         src={badgeByIconKey[method.iconKey]}
         width={38}
@@ -513,9 +554,19 @@ function MethodToken({
   );
 }
 
-function TagToken({ label, selected, onToggle }: { label: string; selected: boolean; onToggle: () => void }) {
+function TagToken({
+  label,
+  selected,
+  disabled,
+  onToggle,
+}: {
+  label: string;
+  selected: boolean;
+  disabled: boolean;
+  onToggle: () => void;
+}) {
   return (
-    <button type="button" data-selected={selected} onClick={onToggle}>
+    <button type="button" data-selected={selected} disabled={disabled} onClick={onToggle}>
       {label}
     </button>
   );

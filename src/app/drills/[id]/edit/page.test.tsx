@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { TaxonomyResponse } from "@/data/types";
 
 const mocks = vi.hoisted(() => ({
-  addDrillForm: vi.fn(),
+  drillFormRouteScreen: vi.fn(),
   getDrillById: vi.fn(),
   getTaxonomy: vi.fn(),
   requireCurrentPageUserId: vi.fn(),
@@ -14,20 +14,11 @@ vi.mock("next/navigation", () => ({
     throw new Error("not found");
   },
 }));
-vi.mock("@/components/navigation/RoutedBottomNav", () => ({
-  RoutedBottomNav: () => <nav aria-label="Bottom navigation" />,
-}));
-vi.mock("@/features/drills/DrillDetailBackButton", () => ({
-  DrillDetailBackButton: () => <button type="button">Back</button>,
-}));
-vi.mock("@/features/drills/AddDrillForm", () => ({
-  AddDrillForm: (props: Record<string, unknown>) => {
-    mocks.addDrillForm(props);
+vi.mock("@/features/drills/DrillFormRouteScreen", () => ({
+  DrillFormRouteScreen: (props: Record<string, unknown>) => {
+    mocks.drillFormRouteScreen(props);
     return <div>Edit form</div>;
   },
-}));
-vi.mock("@/features/drills/DeleteDrillSection", () => ({
-  DeleteDrillSection: () => null,
 }));
 vi.mock("@/modules/auth/page-user", () => ({
   requireCurrentPageUserId: mocks.requireCurrentPageUserId,
@@ -67,10 +58,10 @@ describe("EditDrillPage taxonomy data", () => {
     expect(mocks.requireCurrentPageUserId).toHaveBeenCalledWith(`/drills/${drillId}/edit`);
     expect(mocks.getDrillById).toHaveBeenCalledWith(userId, drillId);
     expect(mocks.getTaxonomy).toHaveBeenCalledWith(userId);
-    expect(mocks.addDrillForm).toHaveBeenCalledWith(expect.objectContaining({
-      initialDrill: drill,
+    expect(mocks.drillFormRouteScreen).toHaveBeenCalledWith(expect.objectContaining({
+      drill,
       initialTaxonomy: taxonomyFixture,
-      mode: "edit",
+      variant: "edit",
     }));
   });
 });

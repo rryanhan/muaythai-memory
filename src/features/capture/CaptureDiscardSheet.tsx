@@ -12,6 +12,7 @@ export type CaptureDiscardSheetProps = {
   description?: string;
   stayLabel?: string;
   discardLabel?: string;
+  ariaLabel?: string;
 };
 
 export function CaptureDiscardSheet({
@@ -22,6 +23,7 @@ export function CaptureDiscardSheet({
   description = "Your recording, transcript, and unsaved drill changes will be lost.",
   stayLabel = "Keep editing",
   discardLabel = "Discard capture",
+  ariaLabel = "Discard capture confirmation",
 }: CaptureDiscardSheetProps) {
   const contentRef = useDrawerFocus(open);
 
@@ -41,7 +43,7 @@ export function CaptureDiscardSheet({
         <Drawer.Content
           ref={contentRef}
           className={styles.discardSheet}
-          aria-label="Discard capture confirmation"
+          aria-label={ariaLabel}
         >
           <Drawer.Handle className="sheet-handle" />
           <Drawer.Title asChild>

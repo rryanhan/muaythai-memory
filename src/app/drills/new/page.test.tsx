@@ -5,16 +5,20 @@ import type { TaxonomyResponse } from "@/data/types";
 
 const mocks = vi.hoisted(() => ({
   addDrillPageForm: vi.fn(),
+  drillFormRouteScreen: vi.fn(),
   getTaxonomy: vi.fn(),
   requireCurrentPageUserId: vi.fn(),
   requireProfileOnboardedPageUserId: vi.fn(),
 }));
 
-vi.mock("@/components/navigation/RoutedBottomNav", () => ({
-  RoutedBottomNav: () => <nav aria-label="Bottom navigation" />,
-}));
 vi.mock("@/features/drills/DrillDetailBackButton", () => ({
   DrillDetailBackButton: () => <button type="button">Back</button>,
+}));
+vi.mock("@/features/drills/DrillFormRouteScreen", () => ({
+  DrillFormRouteScreen: (props: Record<string, unknown>) => {
+    mocks.drillFormRouteScreen(props);
+    return <div>Drill route screen</div>;
+  },
 }));
 vi.mock("@/features/drills/AddDrillPageForm", () => ({
   AddDrillPageForm: (props: Record<string, unknown>) => {
@@ -48,20 +52,22 @@ describe("AddDrillPage taxonomy data", () => {
   beforeEach(() => {
     vi.resetAllMocks();
     mocks.requireCurrentPageUserId.mockResolvedValue(userId);
+    mocks.requireProfileOnboardedPageUserId.mockResolvedValue(userId);
     mocks.getTaxonomy.mockResolvedValue(taxonomyFixture);
   });
 
   it("loads taxonomy for the authenticated user and seeds the form", async () => {
     render(await AddDrillPage({ searchParams: Promise.resolve({}) }));
 
-    expect(screen.getByText("Drill form")).toBeInTheDocument();
+    expect(screen.getByText("Drill route screen")).toBeInTheDocument();
     expect(mocks.requireCurrentPageUserId).toHaveBeenCalledWith("/drills/new");
     expect(mocks.getTaxonomy).toHaveBeenCalledWith(userId);
-    expect(mocks.addDrillPageForm).toHaveBeenCalledWith(expect.objectContaining({
+    expect(mocks.drillFormRouteScreen).toHaveBeenCalledWith(expect.objectContaining({
       fromJournal: false,
       initialTaxonomy: taxonomyFixture,
-      onboarding: false,
+      variant: "create",
     }));
+    expect(mocks.addDrillPageForm).not.toHaveBeenCalled();
   });
 
   it("falls back to the form's client query when preloading fails", async () => {
@@ -72,8 +78,8 @@ describe("AddDrillPage taxonomy data", () => {
     try {
       render(await AddDrillPage({ searchParams: Promise.resolve({}) }));
 
-      expect(screen.getByText("Drill form")).toBeInTheDocument();
-      expect(mocks.addDrillPageForm).toHaveBeenCalledWith(expect.objectContaining({
+      expect(screen.getByText("Drill route screen")).toBeInTheDocument();
+      expect(mocks.drillFormRouteScreen).toHaveBeenCalledWith(expect.objectContaining({
         initialTaxonomy: undefined,
       }));
       expect(consoleError).toHaveBeenCalledWith(
@@ -83,5 +89,21 @@ describe("AddDrillPage taxonomy data", () => {
     } finally {
       consoleError.mockRestore();
     }
+  });
+
+  it("keeps the onboarding form on its existing guarded path", async () => {
+    render(await AddDrillPage({
+      searchParams: Promise.resolve({ onboarding: "1", next: "/?view=profile" }),
+    }));
+
+    expect(screen.getByText("Drill form")).toBeInTheDocument();
+    expect(mocks.requireProfileOnboardedPageUserId).toHaveBeenCalledWith(
+      "/drills/new?onboarding=1&next=%2F%3Fview%3Dprofile",
+    );
+    expect(mocks.addDrillPageForm).toHaveBeenCalledWith(expect.objectContaining({
+      onboarding: true,
+      nextPath: "/?view=profile",
+    }));
+    expect(mocks.drillFormRouteScreen).not.toHaveBeenCalled();
   });
 });

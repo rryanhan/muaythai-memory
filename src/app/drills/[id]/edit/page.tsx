@@ -2,12 +2,8 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { cache } from "react";
 import { z } from "zod";
-import { RoutedBottomNav } from "@/components/navigation/RoutedBottomNav";
-import { DrillDetailBackButton } from "@/features/drills/DrillDetailBackButton";
-import { AddDrillForm } from "@/features/drills/AddDrillForm";
-import { DeleteDrillSection } from "@/features/drills/DeleteDrillSection";
+import { DrillFormRouteScreen } from "@/features/drills/DrillFormRouteScreen";
 import { getDrillById } from "@/modules/drills/queries";
-import routeStyles from "@/features/drills/DrillRouteShell.module.css";
 import { requireCurrentPageUserId } from "@/modules/auth/page-user";
 import { getTaxonomy } from "@/modules/taxonomy/queries";
 
@@ -63,19 +59,10 @@ export default async function EditDrillPage({ params }: EditDrillPageProps) {
   }
 
   return (
-    <main className={routeStyles.formPage}>
-      <div className="notebook-grid" aria-hidden="true" />
-      <header className="drill-detail-page-header">
-        <DrillDetailBackButton />
-        <p className="eyebrow">Edit Drill</p>
-      </header>
-      <section className="add-drill-heading">
-        <h1>Edit Drill</h1>
-        <p>Adjust the steps, notes, tags, and saved-list markers.</p>
-      </section>
-      <AddDrillForm mode="edit" initialDrill={drill} initialTaxonomy={initialTaxonomy} />
-      <DeleteDrillSection drillId={drill.id} drillTitle={drill.title} />
-      <RoutedBottomNav activeView="library" />
-    </main>
+    <DrillFormRouteScreen
+      variant="edit"
+      drill={drill}
+      initialTaxonomy={initialTaxonomy}
+    />
   );
 }

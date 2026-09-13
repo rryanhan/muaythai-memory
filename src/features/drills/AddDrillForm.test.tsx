@@ -1,9 +1,9 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DRILL_LIMITS } from "@/config/domain-limits";
-import type { TaxonomyResponse } from "@/data/types";
+import type { DrillDetail, TaxonomyResponse } from "@/data/types";
 import { AddDrillForm } from "./AddDrillForm";
 
 const mocks = vi.hoisted(() => ({
@@ -28,10 +28,60 @@ vi.mock("@/data/drills", () => ({
 }));
 
 const taxonomyFixture: TaxonomyResponse = {
-  customTags: [],
-  standardTags: [],
-  statusTags: [],
-  tagCategories: [],
+  customTags: [
+    {
+      id: "00000000-0000-4000-8000-000000000305",
+      name: "Wall Work",
+      slug: "wall-work",
+      kind: "custom",
+      sortOrder: 1,
+      category: null,
+    },
+  ],
+  standardTags: [
+    {
+      id: "00000000-0000-4000-8000-000000000304",
+      name: "Clinch Entry",
+      slug: "clinch-entry",
+      kind: "standard",
+      sortOrder: 1,
+      category: {
+        id: "00000000-0000-4000-8000-000000000303",
+        name: "Clinch",
+        slug: "clinch",
+      },
+    },
+  ],
+  statusTags: [
+    {
+      id: "00000000-0000-4000-8000-000000000306",
+      name: "Starred",
+      slug: "starred",
+      sortOrder: 1,
+    },
+  ],
+  tagCategories: [
+    {
+      id: "00000000-0000-4000-8000-000000000303",
+      name: "Clinch",
+      slug: "clinch",
+      sortOrder: 1,
+      tags: [
+        {
+          id: "00000000-0000-4000-8000-000000000304",
+          name: "Clinch Entry",
+          slug: "clinch-entry",
+          kind: "standard",
+          sortOrder: 1,
+          category: {
+            id: "00000000-0000-4000-8000-000000000303",
+            name: "Clinch",
+            slug: "clinch",
+          },
+        },
+      ],
+    },
+  ],
   trainingMethods: [
     {
       id: "00000000-0000-4000-8000-000000000301",
@@ -41,6 +91,26 @@ const taxonomyFixture: TaxonomyResponse = {
       sortOrder: 1,
     },
   ],
+};
+
+const savedDrillFixture: DrillDetail = {
+  id: "00000000-0000-4000-8000-000000000401",
+  title: "Slip and return",
+  summary: "",
+  notes: null,
+  steps: [
+    {
+      id: "00000000-0000-4000-8000-000000000402",
+      position: 1,
+      body: "Slip outside.",
+    },
+  ],
+  trainingMethods: taxonomyFixture.trainingMethods,
+  tags: [],
+  customTags: [],
+  statusTags: [],
+  createdAt: new Date("2026-09-13T12:00:00Z"),
+  updatedAt: new Date("2026-09-13T12:00:00Z"),
 };
 
 describe("AddDrillForm creation commit", () => {
@@ -60,7 +130,7 @@ describe("AddDrillForm creation commit", () => {
     expect(mocks.getTaxonomy).not.toHaveBeenCalled();
   });
 
-  it("locks Cancel during Save and focuses a recoverable request error", async () => {
+  it("locks every form action during Save and focuses a recoverable request error", async () => {
     let rejectCreate: ((error: Error) => void) | undefined;
     const createAction = vi.fn(
       () => new Promise<never>((_resolve, reject) => {
@@ -72,19 +142,31 @@ describe("AddDrillForm creation commit", () => {
     renderForm(
       <AddDrillForm
         createAction={createAction}
+        cleanupState={{
+          status: "error",
+          errorMessage: "Cleanup paused.",
+          onRetry: vi.fn(),
+        }}
         onCreationCommitChange={onCommitChange}
       />,
     );
 
     await user.type(await screen.findByLabelText("Title"), "Slip and return");
     await user.type(screen.getByPlaceholderText("Start with..."), "Slip outside.");
+    await user.click(screen.getByRole("button", { name: "Add step" }));
+    await user.type(screen.getByPlaceholderText("Next step"), "Return with the cross.");
+    await user.click(screen.getByRole("button", { name: "Favourite" }));
     await user.click(screen.getByRole("button", { name: "Pad Work" }));
+    await user.click(screen.getByRole("button", { name: "Clinch Entry" }));
+    await user.click(screen.getByRole("button", { name: "Wall Work" }));
     await user.click(screen.getByRole("button", { name: "Save drill" }));
 
     expect(onCommitChange).toHaveBeenCalledWith(true);
-    const cancel = screen.getByRole("button", { name: "Cancel" });
-    expect(cancel).toBeDisabled();
-    expect(cancel.closest("form")).toHaveAttribute("aria-busy", "true");
+    const form = screen.getByRole("button", { name: "Cancel" }).closest("form");
+    expect(form).toHaveAttribute("aria-busy", "true");
+    for (const control of form?.querySelectorAll("input, textarea, button") ?? []) {
+      expect(control).toBeDisabled();
+    }
 
     await act(async () => {
       rejectCreate?.(new Error("Connection interrupted."));
@@ -94,6 +176,70 @@ describe("AddDrillForm creation commit", () => {
     await waitFor(() => expect(alert).toHaveFocus());
     expect(screen.getByRole("button", { name: "Cancel" })).toBeEnabled();
     expect(onCommitChange).toHaveBeenLastCalledWith(false);
+  });
+
+  it("submits only once when two submit events arrive before React can rerender", async () => {
+    const create = deferred<never>();
+    const createAction = vi.fn(() => create.promise);
+    const onCommitChange = vi.fn();
+    const user = userEvent.setup();
+    const { container } = renderForm(
+      <AddDrillForm
+        createAction={createAction}
+        onCreationCommitChange={onCommitChange}
+      />,
+    );
+
+    await user.type(await screen.findByLabelText("Title"), "Slip and return");
+    await user.type(screen.getByPlaceholderText("Start with..."), "Slip outside.");
+    await user.click(screen.getByRole("button", { name: "Pad Work" }));
+    const form = container.querySelector("form");
+    expect(form).not.toBeNull();
+
+    act(() => {
+      fireEvent.submit(form!);
+      fireEvent.submit(form!);
+    });
+
+    await waitFor(() => expect(createAction).toHaveBeenCalledTimes(1));
+    expect(onCommitChange).toHaveBeenCalledTimes(1);
+    expect(onCommitChange).toHaveBeenCalledWith(true);
+  });
+
+  it("does not run stale UI callbacks when a save settles after unmount", async () => {
+    const create = deferred<DrillDetail>();
+    const createAction = vi.fn(() => create.promise);
+    const onCommitChange = vi.fn();
+    const onDirtyChange = vi.fn();
+    const onSaveSuccess = vi.fn();
+    const user = userEvent.setup();
+    const { queryClient, unmount } = renderForm(
+      <AddDrillForm
+        createAction={createAction}
+        onCreationCommitChange={onCommitChange}
+        onDirtyChange={onDirtyChange}
+        onSaveSuccess={onSaveSuccess}
+      />,
+    );
+
+    await user.type(await screen.findByLabelText("Title"), "Slip and return");
+    await user.type(screen.getByPlaceholderText("Start with..."), "Slip outside.");
+    await user.click(screen.getByRole("button", { name: "Pad Work" }));
+    await user.click(screen.getByRole("button", { name: "Save drill" }));
+    expect(onCommitChange).toHaveBeenLastCalledWith(true);
+
+    unmount();
+    await act(async () => {
+      create.resolve(savedDrillFixture);
+      await create.promise;
+    });
+    await waitFor(() => expect(queryClient.isMutating()).toBe(0));
+
+    expect(onSaveSuccess).not.toHaveBeenCalled();
+    expect(onDirtyChange).not.toHaveBeenCalledWith(false);
+    expect(onCommitChange).not.toHaveBeenCalledWith(false);
+    expect(mocks.push).not.toHaveBeenCalled();
+    expect(mocks.refresh).not.toHaveBeenCalled();
   });
 });
 
@@ -147,9 +293,20 @@ function renderForm(form: React.ReactElement) {
       queries: { retry: false },
     },
   });
-  return render(
+  const result = render(
     <QueryClientProvider client={queryClient}>
       {form}
     </QueryClientProvider>,
   );
+  return { ...result, queryClient };
+}
+
+function deferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((promiseResolve, promiseReject) => {
+    resolve = promiseResolve;
+    reject = promiseReject;
+  });
+  return { promise, reject, resolve };
 }

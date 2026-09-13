@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
-import { RoutedBottomNav } from "@/components/navigation/RoutedBottomNav";
 import { DrillDetailBackButton } from "@/features/drills/DrillDetailBackButton";
 import { AddDrillPageForm } from "@/features/drills/AddDrillPageForm";
+import { DrillFormRouteScreen } from "@/features/drills/DrillFormRouteScreen";
 import routeStyles from "@/features/drills/DrillRouteShell.module.css";
 import { FirstDrillCommitProvider } from "@/features/onboarding/FirstDrillCommitContext";
 import { safeInternalPath } from "@/lib/safe-internal-path";
@@ -39,6 +39,16 @@ export default async function AddDrillPage({
     return undefined;
   });
 
+  if (!onboarding) {
+    return (
+      <DrillFormRouteScreen
+        variant="create"
+        fromJournal={fromJournal}
+        initialTaxonomy={initialTaxonomy}
+      />
+    );
+  }
+
   return (
     <main className={routeStyles.formPage}>
       <div className="notebook-grid" aria-hidden="true" />
@@ -59,7 +69,6 @@ export default async function AddDrillPage({
           replay={replay}
         />
       </FirstDrillCommitProvider>
-      {!onboarding && <RoutedBottomNav activeView={fromJournal ? "profile" : "library"} />}
     </main>
   );
 }
