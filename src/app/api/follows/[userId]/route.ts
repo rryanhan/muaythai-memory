@@ -4,6 +4,7 @@ import { requireOnboardedUserId } from "@/modules/auth/current-user";
 import { connectionMutationResponseSchema } from "@/modules/connections/contracts";
 import { connectionErrorResponse } from "@/modules/connections/http";
 import { cancelOrUnfollow } from "@/modules/connections/mutations";
+import { parseRequestValue, parseResponseContract } from "@/modules/http/contracts";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -16,8 +17,9 @@ export async function DELETE(
 ) {
   try {
     const currentUserId = await requireOnboardedUserId();
-    const { userId } = paramsSchema.parse(await context.params);
-    return NextResponse.json(connectionMutationResponseSchema.parse(
+    const { userId } = parseRequestValue(paramsSchema, await context.params);
+    return NextResponse.json(parseResponseContract(
+      connectionMutationResponseSchema,
       await cancelOrUnfollow(currentUserId, userId),
     ));
   } catch (error) {

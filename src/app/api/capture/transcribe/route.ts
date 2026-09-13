@@ -12,6 +12,11 @@ import {
 import { CaptureRateLimitError, consumeCaptureRateLimit } from "@/modules/capture/rate-limits";
 import { requireProfileOnboardedUserId } from "@/modules/auth/current-user";
 import { authenticationErrorResponse } from "@/modules/auth/http";
+import {
+  parseFormDataRequest,
+  parseResponseContract,
+  RequestContractError,
+} from "@/modules/http/contracts";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -22,7 +27,7 @@ export async function POST(request: NextRequest) {
   try {
     const userId = await requireProfileOnboardedUserId();
     const parsingStartedAt = performance.now();
-    const formData = await request.formData();
+    const formData = await parseFormDataRequest(request);
     const audio = formData.get("audio");
 
     if (!(audio instanceof File)) {
@@ -49,7 +54,10 @@ export async function POST(request: NextRequest) {
       mimeType: audio.type || "unknown",
       sizeBytes: audio.size,
     });
-    return NextResponse.json(captureTranscriptionResponseSchema.parse({ transcript }));
+    return NextResponse.json(parseResponseContract(
+      captureTranscriptionResponseSchema,
+      { transcript },
+    ));
   } catch (error) {
     logTranscriptionTiming(requestId, "request-failed", requestStartedAt, {
       errorType: error instanceof Error ? error.name : "UnknownError",
@@ -74,7 +82,7 @@ export async function POST(request: NextRequest) {
     if (error instanceof CaptureTranscriptionCancelledError) {
       return NextResponse.json({ error: error.message }, { status: 499 });
     }
-    if (error instanceof TypeError) {
+    if (error instanceof RequestContractError) {
       return NextResponse.json({ error: "The audio upload could not be read." }, { status: 400 });
     }
 

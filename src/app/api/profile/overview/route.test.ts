@@ -60,4 +60,23 @@ describe("GET /api/profile/overview", () => {
     expect(response.status).toBe(401);
     expect(mocks.getProfileOverview).not.toHaveBeenCalled();
   });
+
+  it("returns 500 when the query result violates the response contract", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    mocks.getProfileOverview.mockResolvedValueOnce({
+      ...overview,
+      drillCount: -1,
+    });
+
+    try {
+      const response = await GET();
+
+      expect(response.status).toBe(500);
+      await expect(response.json()).resolves.toEqual({
+        error: "Profile overview could not be loaded.",
+      });
+    } finally {
+      consoleError.mockRestore();
+    }
+  });
 });

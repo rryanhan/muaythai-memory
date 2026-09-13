@@ -24,6 +24,12 @@ vi.mock("@/modules/onboarding/mutations", () => ({
 import { POST } from "./route";
 
 const userId = "00000000-0000-4000-8000-000000000001";
+const validProfile = {
+  username: "fighter",
+  firstName: "",
+  lastName: "",
+  location: "",
+};
 
 describe("POST /api/onboarding/profile", () => {
   beforeEach(() => {
@@ -36,7 +42,36 @@ describe("POST /api/onboarding/profile", () => {
     const response = await POST(request());
 
     expect(response.status).toBe(200);
+    expect(mocks.completeProfileOnboarding).toHaveBeenCalledWith(
+      { id: userId },
+      validProfile,
+    );
     expect(mocks.invalidateOnboardingState).toHaveBeenCalledWith(userId);
+  });
+
+  it("returns 400 for malformed JSON without attempting the mutation", async () => {
+    const response = await POST(rawRequest("{not-json"));
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error: "Enter valid profile details.",
+    });
+    expect(mocks.completeProfileOnboarding).not.toHaveBeenCalled();
+    expect(mocks.invalidateOnboardingState).not.toHaveBeenCalled();
+  });
+
+  it("preserves field-level feedback for schema-invalid profile details", async () => {
+    const response = await POST(request({
+      ...validProfile,
+      username: "ab",
+    }));
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error: "Username must be at least 3 characters.",
+    });
+    expect(mocks.completeProfileOnboarding).not.toHaveBeenCalled();
+    expect(mocks.invalidateOnboardingState).not.toHaveBeenCalled();
   });
 
   it("returns a retryable error when the profile succeeds but invalidation fails", async () => {
@@ -73,16 +108,34 @@ describe("POST /api/onboarding/profile", () => {
     );
     consoleError.mockRestore();
   });
+
+  it("invalidates once when the saved profile violates the response contract", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    mocks.completeProfileOnboarding.mockResolvedValue(undefined);
+
+    try {
+      const response = await POST(request());
+
+      expect(response.status).toBe(500);
+      await expect(response.json()).resolves.toEqual({
+        error: "Profile could not be saved. Try again.",
+      });
+      expect(mocks.completeProfileOnboarding).toHaveBeenCalledTimes(1);
+      expect(mocks.invalidateOnboardingState).toHaveBeenCalledOnce();
+      expect(mocks.invalidateOnboardingState).toHaveBeenCalledWith(userId);
+    } finally {
+      consoleError.mockRestore();
+    }
+  });
 });
 
-function request(): NextRequest {
+function request(body: unknown = validProfile): NextRequest {
+  return rawRequest(JSON.stringify(body));
+}
+
+function rawRequest(body: string): NextRequest {
   return new NextRequest("https://example.test/api/onboarding/profile", {
-    body: JSON.stringify({
-      username: "fighter",
-      firstName: "",
-      lastName: "",
-      location: "",
-    }),
+    body,
     headers: { "content-type": "application/json" },
     method: "POST",
   });

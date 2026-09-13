@@ -5,6 +5,11 @@ import { ProfileUpdateError, updateProfile } from "@/modules/profile/mutations";
 import { requireCurrentAppUser } from "@/modules/auth/current-user";
 import { authenticationErrorResponse } from "@/modules/auth/http";
 import { invalidateOnboardingState } from "@/modules/auth/onboarding-state";
+import {
+  parseFormDataRequest,
+  parseResponseContract,
+  RequestContractError,
+} from "@/modules/http/contracts";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -12,7 +17,7 @@ export const runtime = "nodejs";
 export async function PATCH(request: NextRequest) {
   try {
     const currentUser = await requireCurrentAppUser();
-    const formData = await request.formData();
+    const formData = await parseFormDataRequest(request);
     const username = formData.get("username");
     const firstName = formData.get("firstName");
     const lastName = formData.get("lastName");
@@ -55,13 +60,16 @@ export async function PATCH(request: NextRequest) {
         { status: 503, headers: { "retry-after": "1" } },
       );
     }
-    return NextResponse.json(profileResponseSchema.parse({ profile }));
+    return NextResponse.json(parseResponseContract(profileResponseSchema, { profile }));
   } catch (error) {
     const authResponse = authenticationErrorResponse(error);
     if (authResponse) return authResponse;
 
     if (error instanceof AvatarValidationError || error instanceof ProfileUpdateError) {
       return NextResponse.json({ error: error.message }, { status: error.status });
+    }
+    if (error instanceof RequestContractError) {
+      return NextResponse.json({ error: "Profile request could not be read." }, { status: 400 });
     }
 
     console.error("Profile update failed.", error instanceof Error ? error.message : error);

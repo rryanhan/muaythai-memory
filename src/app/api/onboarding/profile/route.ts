@@ -5,8 +5,16 @@ import {
   completeProfileOnboarding,
   OnboardingValidationError,
 } from "@/modules/onboarding/mutations";
-import { onboardingProfileResponseSchema } from "@/modules/onboarding/contracts";
+import {
+  onboardingProfileInputSchema,
+  onboardingProfileResponseSchema,
+} from "@/modules/onboarding/contracts";
 import { finalizeOnboardingMutationResponse } from "@/modules/onboarding/http";
+import {
+  parseJsonRequest,
+  parseResponseContract,
+  RequestContractError,
+} from "@/modules/http/contracts";
 
 export const runtime = "nodejs";
 
@@ -18,12 +26,20 @@ export async function POST(request: NextRequest) {
 
   try {
     const user = await requireCurrentAppUser();
-    const input = await request.json();
+    const input = await parseJsonRequest(request, onboardingProfileInputSchema);
     mutationUserId = user.id;
     mutationAttempted = true;
-    const username = await completeProfileOnboarding(user, input);
+    const username = await completeProfileOnboarding(user, {
+      username: input.username,
+      firstName: input.firstName ?? "",
+      lastName: input.lastName ?? "",
+      location: input.location ?? "",
+    });
     mutationSucceeded = true;
-    response = NextResponse.json(onboardingProfileResponseSchema.parse({ username, next: "first-drill" }));
+    response = NextResponse.json(parseResponseContract(
+      onboardingProfileResponseSchema,
+      { username, next: "first-drill" },
+    ));
   } catch (error) {
     response = profileErrorResponse(error);
   }
@@ -44,8 +60,11 @@ function profileErrorResponse(error: unknown): NextResponse {
   if (error instanceof OnboardingValidationError) {
     return NextResponse.json({ error: error.message }, { status: error.status });
   }
-  if (error instanceof Error && error.name === "ZodError") {
-    return NextResponse.json({ error: "Enter valid profile details." }, { status: 400 });
+  if (error instanceof RequestContractError) {
+    return NextResponse.json(
+      { error: error.issues?.[0]?.message ?? "Enter valid profile details." },
+      { status: 400 },
+    );
   }
   console.error("Profile onboarding failed.", error instanceof Error ? error.message : error);
   return NextResponse.json({ error: "Profile could not be saved. Try again." }, { status: 500 });

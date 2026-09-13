@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { z, ZodError } from "zod";
+import { z } from "zod";
 import { requireOnboardedUserId } from "@/modules/auth/current-user";
 import { authenticationErrorResponse } from "@/modules/auth/http";
 import {
@@ -7,6 +7,12 @@ import {
   updateSavedListResponseSchema,
 } from "@/modules/drills/contracts";
 import { SavedListMutationError, setDrillSavedList } from "@/modules/drills/mutations";
+import {
+  parseJsonRequest,
+  parseRequestValue,
+  parseResponseContract,
+  RequestContractError,
+} from "@/modules/http/contracts";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -16,19 +22,22 @@ const routeParamsSchema = z.object({ id: z.string().uuid() });
 export async function PATCH(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
     const userId = await requireOnboardedUserId();
-    const { id } = routeParamsSchema.parse(await context.params);
-    const input = updateSavedListInputSchema.parse(await request.json());
-    const response = updateSavedListResponseSchema.parse(await setDrillSavedList(userId, id, input));
+    const { id } = parseRequestValue(routeParamsSchema, await context.params);
+    const input = await parseJsonRequest(request, updateSavedListInputSchema);
+    const response = parseResponseContract(
+      updateSavedListResponseSchema,
+      await setDrillSavedList(userId, id, input),
+    );
     return NextResponse.json(response);
   } catch (error) {
     const authResponse = authenticationErrorResponse(error);
     if (authResponse) return authResponse;
 
-    if (error instanceof ZodError || error instanceof SyntaxError) {
+    if (error instanceof RequestContractError) {
       return NextResponse.json(
         {
           error: "Invalid Saved List request.",
-          ...(error instanceof ZodError ? { issues: error.issues } : {}),
+          ...(error.issues ? { issues: error.issues } : {}),
         },
         { status: 400 },
       );

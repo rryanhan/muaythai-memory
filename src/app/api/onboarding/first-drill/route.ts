@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { ZodError } from "zod";
 import { requireProfileOnboardedUserId } from "@/modules/auth/current-user";
 import { authenticationErrorResponse } from "@/modules/auth/http";
 import {
@@ -13,6 +12,12 @@ import {
   onboardingFirstDrillResponseSchema,
 } from "@/modules/onboarding/contracts";
 import { finalizeOnboardingMutationResponse } from "@/modules/onboarding/http";
+import {
+  parseJsonRequest,
+  parseRequestValue,
+  parseResponseContract,
+  RequestContractError,
+} from "@/modules/http/contracts";
 
 export const runtime = "nodejs";
 
@@ -24,13 +29,19 @@ export async function POST(request: NextRequest) {
 
   try {
     const userId = await requireProfileOnboardedUserId();
-    const creationKey = onboardingCreationKeySchema.parse(request.headers.get("idempotency-key"));
-    const input = onboardingFirstDrillInputSchema.parse(await request.json());
+    const creationKey = parseRequestValue(
+      onboardingCreationKeySchema,
+      request.headers.get("idempotency-key"),
+    );
+    const input = await parseJsonRequest(request, onboardingFirstDrillInputSchema);
     mutationUserId = userId;
     mutationAttempted = true;
     const drill = await createGuidedFirstDrill(userId, input, creationKey);
     mutationSucceeded = true;
-    response = NextResponse.json(onboardingFirstDrillResponseSchema.parse({ drill }));
+    response = NextResponse.json(parseResponseContract(
+      onboardingFirstDrillResponseSchema,
+      { drill },
+    ));
   } catch (error) {
     response = firstDrillErrorResponse(error);
   }
@@ -48,7 +59,7 @@ export async function POST(request: NextRequest) {
 function firstDrillErrorResponse(error: unknown): NextResponse {
   const authResponse = authenticationErrorResponse(error);
   if (authResponse) return authResponse;
-  if (error instanceof ZodError || error instanceof CreateDrillValidationError) {
+  if (error instanceof RequestContractError || error instanceof CreateDrillValidationError) {
     return NextResponse.json({ error: "Check the required drill fields and try again." }, { status: 400 });
   }
   if (error instanceof CreateDrillIdempotencyError) {

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { z, ZodError } from "zod";
+import { z } from "zod";
 import {
   deleteDrillResponseSchema,
   drillDetailResponseSchema,
@@ -14,6 +14,12 @@ import {
 import { getDrillById } from "@/modules/drills/queries";
 import { requireOnboardedUserId } from "@/modules/auth/current-user";
 import { authenticationErrorResponse } from "@/modules/auth/http";
+import {
+  parseJsonRequest,
+  parseRequestValue,
+  parseResponseContract,
+  RequestContractError,
+} from "@/modules/http/contracts";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -27,14 +33,14 @@ const routeParamsSchema = z.object({
 export async function GET(_request: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
     const userId = await requireOnboardedUserId();
-    const { id } = routeParamsSchema.parse(await context.params);
+    const { id } = parseRequestValue(routeParamsSchema, await context.params);
     const drill = await getDrillById(userId, id);
 
     if (!drill) {
       return NextResponse.json({ error: "Drill not found." }, { status: 404 });
     }
 
-    const response = drillDetailResponseSchema.parse({ drill });
+    const response = parseResponseContract(drillDetailResponseSchema, { drill });
     return NextResponse.json(response);
   } catch (error) {
     return handleRouteError(error, "Failed to load drill.");
@@ -44,9 +50,12 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ id
 export async function PATCH(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
     const userId = await requireOnboardedUserId();
-    const { id } = routeParamsSchema.parse(await context.params);
-    const input = updateDrillInputSchema.parse(await request.json());
-    const response = drillDetailResponseSchema.parse({ drill: await updateDrill(userId, id, input) });
+    const { id } = parseRequestValue(routeParamsSchema, await context.params);
+    const input = await parseJsonRequest(request, updateDrillInputSchema);
+    const response = parseResponseContract(
+      drillDetailResponseSchema,
+      { drill: await updateDrill(userId, id, input) },
+    );
     return NextResponse.json(response);
   } catch (error) {
     return handleRouteError(error, "Failed to update drill.");
@@ -56,9 +65,12 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
 export async function DELETE(_request: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
     const userId = await requireOnboardedUserId();
-    const { id } = routeParamsSchema.parse(await context.params);
+    const { id } = parseRequestValue(routeParamsSchema, await context.params);
     return NextResponse.json(
-      deleteDrillResponseSchema.parse({ deletedId: await deleteDrill(userId, id) }),
+      parseResponseContract(
+        deleteDrillResponseSchema,
+        { deletedId: await deleteDrill(userId, id) },
+      ),
     );
   } catch (error) {
     return handleRouteError(error, "Failed to delete drill.");
@@ -69,8 +81,11 @@ function handleRouteError(error: unknown, fallbackMessage: string) {
   const authResponse = authenticationErrorResponse(error);
   if (authResponse) return authResponse;
 
-  if (error instanceof ZodError) {
-    return NextResponse.json({ error: "Invalid drill id or response shape.", issues: error.issues }, { status: 400 });
+  if (error instanceof RequestContractError) {
+    return NextResponse.json(
+      { error: "Invalid drill request.", ...(error.issues ? { issues: error.issues } : {}) },
+      { status: 400 },
+    );
   }
 
   if (error instanceof UpdateDrillValidationError) {

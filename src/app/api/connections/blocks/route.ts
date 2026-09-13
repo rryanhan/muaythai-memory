@@ -6,6 +6,7 @@ import {
 } from "@/modules/connections/contracts";
 import { connectionErrorResponse } from "@/modules/connections/http";
 import { blockFighter } from "@/modules/connections/mutations";
+import { parseJsonRequest, parseResponseContract } from "@/modules/http/contracts";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -13,9 +14,10 @@ export const runtime = "nodejs";
 export async function POST(request: NextRequest) {
   try {
     const currentUserId = await requireOnboardedUserId();
-    const input = blockFighterInputSchema.parse(await request.json());
+    const input = await parseJsonRequest(request, blockFighterInputSchema);
     return NextResponse.json(
-      connectionMutationResponseSchema.parse(
+      parseResponseContract(
+        connectionMutationResponseSchema,
         await blockFighter(currentUserId, input.userId),
       ),
       { status: 201 },

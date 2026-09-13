@@ -10,6 +10,7 @@ import {
   getConnectionSectionPage,
   getConnectionsSummary,
 } from "@/modules/connections/queries";
+import { parseRequestContract, parseResponseContract } from "@/modules/http/contracts";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -19,19 +20,32 @@ export async function GET(request: NextRequest) {
     const userId = await requireOnboardedUserId();
     const rawSection = request.nextUrl.searchParams.get("section");
     if (rawSection) {
-      const section = connectionSectionSchema.parse(rawSection);
-      const rawLimit = Number(request.nextUrl.searchParams.get("limit") ?? 20);
-      return NextResponse.json(connectionSectionPageResponseSchema.parse(
-        await getConnectionSectionPage(
-          userId,
-          section,
-          request.nextUrl.searchParams.get("cursor"),
-          Number.isFinite(rawLimit) ? rawLimit : 20,
-        ),
+      const query = parseRequestContract(() => {
+        const rawLimit = Number(request.nextUrl.searchParams.get("limit") ?? 20);
+        return {
+          section: connectionSectionSchema.parse(rawSection),
+          cursor: request.nextUrl.searchParams.get("cursor"),
+          limit: Number.isFinite(rawLimit) ? rawLimit : 20,
+        };
+      });
+      const page = await getConnectionSectionPage(
+        userId,
+        query.section,
+        query.cursor,
+        query.limit,
+      ).catch((error: unknown) => parseRequestContract<never>(() => {
+        throw error;
+      }));
+      return NextResponse.json(parseResponseContract(
+        connectionSectionPageResponseSchema,
+        page,
       ));
     }
     return NextResponse.json(
-      connectionsSummaryResponseSchema.parse(await getConnectionsSummary(userId)),
+      parseResponseContract(
+        connectionsSummaryResponseSchema,
+        await getConnectionsSummary(userId),
+      ),
     );
   } catch (error) {
     return connectionErrorResponse(error, "Connections could not be loaded.");

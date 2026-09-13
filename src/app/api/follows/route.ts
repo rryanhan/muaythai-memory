@@ -6,6 +6,7 @@ import {
 } from "@/modules/connections/contracts";
 import { connectionErrorResponse } from "@/modules/connections/http";
 import { requestFollow } from "@/modules/connections/mutations";
+import { parseJsonRequest, parseResponseContract } from "@/modules/http/contracts";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -13,9 +14,12 @@ export const runtime = "nodejs";
 export async function POST(request: NextRequest) {
   try {
     const userId = await requireOnboardedUserId();
-    const input = requestFollowInputSchema.parse(await request.json());
+    const input = await parseJsonRequest(request, requestFollowInputSchema);
     return NextResponse.json(
-      connectionMutationResponseSchema.parse(await requestFollow(userId, input.username)),
+      parseResponseContract(
+        connectionMutationResponseSchema,
+        await requestFollow(userId, input.username),
+      ),
       { status: 201 },
     );
   } catch (error) {

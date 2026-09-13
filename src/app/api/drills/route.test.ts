@@ -138,6 +138,30 @@ describe("drill API input boundaries", () => {
     expect(mocks.createDrill).not.toHaveBeenCalled();
   });
 
+  it("rejects malformed JSON as a client error before the mutation", async () => {
+    const response = await POST(rawJsonRequest('{"title":'));
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({ error: "Invalid drill request." });
+    expect(mocks.createDrill).not.toHaveBeenCalled();
+  });
+
+  it("returns a generic server error when a created drill violates the response contract", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    mocks.createDrill.mockResolvedValue({ id: "not-a-valid-drill" });
+
+    try {
+      const response = await POST(jsonRequest(validCreateInput()));
+
+      expect(response.status).toBe(500);
+      await expect(response.json()).resolves.toEqual({ error: "Failed to create drill." });
+      expect(mocks.createDrill).toHaveBeenCalledOnce();
+      expect(consoleError).toHaveBeenCalledOnce();
+    } finally {
+      consoleError.mockRestore();
+    }
+  });
+
   it("rejects too many query keywords before the owned drill query", async () => {
     const url = new URL("https://example.test/api/drills");
     for (let index = 0; index <= DRILL_LIMITS.filterKeywords; index += 1) {
@@ -152,9 +176,25 @@ describe("drill API input boundaries", () => {
 });
 
 function jsonRequest(body: unknown): NextRequest {
+  return rawJsonRequest(JSON.stringify(body));
+}
+
+function rawJsonRequest(body: string): NextRequest {
   return new NextRequest("https://example.test/api/drills", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
+    body,
   });
+}
+
+function validCreateInput() {
+  return {
+    title: "Rear kick exit",
+    summary: "",
+    notes: null,
+    steps: ["Throw the rear kick, then angle out."],
+    trainingMethodSlugs: ["pad-work"],
+    tagSlugs: [],
+    statusTagSlugs: [],
+  };
 }

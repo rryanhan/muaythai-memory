@@ -7,6 +7,11 @@ import {
 } from "@/modules/connections/contracts";
 import { connectionErrorResponse } from "@/modules/connections/http";
 import { respondToFollowRequest } from "@/modules/connections/mutations";
+import {
+  parseJsonRequest,
+  parseRequestValue,
+  parseResponseContract,
+} from "@/modules/http/contracts";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -19,9 +24,10 @@ export async function PATCH(
 ) {
   try {
     const currentUserId = await requireOnboardedUserId();
-    const { followerId } = paramsSchema.parse(await context.params);
-    const input = respondToFollowRequestInputSchema.parse(await request.json());
-    return NextResponse.json(connectionMutationResponseSchema.parse(
+    const { followerId } = parseRequestValue(paramsSchema, await context.params);
+    const input = await parseJsonRequest(request, respondToFollowRequestInputSchema);
+    return NextResponse.json(parseResponseContract(
+      connectionMutationResponseSchema,
       await respondToFollowRequest(currentUserId, followerId, input),
     ));
   } catch (error) {

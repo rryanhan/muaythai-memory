@@ -4,6 +4,7 @@ import { authenticationErrorResponse } from "@/modules/auth/http";
 import { onboardingSkipResponseSchema } from "@/modules/onboarding/contracts";
 import { finalizeOnboardingMutationResponse } from "@/modules/onboarding/http";
 import { skipFirstDrillGuide } from "@/modules/onboarding/mutations";
+import { parseResponseContract } from "@/modules/http/contracts";
 
 export const runtime = "nodejs";
 
@@ -19,7 +20,10 @@ export async function POST() {
     mutationAttempted = true;
     const skipped = await skipFirstDrillGuide(userId);
     mutationSucceeded = true;
-    response = NextResponse.json(onboardingSkipResponseSchema.parse({ skipped }));
+    response = NextResponse.json(parseResponseContract(
+      onboardingSkipResponseSchema,
+      { skipped },
+    ));
   } catch (error) {
     response = skipErrorResponse(error);
   }

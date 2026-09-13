@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { ZodError } from "zod";
 import { captureDraftRequestSchema, captureDraftResponseSchema } from "@/modules/capture/contracts";
 import { generateCaptureDraft } from "@/modules/capture/draft";
 import {
@@ -10,6 +9,11 @@ import {
 import { CaptureRateLimitError } from "@/modules/capture/rate-limits";
 import { requireProfileOnboardedUserId } from "@/modules/auth/current-user";
 import { authenticationErrorResponse } from "@/modules/auth/http";
+import {
+  parseJsonRequest,
+  parseResponseContract,
+  RequestContractError,
+} from "@/modules/http/contracts";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -17,8 +21,9 @@ export const runtime = "nodejs";
 export async function POST(request: NextRequest) {
   try {
     const userId = await requireProfileOnboardedUserId();
-    const input = captureDraftRequestSchema.parse(await request.json());
-    const response = captureDraftResponseSchema.parse(
+    const input = await parseJsonRequest(request, captureDraftRequestSchema);
+    const response = parseResponseContract(
+      captureDraftResponseSchema,
       await generateCaptureDraft(userId, input.transcript, { signal: request.signal }),
     );
     return NextResponse.json(response);
@@ -31,9 +36,12 @@ function handleRouteError(error: unknown) {
   const authResponse = authenticationErrorResponse(error);
   if (authResponse) return authResponse;
 
-  if (error instanceof ZodError) {
+  if (error instanceof RequestContractError) {
     return NextResponse.json(
-      { error: "Invalid capture draft request or response shape.", issues: error.issues },
+      {
+        error: "Invalid capture draft request.",
+        ...(error.issues ? { issues: error.issues } : {}),
+      },
       { status: 400 },
     );
   }

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { ZodError } from "zod";
 import { authenticationErrorResponse } from "@/modules/auth/http";
+import { RequestContractError } from "@/modules/http/contracts";
 import { ConnectionMutationError } from "./errors";
 
 export function connectionErrorResponse(
@@ -10,9 +10,12 @@ export function connectionErrorResponse(
   const authResponse = authenticationErrorResponse(error);
   if (authResponse) return authResponse;
 
-  if (error instanceof ZodError) {
+  if (error instanceof RequestContractError) {
     return NextResponse.json(
-      { error: "Invalid connection request.", issues: error.issues },
+      {
+        error: "Invalid connection request.",
+        ...(error.issues ? { issues: error.issues } : {}),
+      },
       { status: 400 },
     );
   }

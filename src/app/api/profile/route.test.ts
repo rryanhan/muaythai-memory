@@ -23,9 +23,6 @@ vi.mock("@/modules/auth/onboarding-state", () => ({
 vi.mock("@/modules/profile/avatar", () => ({
   AvatarValidationError: class extends Error {},
 }));
-vi.mock("@/modules/profile/contracts", () => ({
-  profileResponseSchema: { parse: (value: unknown) => value },
-}));
 vi.mock("@/modules/profile/mutations", () => ({
   ProfileUpdateError: class extends Error {
     readonly status = 400;
@@ -36,6 +33,16 @@ vi.mock("@/modules/profile/mutations", () => ({
 import { PATCH } from "./route";
 
 const userId = "00000000-0000-4000-8000-000000000001";
+const profile = {
+  id: userId,
+  username: "new_name",
+  displayName: "new_name",
+  firstName: null,
+  lastName: null,
+  location: null,
+  avatarUrl: null,
+  email: "fighter@example.com",
+};
 
 describe("PATCH /api/profile cache coherence", () => {
   beforeEach(() => {
@@ -44,12 +51,7 @@ describe("PATCH /api/profile cache coherence", () => {
       id: userId,
       email: "fighter@example.com",
     });
-    mocks.updateProfile.mockResolvedValue({
-      id: userId,
-      username: "new_name",
-      displayName: "new_name",
-      email: "fighter@example.com",
-    });
+    mocks.updateProfile.mockResolvedValue(profile);
   });
 
   it("invalidates cached onboarding state after a successful profile update", async () => {
@@ -67,6 +69,23 @@ describe("PATCH /api/profile cache coherence", () => {
     const response = await PATCH(profileRequest(formData));
 
     expect(response.status).toBe(400);
+    expect(mocks.updateProfile).not.toHaveBeenCalled();
+    expect(mocks.invalidateOnboardingState).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 when multipart parsing rejects the request", async () => {
+    const request = {
+      formData: async () => {
+        throw new TypeError("invalid multipart body");
+      },
+    } as unknown as NextRequest;
+
+    const response = await PATCH(request);
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error: "Profile request could not be read.",
+    });
     expect(mocks.updateProfile).not.toHaveBeenCalled();
     expect(mocks.invalidateOnboardingState).not.toHaveBeenCalled();
   });
@@ -89,6 +108,28 @@ describe("PATCH /api/profile cache coherence", () => {
       "cache unavailable",
     );
     consoleError.mockRestore();
+  });
+
+  it("returns 500 after invalidation when the saved profile violates the response contract", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    mocks.updateProfile.mockResolvedValue({
+      ...profile,
+      id: "not-a-uuid",
+    });
+
+    try {
+      const response = await PATCH(profileRequest());
+
+      expect(response.status).toBe(500);
+      await expect(response.json()).resolves.toEqual({
+        error: "Profile could not be saved. Try again.",
+      });
+      expect(mocks.updateProfile).toHaveBeenCalledOnce();
+      expect(mocks.invalidateOnboardingState).toHaveBeenCalledOnce();
+      expect(mocks.invalidateOnboardingState).toHaveBeenCalledWith(userId);
+    } finally {
+      consoleError.mockRestore();
+    }
   });
 });
 

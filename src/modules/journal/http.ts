@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { ZodError } from "zod";
 import { authenticationErrorResponse } from "@/modules/auth/http";
+import { RequestContractError } from "@/modules/http/contracts";
 import { JournalMutationError } from "./mutations";
 import { JournalCursorError } from "./queries";
 
@@ -8,8 +8,14 @@ export function journalErrorResponse(error: unknown, fallbackMessage: string): N
   const authResponse = authenticationErrorResponse(error);
   if (authResponse) return authResponse;
 
-  if (error instanceof ZodError) {
-    return NextResponse.json({ error: "Invalid journal request.", issues: error.issues }, { status: 400 });
+  if (error instanceof RequestContractError) {
+    return NextResponse.json(
+      {
+        error: "Invalid journal request.",
+        ...(error.issues ? { issues: error.issues } : {}),
+      },
+      { status: 400 },
+    );
   }
   if (error instanceof JournalMutationError || error instanceof JournalCursorError) {
     return NextResponse.json({ error: error.message }, { status: error.status });

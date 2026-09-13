@@ -9,6 +9,12 @@ import {
 import { drillShareErrorResponse } from "@/modules/sharing/http";
 import { updateDrillShare } from "@/modules/sharing/mutations";
 import { getDrillShareRecipientPage } from "@/modules/sharing/queries";
+import {
+  parseJsonRequest,
+  parseRequestContract,
+  parseRequestValue,
+  parseResponseContract,
+} from "@/modules/http/contracts";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -21,14 +27,18 @@ export async function GET(
 ) {
   try {
     const ownerUserId = await requireOnboardedUserId();
-    const { id } = paramsSchema.parse(await context.params);
+    const { id } = parseRequestValue(paramsSchema, await context.params);
+    const page = await getDrillShareRecipientPage(
+      ownerUserId,
+      id,
+      request.nextUrl.searchParams.get("cursor"),
+    ).catch((error: unknown) => parseRequestContract<never>(() => {
+      throw error;
+    }));
     return NextResponse.json(
-      drillShareRecipientPageSchema.parse(
-        await getDrillShareRecipientPage(
-          ownerUserId,
-          id,
-          request.nextUrl.searchParams.get("cursor"),
-        ),
+      parseResponseContract(
+        drillShareRecipientPageSchema,
+        page,
       ),
     );
   } catch (error) {
@@ -42,10 +52,11 @@ export async function PATCH(
 ) {
   try {
     const ownerUserId = await requireOnboardedUserId();
-    const { id } = paramsSchema.parse(await context.params);
-    const input = updateDrillShareInputSchema.parse(await request.json());
+    const { id } = parseRequestValue(paramsSchema, await context.params);
+    const input = await parseJsonRequest(request, updateDrillShareInputSchema);
     return NextResponse.json(
-      updateDrillShareResponseSchema.parse(
+      parseResponseContract(
+        updateDrillShareResponseSchema,
         await updateDrillShare(
           ownerUserId,
           id,

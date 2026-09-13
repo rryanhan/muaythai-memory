@@ -65,6 +65,17 @@ describe("POST /api/capture/transcribe hardening", () => {
     expect(mocks.transcribeCaptureAudio).not.toHaveBeenCalled();
   });
 
+  it("returns 400 when multipart parsing rejects the request", async () => {
+    const response = await POST(formDataFailureRequest(new TypeError("invalid multipart body")));
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error: "The audio upload could not be read.",
+    });
+    expect(mocks.consumeCaptureRateLimit).not.toHaveBeenCalled();
+    expect(mocks.transcribeCaptureAudio).not.toHaveBeenCalled();
+  });
+
   it("validates audio before consuming quota", async () => {
     const audio = new File(["audio"], "memo.webm", { type: "audio/webm" });
     const formData = new FormData();
@@ -105,11 +116,58 @@ describe("POST /api/capture/transcribe hardening", () => {
     expect(response.headers.get("Retry-After")).toBe("77");
     expect(mocks.transcribeCaptureAudio).not.toHaveBeenCalled();
   });
+
+  it("does not mislabel a downstream TypeError as an invalid upload", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    mocks.transcribeCaptureAudio.mockRejectedValue(new TypeError("provider bug"));
+
+    try {
+      const response = await POST(audioRequest());
+
+      expect(response.status).toBe(500);
+      await expect(response.json()).resolves.toEqual({
+        error: "Failed to transcribe the recording.",
+      });
+    } finally {
+      consoleError.mockRestore();
+    }
+  });
+
+  it("returns 500 when the transcript violates the response contract", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    mocks.transcribeCaptureAudio.mockResolvedValue("   ");
+
+    try {
+      const response = await POST(audioRequest());
+
+      expect(response.status).toBe(500);
+      await expect(response.json()).resolves.toEqual({
+        error: "Failed to transcribe the recording.",
+      });
+    } finally {
+      consoleError.mockRestore();
+    }
+  });
 });
+
+function audioRequest(): NextRequest {
+  const formData = new FormData();
+  formData.set("audio", new File(["audio"], "memo.webm", { type: "audio/webm" }));
+  return formRequest(formData);
+}
 
 function formRequest(formData: FormData): NextRequest {
   return {
     formData: async () => formData,
     signal: new AbortController().signal,
   } as NextRequest;
+}
+
+function formDataFailureRequest(error: Error): NextRequest {
+  return {
+    formData: async () => {
+      throw error;
+    },
+    signal: new AbortController().signal,
+  } as unknown as NextRequest;
 }

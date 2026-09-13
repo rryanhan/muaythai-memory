@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireOnboardedUserId } from "@/modules/auth/current-user";
+import { parseRequestValue, parseResponseContract } from "@/modules/http/contracts";
 import { journalListResponseSchema } from "@/modules/journal/contracts";
 import { journalErrorResponse } from "@/modules/journal/http";
 import { isOwnedDrill, listJournalEntries } from "@/modules/journal/queries";
@@ -17,7 +18,7 @@ const listParamsSchema = z.object({
 export async function GET(request: NextRequest) {
   try {
     const userId = await requireOnboardedUserId();
-    const params = listParamsSchema.parse({
+    const params = parseRequestValue(listParamsSchema, {
       cursor: request.nextUrl.searchParams.get("cursor") ?? undefined,
       limit: request.nextUrl.searchParams.get("limit") ?? undefined,
       drillId: request.nextUrl.searchParams.get("drillId") ?? undefined,
@@ -26,7 +27,10 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Drill not found." }, { status: 404 });
     }
     return NextResponse.json(
-      journalListResponseSchema.parse(await listJournalEntries(userId, params)),
+      parseResponseContract(
+        journalListResponseSchema,
+        await listJournalEntries(userId, params),
+      ),
     );
   } catch (error) {
     return journalErrorResponse(error, "Journal entries could not be loaded.");

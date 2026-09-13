@@ -4,6 +4,7 @@ import { requireOnboardedUserId } from "@/modules/auth/current-user";
 import { fighterProfileResponseSchema } from "@/modules/connections/contracts";
 import { connectionErrorResponse } from "@/modules/connections/http";
 import { getFighterProfileByUsername } from "@/modules/connections/queries";
+import { parseRequestValue, parseResponseContract } from "@/modules/http/contracts";
 import { profileUsernameSchema } from "@/modules/profile/contracts";
 
 export const dynamic = "force-dynamic";
@@ -17,12 +18,12 @@ export async function GET(
 ) {
   try {
     const currentUserId = await requireOnboardedUserId();
-    const { username } = paramsSchema.parse(await context.params);
+    const { username } = parseRequestValue(paramsSchema, await context.params);
     const fighter = await getFighterProfileByUsername(currentUserId, username);
     if (!fighter) {
       return NextResponse.json({ error: "Fighter not found." }, { status: 404 });
     }
-    return NextResponse.json(fighterProfileResponseSchema.parse({ fighter }));
+    return NextResponse.json(parseResponseContract(fighterProfileResponseSchema, { fighter }));
   } catch (error) {
     return connectionErrorResponse(error, "Fighter profile could not be loaded.");
   }

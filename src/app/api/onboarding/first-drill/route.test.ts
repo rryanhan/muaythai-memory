@@ -168,6 +168,17 @@ describe("POST /api/onboarding/first-drill", () => {
     expect(mocks.invalidateOnboardingState).not.toHaveBeenCalled();
   });
 
+  it("rejects malformed JSON before creating a drill", async () => {
+    const response = await POST(rawRequest("{not-json", creationKey));
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error: "Check the required drill fields and try again.",
+    });
+    expect(mocks.createGuidedFirstDrill).not.toHaveBeenCalled();
+    expect(mocks.invalidateOnboardingState).not.toHaveBeenCalled();
+  });
+
   it("rejects oversized guided drill content before creating a drill", async () => {
     const response = await POST(request({
       ...input,
@@ -222,6 +233,28 @@ describe("POST /api/onboarding/first-drill", () => {
     consoleError.mockRestore();
   });
 
+  it("invalidates once when a saved drill violates the response contract", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    mocks.createGuidedFirstDrill.mockResolvedValue({
+      ...drill,
+      id: "not-a-uuid",
+    });
+
+    try {
+      const response = await POST(request(input, creationKey));
+
+      expect(response.status).toBe(500);
+      await expect(response.json()).resolves.toEqual({
+        error: "Your first drill could not be saved. Try again.",
+      });
+      expect(mocks.createGuidedFirstDrill).toHaveBeenCalledTimes(1);
+      expect(mocks.invalidateOnboardingState).toHaveBeenCalledOnce();
+      expect(mocks.invalidateOnboardingState).toHaveBeenCalledWith(userId);
+    } finally {
+      consoleError.mockRestore();
+    }
+  });
+
   it("invalidates after a post-commit response failure without replacing the original error", async () => {
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
     mocks.createGuidedFirstDrill.mockRejectedValue(new Error("post-commit read failed"));
@@ -245,11 +278,15 @@ describe("POST /api/onboarding/first-drill", () => {
 });
 
 function request(body: unknown, idempotencyKey?: string): NextRequest {
+  return rawRequest(JSON.stringify(body), idempotencyKey);
+}
+
+function rawRequest(body: string, idempotencyKey?: string): NextRequest {
   const headers = new Headers({ "content-type": "application/json" });
   if (idempotencyKey) headers.set("idempotency-key", idempotencyKey);
 
   return new NextRequest("https://example.test/api/onboarding/first-drill", {
-    body: JSON.stringify(body),
+    body,
     headers,
     method: "POST",
   });

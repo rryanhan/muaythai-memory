@@ -4,6 +4,7 @@ import { requireOnboardedUserId } from "@/modules/auth/current-user";
 import { sharedDrillDetailResponseSchema } from "@/modules/sharing/contracts";
 import { drillShareErrorResponse } from "@/modules/sharing/http";
 import { getSharedDrillById } from "@/modules/sharing/queries";
+import { parseRequestValue, parseResponseContract } from "@/modules/http/contracts";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -16,12 +17,12 @@ export async function GET(
 ) {
   try {
     const userId = await requireOnboardedUserId();
-    const { id } = paramsSchema.parse(await context.params);
+    const { id } = parseRequestValue(paramsSchema, await context.params);
     const detail = await getSharedDrillById(userId, id);
     if (!detail) {
       return NextResponse.json({ error: "Shared drill not found." }, { status: 404 });
     }
-    return NextResponse.json(sharedDrillDetailResponseSchema.parse(detail));
+    return NextResponse.json(parseResponseContract(sharedDrillDetailResponseSchema, detail));
   } catch (error) {
     return drillShareErrorResponse(error, "Shared drill could not be loaded.");
   }

@@ -54,6 +54,25 @@ describe("POST /api/onboarding/skip", () => {
     consoleError.mockRestore();
   });
 
+  it("invalidates once when the skip result violates the response contract", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    mocks.skipFirstDrillGuide.mockResolvedValue("yes");
+
+    try {
+      const response = await POST();
+
+      expect(response.status).toBe(500);
+      await expect(response.json()).resolves.toEqual({
+        error: "The guide could not be skipped. Try again.",
+      });
+      expect(mocks.skipFirstDrillGuide).toHaveBeenCalledTimes(1);
+      expect(mocks.invalidateOnboardingState).toHaveBeenCalledOnce();
+      expect(mocks.invalidateOnboardingState).toHaveBeenCalledWith(userId);
+    } finally {
+      consoleError.mockRestore();
+    }
+  });
+
   it("invalidates after a post-commit failure without hiding the mutation error", async () => {
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
     mocks.skipFirstDrillGuide.mockRejectedValue(new Error("skip response failed"));

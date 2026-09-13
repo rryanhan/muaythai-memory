@@ -38,6 +38,32 @@ describe("POST /api/capture/draft hardening", () => {
     expect(mocks.generateCaptureDraft).not.toHaveBeenCalled();
   });
 
+  it("returns 400 for malformed JSON before dispatching cleanup", async () => {
+    const response = await POST(rawRequest("{not-json"));
+
+    expect(response.status).toBe(400);
+    expect(mocks.generateCaptureDraft).not.toHaveBeenCalled();
+  });
+
+  it("returns 500 when generated output violates the response contract", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    mocks.generateCaptureDraft.mockResolvedValue({ draft: null, warnings: [] });
+
+    try {
+      const response = await POST(request({
+        transcript: "On pads, throw a jab and cross before finishing with a kick.",
+      }));
+
+      expect(response.status).toBe(500);
+      await expect(response.json()).resolves.toEqual({
+        error: "Failed to generate capture draft.",
+      });
+      expect(mocks.generateCaptureDraft).toHaveBeenCalledOnce();
+    } finally {
+      consoleError.mockRestore();
+    }
+  });
+
   it("returns Retry-After for a blocked cleanup", async () => {
     mocks.generateCaptureDraft.mockRejectedValue(new CaptureRateLimitError({
       action: "cleanup",
@@ -56,9 +82,13 @@ describe("POST /api/capture/draft hardening", () => {
 });
 
 function request(body: unknown): NextRequest {
+  return rawRequest(JSON.stringify(body));
+}
+
+function rawRequest(body: string): NextRequest {
   return new NextRequest("https://example.test/api/capture/draft", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
+    body,
   });
 }
