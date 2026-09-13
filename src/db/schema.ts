@@ -495,6 +495,15 @@ export const journalEntries = pgTable(
     userOccurredIdx: index("journal_entries_user_occurred_idx").on(table.userId, table.occurredOn),
     userStatusIdx: index("journal_entries_user_status_idx").on(table.userId, table.status),
     drillIdx: index("journal_entries_drill_id_idx").on(table.drillId),
+    abandonedUploadIdx: index("journal_entries_abandoned_upload_idx")
+      .on(table.updatedAt, table.id, table.userId)
+      .where(sql`${table.status} = 'uploading'`),
+    staleMediaOperationIdx: index("journal_entries_stale_media_operation_idx")
+      .on(table.mediaOperation, table.mediaOperationStartedAt, table.id, table.userId)
+      .where(sql`${table.mediaOperation} in ('delete', 'cleanup')`),
+    deletedRetentionIdx: index("journal_entries_deleted_retention_idx")
+      .on(table.deletedAt, table.id, table.userId)
+      .where(sql`${table.status} = 'deleted'`),
     mediaOperationCheck: check(
       "journal_entries_media_operation_check",
       sql`((

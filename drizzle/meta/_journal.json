@@ -120,6 +120,13 @@
       "when": 1788054974010,
       "tag": "0016_drop-legacy-friendships",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1789334125767,
+      "tag": "0017_massive_proteus",
+      "breakpoints": true
     }
   ]
 }

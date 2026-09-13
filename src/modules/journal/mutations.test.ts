@@ -1,4 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { sql, type SQL } from "drizzle-orm";
+import { PgDialect } from "drizzle-orm/pg-core";
 
 type UploadRow = {
   createdAt: Date;
@@ -19,6 +21,9 @@ type UploadRow = {
 
 const mocks = vi.hoisted(() => ({
   activeTransactions: 0,
+  abandonedScanLimit: vi.fn(),
+  abandonedScanOrderBy: vi.fn(),
+  abandonedScanWhere: vi.fn(),
   afterAbandonedScan: null as (() => void | Promise<void>) | null,
   bucketCreateSignedUploadUrl: vi.fn(),
   bucketInfo: vi.fn(),
@@ -82,6 +87,9 @@ const otherUserPosterPath = "other-user/entry/poster-55555555-5555-4555-8555-555
 beforeEach(() => {
   process.env.NEXT_PUBLIC_SUPABASE_URL = "https://staging.supabase.co";
   mocks.activeTransactions = 0;
+  mocks.abandonedScanLimit.mockReset();
+  mocks.abandonedScanOrderBy.mockReset();
+  mocks.abandonedScanWhere.mockReset();
   mocks.afterAbandonedScan = null;
   mocks.bucketCreateSignedUploadUrl.mockReset().mockResolvedValue({
     data: { token: "fresh-upload-token" },
@@ -158,7 +166,9 @@ beforeEach(() => {
   mocks.row = uploadRow();
   mocks.selectAbandonedRows.mockReset().mockImplementation(() => {
     const builder = chainBuilder();
-    builder.where = vi.fn(async () => {
+    builder.where = mocks.abandonedScanWhere.mockImplementation(() => builder);
+    builder.orderBy = mocks.abandonedScanOrderBy.mockImplementation(() => builder);
+    builder.limit = mocks.abandonedScanLimit.mockImplementation(async (limit: number) => {
       const row = mocks.row;
       const rows = row && (
         row.status === "uploading"
@@ -176,7 +186,7 @@ beforeEach(() => {
       const afterScan = mocks.afterAbandonedScan;
       mocks.afterAbandonedScan = null;
       await afterScan?.();
-      return rows;
+      return rows.slice(0, limit);
     });
     return builder;
   });
@@ -702,6 +712,48 @@ describe("journal media operation claims", () => {
 });
 
 describe("cleanupAbandonedJournalUploads", () => {
+  it("selects a bounded oldest-first batch and caps caller overrides", async () => {
+    mocks.row = null;
+    const now = new Date("2026-07-23T12:00:00Z");
+
+    await expect(cleanupAbandonedJournalUploads(now))
+      .resolves.toEqual({ removed: 0, failed: 0 });
+
+    expect(mocks.abandonedScanLimit).toHaveBeenNthCalledWith(1, 25);
+    const orderBy = mocks.abandonedScanOrderBy.mock.calls[0] as SQL[];
+    const compiledOrder = new PgDialect().sqlToQuery(
+      sql`select 1 order by ${sql.join(orderBy, sql`, `)}`,
+    );
+    expect(compiledOrder.sql).toMatch(
+      /coalesce\(\s*"journal_entries"\."media_operation_started_at",\s*"journal_entries"\."deleted_at",\s*"journal_entries"\."updated_at"\s*\) asc/,
+    );
+    expect(compiledOrder.sql).toContain('"journal_entries"."id" asc');
+
+    await expect(cleanupAbandonedJournalUploads(now, { batchSize: 1_000 }))
+      .resolves.toEqual({ removed: 0, failed: 0 });
+    expect(mocks.abandonedScanLimit).toHaveBeenNthCalledWith(2, 100);
+  });
+
+  it("filters fresh media claims out of the bounded candidate scan", async () => {
+    mocks.row = null;
+
+    await expect(cleanupAbandonedJournalUploads(new Date("2026-07-23T12:00:00Z")))
+      .resolves.toEqual({ removed: 0, failed: 0 });
+
+    const where = mocks.abandonedScanWhere.mock.calls[0]?.[0] as SQL;
+    const compiledWhere = new PgDialect().sqlToQuery(sql`select 1 where ${where}`);
+    expect(compiledWhere.sql).toContain('"journal_entries"."media_operation" is null');
+    expect(compiledWhere.sql).toContain(
+      '"journal_entries"."media_operation_started_at" <=',
+    );
+    expect(compiledWhere.sql).toContain('"journal_entries"."status" = \'uploading\'');
+    expect(compiledWhere.sql).toContain('"journal_entries"."media_operation" = \'cleanup\'');
+    expect(compiledWhere.sql).toContain('"journal_entries"."media_operation" = \'delete\'');
+    expect(compiledWhere.sql).toContain('"journal_entries"."status" = \'deleted\'');
+    expect(compiledWhere.sql.match(/"journal_entries"\."media_operation" is null/g))
+      .toHaveLength(2);
+  });
+
   it("does not claim an aged upload refreshed after the abandoned scan", async () => {
     const now = new Date("2026-07-23T12:00:00Z");
     vi.useFakeTimers();
@@ -728,10 +780,34 @@ describe("cleanupAbandonedJournalUploads", () => {
     }
   });
 
+  it("timestamps delayed claims when each worker starts instead of when the batch was scanned", async () => {
+    const scanTime = new Date("2026-07-23T12:00:00Z");
+    const delayedClaimTime = new Date("2026-07-23T12:06:00Z");
+    vi.useFakeTimers();
+    vi.setSystemTime(scanTime);
+    mocks.removeFailures = 1;
+    mocks.afterAbandonedScan = () => {
+      vi.setSystemTime(delayedClaimTime);
+    };
+
+    try {
+      await expect(cleanupAbandonedJournalUploads())
+        .resolves.toEqual({ removed: 0, failed: 1 });
+
+      expect(mocks.row).toMatchObject({
+        mediaOperation: "cleanup",
+        mediaOperationStartedAt: delayedClaimTime,
+        status: "uploading",
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("counts a claim failure and continues cleaning later rows", async () => {
     mocks.selectAbandonedRows.mockImplementationOnce(() => {
       const builder = chainBuilder();
-      builder.where = vi.fn(async () => [
+      builder.limit = vi.fn(async () => [
         { id: "failed-entry", userId: "user" },
         { id: "entry", userId: "user" },
       ]);
@@ -746,6 +822,59 @@ describe("cleanupAbandonedJournalUploads", () => {
     expect(mocks.bucketList).toHaveBeenCalledOnce();
     expect(mocks.bucketRemove).toHaveBeenCalledOnce();
     expect(mocks.objects).toEqual([]);
+  });
+
+  it("processes no more than three cleanup candidates concurrently", async () => {
+    const candidates = Array.from({ length: 5 }, (_, index) => ({
+      id: `entry-${index}`,
+      userId: "user",
+    }));
+    mocks.selectAbandonedRows.mockImplementationOnce(() => {
+      const builder = chainBuilder();
+      builder.limit = vi.fn(async (limit: number) => candidates.slice(0, limit));
+      return builder;
+    });
+    const candidateRows = new Map<string, UploadRow>(candidates.map(({ id }) => [
+      id,
+      {
+        ...uploadRow(),
+        id,
+        posterPath: null,
+        storagePath: `user/${id}/video.mp4`,
+      },
+    ]));
+    installIndependentSerializedTransactions(candidateRows);
+
+    const listGates = Array.from({ length: candidates.length }, () => (
+      deferred<{ data: []; error: null }>()
+    ));
+    let activeStorageCalls = 0;
+    let maxActiveStorageCalls = 0;
+    let nextGate = 0;
+    mocks.bucketList.mockImplementation(async () => {
+      const gate = listGates[nextGate]!;
+      nextGate += 1;
+      activeStorageCalls += 1;
+      maxActiveStorageCalls = Math.max(maxActiveStorageCalls, activeStorageCalls);
+      const result = await gate.promise;
+      activeStorageCalls -= 1;
+      return result;
+    });
+
+    const cleanup = cleanupAbandonedJournalUploads(
+      new Date("2026-07-23T12:00:00Z"),
+      { batchSize: candidates.length },
+    );
+    await vi.waitFor(() => expect(mocks.bucketList).toHaveBeenCalledTimes(3));
+    expect(maxActiveStorageCalls).toBe(3);
+
+    for (const gate of listGates.slice(0, 3)) gate.resolve({ data: [], error: null });
+    await vi.waitFor(() => expect(mocks.bucketList).toHaveBeenCalledTimes(5));
+    expect(maxActiveStorageCalls).toBe(3);
+
+    for (const gate of listGates.slice(3)) gate.resolve({ data: [], error: null });
+    await expect(cleanup).resolves.toEqual({ removed: 5, failed: 0 });
+    expect(candidateRows.size).toBe(0);
   });
 
   it("discovers owned poster orphans without crossing entry or user prefixes", async () => {
@@ -798,7 +927,7 @@ describe("cleanupAbandonedJournalUploads", () => {
       .resolves.toEqual({ removed: 0, failed: 1 });
     expect(mocks.row).toMatchObject({ mediaOperation: "cleanup" });
 
-    await expect(cleanupAbandonedJournalUploads(new Date("2026-07-23T12:01:00Z")))
+    await expect(cleanupAbandonedJournalUploads(new Date("2026-07-23T12:05:00Z")))
       .resolves.toEqual({ removed: 1, failed: 0 });
     expect(mocks.row).toBeNull();
     expect(mocks.objects).toEqual([]);
@@ -813,7 +942,7 @@ describe("cleanupAbandonedJournalUploads", () => {
     expect(mocks.row).toMatchObject({ id: "entry", status: "uploading" });
     expect(mocks.objects).toEqual([]);
 
-    await expect(cleanupAbandonedJournalUploads(new Date("2026-07-23T12:01:00Z")))
+    await expect(cleanupAbandonedJournalUploads(new Date("2026-07-23T12:05:00Z")))
       .resolves.toEqual({ removed: 1, failed: 0 });
     expect(mocks.row).toBeNull();
     expect(mocks.bucketRemove).toHaveBeenCalledTimes(2);
@@ -864,6 +993,37 @@ describe("cleanupAbandonedJournalUploads", () => {
     expect(mocks.row).toMatchObject({ mediaOperation: "delete", status: "ready" });
     expect(mocks.bucketList).not.toHaveBeenCalled();
     expect(mocks.bucketRemove).not.toHaveBeenCalled();
+  });
+
+  it("does not preempt a fresh cleanup claim", async () => {
+    mocks.row = {
+      ...uploadRow(),
+      mediaOperation: "cleanup",
+      mediaOperationToken: "11111111-1111-4111-8111-111111111111",
+      mediaOperationStartedAt: new Date("2026-07-23T11:59:00Z"),
+    };
+
+    await expect(cleanupAbandonedJournalUploads(new Date("2026-07-23T12:00:00Z")))
+      .resolves.toEqual({ removed: 0, failed: 0 });
+
+    expect(mocks.row).toMatchObject({ mediaOperation: "cleanup", status: "uploading" });
+    expect(mocks.bucketList).not.toHaveBeenCalled();
+    expect(mocks.bucketRemove).not.toHaveBeenCalled();
+  });
+
+  it("takes over a cleanup claim exactly at the lease boundary", async () => {
+    mocks.row = {
+      ...uploadRow(),
+      mediaOperation: "cleanup",
+      mediaOperationToken: "11111111-1111-4111-8111-111111111111",
+      mediaOperationStartedAt: new Date("2026-07-23T11:55:00Z"),
+    };
+
+    await expect(cleanupAbandonedJournalUploads(new Date("2026-07-23T12:00:00Z")))
+      .resolves.toEqual({ removed: 1, failed: 0 });
+
+    expect(mocks.row).toBeNull();
+    expect(mocks.objects).toEqual([]);
   });
 
   it("takes over an expired delete claim on a ready entry", async () => {
@@ -924,7 +1084,7 @@ describe("cleanupAbandonedJournalUploads", () => {
     });
     expect(mocks.objects).toEqual(["user/entry/video.mp4", oldPosterPath]);
 
-    await expect(cleanupAbandonedJournalUploads(new Date("2026-07-23T12:01:00Z")))
+    await expect(cleanupAbandonedJournalUploads(new Date("2026-07-23T12:05:00Z")))
       .resolves.toEqual({ removed: 0, failed: 0 });
     expect(mocks.row).toMatchObject({
       mediaOperation: null,
@@ -1016,6 +1176,91 @@ function installSerializedTransactions(): void {
   });
 }
 
+function installIndependentSerializedTransactions(rows: Map<string, UploadRow>): void {
+  let tail = Promise.resolve();
+  mocks.transaction.mockReset().mockImplementation(async (
+    callback: (tx: ReturnType<typeof fakeTransaction>) => Promise<unknown>,
+  ) => {
+    let release: () => void = () => {};
+    const previous = tail;
+    tail = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    await previous;
+
+    try {
+      mocks.activeTransactions += 1;
+      return await callback(fakeKeyedTransaction(rows));
+    } finally {
+      mocks.activeTransactions -= 1;
+      setTimeout(release, 0);
+    }
+  });
+}
+
+function fakeKeyedTransaction(rows: Map<string, UploadRow>): ReturnType<typeof fakeTransaction> {
+  function getEntryId(condition: unknown): string | null {
+    const { params } = new PgDialect().sqlToQuery(condition as SQL);
+    return params.find((param): param is string => (
+      typeof param === "string" && rows.has(param)
+    )) ?? null;
+  }
+
+  return {
+    delete: vi.fn(() => {
+      let entryId: string | null = null;
+      const builder = chainBuilder();
+      builder.where = vi.fn((condition: unknown) => {
+        entryId = getEntryId(condition);
+        return builder;
+      });
+      builder.returning = vi.fn(async () => {
+        if (!entryId || !rows.has(entryId)) return [];
+        rows.delete(entryId);
+        return [{ id: entryId }];
+      });
+      return builder;
+    }),
+    select: vi.fn(() => {
+      let entryId: string | null = null;
+      const builder = chainBuilder();
+      builder.where = vi.fn((condition: unknown) => {
+        entryId = getEntryId(condition);
+        return builder;
+      });
+      builder.for = vi.fn(() => {
+        mocks.forUpdate();
+        return builder;
+      });
+      builder.limit = vi.fn(async () => {
+        const row = entryId ? rows.get(entryId) : null;
+        return row ? [{ ...row }] : [];
+      });
+      return builder;
+    }),
+    update: vi.fn(() => {
+      let entryId: string | null = null;
+      let values: Partial<UploadRow> = {};
+      const builder = chainBuilder();
+      builder.set = vi.fn((nextValues: Partial<UploadRow>) => {
+        values = nextValues;
+        return builder;
+      });
+      builder.where = vi.fn((condition: unknown) => {
+        entryId = getEntryId(condition);
+        return builder;
+      });
+      builder.returning = vi.fn(async () => {
+        const row = entryId ? rows.get(entryId) : null;
+        if (!entryId || !row) return [];
+        rows.set(entryId, { ...row, ...values });
+        return [{ id: entryId }];
+      });
+      return builder;
+    }),
+  };
+}
+
 function fakeTransaction(local: { row: UploadRow | null }) {
   return {
     delete: vi.fn(() => {
@@ -1068,7 +1313,7 @@ function fakeTransaction(local: { row: UploadRow | null }) {
 
 function chainBuilder(): Record<string, ReturnType<typeof vi.fn>> {
   const builder: Record<string, ReturnType<typeof vi.fn>> = {};
-  for (const method of ["from", "innerJoin", "where", "for", "limit", "set", "returning"]) {
+  for (const method of ["from", "innerJoin", "where", "orderBy", "for", "limit", "set", "returning"]) {
     builder[method] = vi.fn(() => builder);
   }
   return builder;

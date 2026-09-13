@@ -1,0 +1,3 @@
+CREATE INDEX "journal_entries_abandoned_upload_idx" ON "journal_entries" USING btree ("updated_at","id","user_id") WHERE "journal_entries"."status" = 'uploading';--> statement-breakpoint
+CREATE INDEX "journal_entries_stale_media_operation_idx" ON "journal_entries" USING btree ("media_operation","media_operation_started_at","id","user_id") WHERE "journal_entries"."media_operation" in ('delete', 'cleanup');--> statement-breakpoint
+CREATE INDEX "journal_entries_deleted_retention_idx" ON "journal_entries" USING btree ("deleted_at","id","user_id") WHERE "journal_entries"."status" = 'deleted';

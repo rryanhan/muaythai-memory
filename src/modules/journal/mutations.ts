@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { and, eq, lt, lte, or } from "drizzle-orm";
+import { and, asc, eq, isNull, lt, lte, or, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { drills, journalEntries, journalMedia } from "@/db/schema";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
@@ -321,12 +321,23 @@ export async function deleteJournalEntry(userId: string, entryId: string): Promi
   throw new JournalMutationError("Journal entry is already being removed.", 409);
 }
 
-export async function cleanupAbandonedJournalUploads(now = new Date()): Promise<{ removed: number; failed: number }> {
-  const cutoff = new Date(now.getTime() - JOURNAL_ABANDONED_UPLOAD_HOURS * 60 * 60 * 1000);
-  const tombstoneCutoff = new Date(
-    now.getTime() - JOURNAL_DELETE_TOMBSTONE_HOURS * 60 * 60 * 1000,
+type JournalCleanupOptions = {
+  batchSize?: number;
+};
+
+export async function cleanupAbandonedJournalUploads(
+  now?: Date,
+  options: JournalCleanupOptions = {},
+): Promise<{ removed: number; failed: number }> {
+  const scanNow = now ?? new Date();
+  const cutoff = new Date(
+    scanNow.getTime() - JOURNAL_ABANDONED_UPLOAD_HOURS * 60 * 60 * 1000,
   );
-  const leaseCutoff = new Date(now.getTime() - JOURNAL_OPERATION_LEASE_MS);
+  const tombstoneCutoff = new Date(
+    scanNow.getTime() - JOURNAL_DELETE_TOMBSTONE_HOURS * 60 * 60 * 1000,
+  );
+  const leaseCutoff = new Date(scanNow.getTime() - JOURNAL_OPERATION_LEASE_MS);
+  const batchSize = normalizeJournalCleanupBatchSize(options.batchSize);
   const rows = await db
     .select({
       id: journalEntries.id,
@@ -334,65 +345,95 @@ export async function cleanupAbandonedJournalUploads(now = new Date()): Promise<
     })
     .from(journalEntries)
     .where(or(
-      and(eq(journalEntries.status, "uploading"), lt(journalEntries.updatedAt, cutoff)),
-      eq(journalEntries.mediaOperation, "cleanup"),
       and(
-        eq(journalEntries.mediaOperation, "delete"),
+        sql`${journalEntries.status} = 'uploading'`,
+        lt(journalEntries.updatedAt, cutoff),
+        or(
+          isNull(journalEntries.mediaOperation),
+          lte(journalEntries.mediaOperationStartedAt, leaseCutoff),
+        ),
+      ),
+      and(
+        sql`${journalEntries.mediaOperation} = 'cleanup'`,
         lte(journalEntries.mediaOperationStartedAt, leaseCutoff),
       ),
       and(
-        eq(journalEntries.status, "deleted"),
-        lte(journalEntries.deletedAt, tombstoneCutoff),
+        sql`${journalEntries.mediaOperation} = 'delete'`,
+        lte(journalEntries.mediaOperationStartedAt, leaseCutoff),
       ),
-    ));
+      and(
+        sql`${journalEntries.status} = 'deleted'`,
+        lte(journalEntries.deletedAt, tombstoneCutoff),
+        or(
+          isNull(journalEntries.mediaOperation),
+          lte(journalEntries.mediaOperationStartedAt, leaseCutoff),
+        ),
+      ),
+    ))
+    .orderBy(
+      asc(sql`coalesce(
+        ${journalEntries.mediaOperationStartedAt},
+        ${journalEntries.deletedAt},
+        ${journalEntries.updatedAt}
+      )`),
+      asc(journalEntries.id),
+    )
+    .limit(batchSize);
   if (rows.length === 0) return { removed: 0, failed: 0 };
 
   const bucket = createSupabaseAdminClient().storage.from(JOURNAL_MEDIA_BUCKET);
-  let removed = 0;
-  let failed = 0;
+  const outcomes = await runWithConcurrencyLimit(
+    rows,
+    JOURNAL_CLEANUP_CONCURRENCY,
+    async (row): Promise<"removed" | "failed" | "skipped"> => {
+      try {
+        // A real batch can outlive the lease. Keep an explicit as-of time deterministic,
+        // but stamp production claims when their worker actually starts.
+        const claim = await claimAbandonedCleanup(
+          row.userId,
+          row.id,
+          cutoff,
+          tombstoneCutoff,
+          now ?? new Date(),
+        );
+        if (!claim) return "skipped";
 
-  for (const row of rows) {
-    try {
-      const claim = await claimAbandonedCleanup(
-        row.userId,
-        row.id,
-        cutoff,
-        tombstoneCutoff,
-        now,
-      );
-      if (!claim) continue;
+        const cleanupError = await removeJournalEntryStorageObjects(
+          bucket,
+          row.userId,
+          row.id,
+          [claim.current.storagePath, claim.current.posterPath].filter(
+            (path): path is string => Boolean(path),
+          ),
+        );
+        if (cleanupError) {
+          logStorageCleanupError("Abandoned journal upload Storage cleanup failed.", cleanupError);
+          return "failed";
+        }
 
-      const cleanupError = await removeJournalEntryStorageObjects(
-        bucket,
-        row.userId,
-        row.id,
-        [claim.current.storagePath, claim.current.posterPath].filter((path): path is string => Boolean(path)),
-      );
-      if (cleanupError) {
-        logStorageCleanupError("Abandoned journal upload Storage cleanup failed.", cleanupError);
-        failed += 1;
-        continue;
+        if (!claim.physicallyDelete) {
+          await releaseOperation(row.userId, row.id, "cleanup", claim.token);
+          return "skipped";
+        }
+
+        const finalized = await finalizeDeletion(
+          row.userId,
+          row.id,
+          "cleanup",
+          claim.token,
+          claim.requiredStatus,
+        );
+        return finalized ? "removed" : "skipped";
+      } catch (error) {
+        logStorageCleanupError("Abandoned journal upload cleanup failed.", error);
+        return "failed";
       }
-
-      if (!claim.physicallyDelete) {
-        await releaseOperation(row.userId, row.id, "cleanup", claim.token);
-        continue;
-      }
-
-      const finalized = await finalizeDeletion(
-        row.userId,
-        row.id,
-        "cleanup",
-        claim.token,
-        claim.requiredStatus,
-      );
-      if (finalized) removed += 1;
-    } catch (error) {
-      logStorageCleanupError("Abandoned journal upload cleanup failed.", error);
-      failed += 1;
-    }
-  }
-  return { removed, failed };
+    },
+  );
+  return {
+    removed: outcomes.filter((outcome) => outcome === "removed").length,
+    failed: outcomes.filter((outcome) => outcome === "failed").length,
+  };
 }
 
 async function assertOwnedDrill(userId: string, drillId: string): Promise<void> {
@@ -417,8 +458,39 @@ type OperationClaim = {
 };
 
 const JOURNAL_OPERATION_LEASE_MS = 5 * 60 * 1000;
+const JOURNAL_CLEANUP_DEFAULT_BATCH_SIZE = 25;
+const JOURNAL_CLEANUP_MAX_BATCH_SIZE = 100;
+const JOURNAL_CLEANUP_CONCURRENCY = 3;
 const JOURNAL_POSTER_OBJECT_NAME =
   /^poster-[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.(?:jpg|webp)$/i;
+
+function normalizeJournalCleanupBatchSize(batchSize: number | undefined): number {
+  if (batchSize === undefined || !Number.isFinite(batchSize) || batchSize < 1) {
+    return JOURNAL_CLEANUP_DEFAULT_BATCH_SIZE;
+  }
+  return Math.min(Math.trunc(batchSize), JOURNAL_CLEANUP_MAX_BATCH_SIZE);
+}
+
+async function runWithConcurrencyLimit<Item, Result>(
+  items: readonly Item[],
+  concurrency: number,
+  work: (item: Item) => Promise<Result>,
+): Promise<Result[]> {
+  const results = new Array<Result>(items.length);
+  let nextIndex = 0;
+
+  async function runWorker(): Promise<void> {
+    while (nextIndex < items.length) {
+      const index = nextIndex;
+      nextIndex += 1;
+      results[index] = await work(items[index]);
+    }
+  }
+
+  const workerCount = Math.min(concurrency, items.length);
+  await Promise.all(Array.from({ length: workerCount }, () => runWorker()));
+  return results;
+}
 
 export async function claimPosterSave(
   userId: string,
@@ -492,12 +564,13 @@ async function claimAbandonedCleanup(
     const leaseCutoff = new Date(now.getTime() - JOURNAL_OPERATION_LEASE_MS);
     const staleDelete = current.mediaOperation === "delete"
       && Boolean(current.mediaOperationStartedAt && current.mediaOperationStartedAt <= leaseCutoff);
-    const destructiveCleanup = current.mediaOperation === "cleanup";
+    const destructiveCleanup = current.mediaOperation === "cleanup"
+      && Boolean(current.mediaOperationStartedAt && current.mediaOperationStartedAt <= leaseCutoff);
     const abandonedUpload = current.status === "uploading" && current.updatedAt < cutoff;
     const expiredTombstone = current.status === "deleted"
       && Boolean(current.deletedAt && current.deletedAt <= tombstoneCutoff);
     if (!staleDelete && !destructiveCleanup && !abandonedUpload && !expiredTombstone) return null;
-    if (current.mediaOperation && current.mediaOperation !== "cleanup") {
+    if (current.mediaOperation) {
       if (!current.mediaOperationStartedAt || current.mediaOperationStartedAt > leaseCutoff) return null;
     }
 
