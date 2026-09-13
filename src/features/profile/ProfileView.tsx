@@ -56,7 +56,7 @@ export function ProfileView({ currentUser }: ProfileViewProps) {
           <p className="eyebrow">Profile</p>
           <h1>{currentUser.username ? `@${currentUser.username}` : currentUser.displayName}</h1>
         </div>
-        <Link className={styles.editLink} href="/profile/edit" prefetch aria-label="Edit profile">
+        <Link className={styles.editLink} href="/profile/edit" aria-label="Edit profile">
           <PencilSimple size={21} weight="regular" aria-hidden="true" />
         </Link>
         <div className={styles.profileStats} aria-label="Profile counts">
@@ -64,7 +64,7 @@ export function ProfileView({ currentUser }: ProfileViewProps) {
             <strong>{overviewQuery.isPending ? "–" : overview?.drillCount ?? 0}</strong>
             Drills
           </span>
-          <Link href="/connections?tab=followers" prefetch>
+          <Link href="/connections?tab=followers">
             <strong>{connectionsQuery.data?.counts.followers ?? "–"}</strong>
             Followers
             {(connectionsQuery.data?.counts.incoming ?? 0) > 0 && (
@@ -73,7 +73,7 @@ export function ProfileView({ currentUser }: ProfileViewProps) {
               </small>
             )}
           </Link>
-          <Link href="/connections?tab=following" prefetch>
+          <Link href="/connections?tab=following">
             <strong>{connectionsQuery.data?.counts.following ?? "–"}</strong>
             Following
           </Link>
@@ -135,7 +135,7 @@ export function ProfileView({ currentUser }: ProfileViewProps) {
             <p className="eyebrow">Training Memory</p>
             <h2 id="progress-journal-title">Progress Journal</h2>
           </div>
-          <Link className={styles.addEntry} href="/journal/new" prefetch>
+          <Link className={styles.addEntry} href="/journal/new">
             <Plus size={18} weight="bold" aria-hidden="true" />
             Add Entry
           </Link>
@@ -168,7 +168,7 @@ export function ProfileView({ currentUser }: ProfileViewProps) {
         ) : (
           <div className={styles.journalEmpty}>
             <p>Your training clips will collect here by date.</p>
-            <Link href="/journal/new" prefetch>Add your first entry</Link>
+            <Link href="/journal/new">Add your first entry</Link>
           </div>
         )}
       </section>
@@ -193,7 +193,7 @@ function SavedListLink({
   icon: React.ReactNode;
 }) {
   return (
-    <Link className={styles.savedLink} href={href} prefetch>
+    <Link className={styles.savedLink} href={href}>
       {icon}
       <span>{title}</span>
       <strong>{count ?? "–"}</strong>

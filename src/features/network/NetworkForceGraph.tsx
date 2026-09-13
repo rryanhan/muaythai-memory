@@ -14,6 +14,8 @@ import {
   useMemo,
   useRef,
   useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
 } from "react";
 import type { GraphResponse } from "@/data";
@@ -318,15 +320,38 @@ export function NetworkForceGraph({
     }
 
     if (!dragState.moved) {
-      if (node.type === "trainingMethod") {
-        onMethodSelect(node.slug);
-      }
-      if (node.type === "drill") {
-        onDrillSelect(node.entityId);
-      }
+      activateNode(node);
     }
 
     dragStateRef.current = null;
+  }
+
+  function activateNode(node: PhysicsNode) {
+    if (node.type === "trainingMethod") {
+      onMethodSelect(node.slug);
+    }
+    if (node.type === "drill") {
+      onDrillSelect(node.entityId);
+    }
+  }
+
+  function handleNodeKeyDown(node: PhysicsNode, event: ReactKeyboardEvent<SVGGElement>) {
+    if (event.key !== "Enter" && event.key !== " ") return;
+
+    event.preventDefault();
+    event.stopPropagation();
+    activateNode(node);
+  }
+
+  function handleNodeClick(node: PhysicsNode, event: ReactMouseEvent<SVGGElement>) {
+    // Pointer taps activate on pointerup so dragging remains possible. A zero-detail
+    // click is synthetic (for example, from assistive technology) and still needs
+    // an activation path because SVG groups have no native button behavior.
+    if (event.detail !== 0) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+    activateNode(node);
   }
 
   return (
@@ -374,10 +399,15 @@ export function NetworkForceGraph({
                   data-highlighted={Boolean(visualState.canHighlight && active)}
                   data-far-visible={Boolean(visualState.canHighlight && active)}
                   transform={`translate(${node.x}, ${node.y})`}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`Open drill ${node.label}`}
                   onPointerDown={(event) => handleNodePointerDown(node, event)}
                   onPointerMove={handleNodePointerMove}
                   onPointerUp={finishNodeDrag}
                   onPointerCancel={finishNodeDrag}
+                  onKeyDown={(event) => handleNodeKeyDown(node, event)}
+                  onClick={(event) => handleNodeClick(node, event)}
                 >
                   <g
                     className="network-force-node-visual"
@@ -411,10 +441,16 @@ export function NetworkForceGraph({
                   data-active={!visualState.canHighlight || active}
                   data-focused={Boolean(node.slug && focusedMethodSet.has(node.slug))}
                   transform={`translate(${node.x}, ${node.y})`}
+                  role={node.slug ? "button" : undefined}
+                  tabIndex={node.slug ? 0 : undefined}
+                  aria-label={node.slug ? `Filter by training method ${node.label}` : undefined}
+                  aria-pressed={node.slug ? focusedMethodSet.has(node.slug) : undefined}
                   onPointerDown={(event) => handleNodePointerDown(node, event)}
                   onPointerMove={handleNodePointerMove}
                   onPointerUp={finishNodeDrag}
                   onPointerCancel={finishNodeDrag}
+                  onKeyDown={(event) => handleNodeKeyDown(node, event)}
+                  onClick={node.slug ? (event) => handleNodeClick(node, event) : undefined}
                 >
                   <g
                     className="network-force-node-visual"

@@ -47,6 +47,17 @@
   cursor: grabbing;
 }
 
+.root :global(.network-force-node[role="button"]:focus) {
+  outline: none;
+}
+
+.root :global(.network-force-node[role="button"]:focus-visible .network-force-hit-area) {
+  fill: rgba(209, 74, 50, 0.12);
+  stroke: var(--accent);
+  stroke-width: 3px;
+  vector-effect: non-scaling-stroke;
+}
+
 .root :global(.network-force-hit-area) {
   fill: transparent;
   pointer-events: all;

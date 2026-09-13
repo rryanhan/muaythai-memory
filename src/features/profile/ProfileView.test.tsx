@@ -95,6 +95,28 @@ describe("ProfileView", () => {
     expect(screen.getByRole("link", { name: /drill back in/i })).toHaveTextContent("2");
   });
 
+  it("keeps visible profile links on Next's bounded default prefetch policy", async () => {
+    renderProfile();
+
+    await screen.findByLabelText("Pad Work: 4 drills");
+    const boundedDestinations = new Set([
+      "/profile/edit",
+      "/connections?tab=followers",
+      "/connections?tab=following",
+      "/profile/favourites",
+      "/profile/drill-back-in",
+      "/journal/new",
+    ]);
+    const destinationProps = mocks.linkProps.mock.calls
+      .map(([value]) => value)
+      .filter((value) => boundedDestinations.has(value.href));
+
+    expect(new Set(destinationProps.map(({ href }) => href))).toEqual(boundedDestinations);
+    for (const props of destinationProps) {
+      expect(props.prefetch).not.toBe(true);
+    }
+  });
+
   it("links journal rows without forcing or manually triggering full-route prefetches", async () => {
     mocks.getJournalEntries.mockResolvedValue({
       entries: [{
@@ -117,7 +139,7 @@ describe("ProfileView", () => {
       .map(([value]) => value)
       .find((value) => value.href === "/journal/00000000-0000-4000-8000-000000000201");
     expect(props).toBeDefined();
-    expect(props).not.toHaveProperty("prefetch");
+    expect(props?.prefetch).not.toBe(true);
     expect(props).not.toHaveProperty("onFocus");
     expect(props).not.toHaveProperty("onPointerEnter");
     expect(props).not.toHaveProperty("onTouchStart");
