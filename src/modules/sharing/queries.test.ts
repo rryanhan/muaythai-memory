@@ -13,7 +13,11 @@ vi.mock("@/db/client", () => ({
   },
 }));
 
-import { getDrillShareRecipientPage, listSharedDrills } from "./queries";
+import {
+  getDrillShareRecipientPage,
+  getSharedDrillById,
+  listSharedDrills,
+} from "./queries";
 
 const ownerId = "11111111-1111-4111-8111-111111111111";
 const drillId = "22222222-2222-4222-8222-222222222222";
@@ -154,6 +158,174 @@ describe("getDrillShareRecipientPage", () => {
       userId: "00000000-0000-4000-8000-000000000019",
     });
     expect(mocks.execute).toHaveBeenCalledOnce();
+  });
+});
+
+describe("getSharedDrillById", () => {
+  beforeEach(() => {
+    mocks.execute.mockReset();
+    mocks.select.mockReset();
+  });
+
+  it("hydrates an authorized detail, then confirms access before returning it", async () => {
+    const row = {
+      drillId,
+      drillTitle: "Long guard entry",
+      drillSummary: "Frame, step, and enter safely.",
+      drillNotes: "Keep the lead shoulder high.",
+      trainingMethods: [{
+        id: "55555555-5555-4555-8555-555555555555",
+        name: "Pad work",
+        slug: "pad-work",
+        iconKey: "pad-work",
+        sortOrder: 1,
+      }],
+      tags: [{
+        id: "66666666-6666-4666-8666-666666666666",
+        name: "Long guard",
+        slug: "long-guard",
+        kind: "standard" as const,
+        sortOrder: 1,
+        category: null,
+      }],
+      customTags: [{
+        id: "77777777-7777-4777-8777-777777777777",
+        name: "Stay tall",
+        slug: "stay-tall",
+        kind: "custom" as const,
+        sortOrder: 2,
+        category: null,
+      }],
+      steps: [{
+        id: "88888888-8888-4888-8888-888888888888",
+        position: 1,
+        body: "Post on the lead shoulder.",
+      }],
+      drillCreatedAt: "2026-05-01T01:00:00.000Z",
+      drillUpdatedAt: "2026-05-02T02:00:00.000Z",
+      ownerId,
+      ownerUsername: "owner_name",
+      ownerAvatarUrl: null,
+      sharedAt: "2026-05-03T03:00:00.000Z",
+    };
+    const confirmedAccess = {
+      ownerId,
+      ownerUsername: "confirmed_owner",
+      ownerAvatarUrl: "/confirmed-avatar.png",
+      sharedAt: "2026-05-04T04:00:00.000Z",
+    };
+    mocks.execute.mockImplementationOnce(async (query) => {
+      const compiled = new PgDialect().sqlToQuery(query);
+      const normalizedSql = compiled.sql.replace(/\s+/g, " ").trim();
+
+      expect(compiled.params).toEqual([viewerId, drillId]);
+      expect(normalizedSql).toContain(`with request_context as (`);
+      expect(normalizedSql).toContain(`authorized_drill as materialized (`);
+      expect(normalizedSql).toContain(
+        `"drill_shares"."drill_id" = request_context."drillId" ` +
+          `and "drill_shares"."recipient_user_id" = request_context."viewerId"`,
+      );
+      expect(normalizedSql).toContain(`"users"."username" is not null`);
+      expect(normalizedSql).not.toContain(`"users"."profile_onboarded_at"`);
+      expect(normalizedSql).toContain(
+        `viewer_follow."follower_id" = request_context."viewerId" ` +
+          `and viewer_follow."following_id" = "drills"."user_id" ` +
+          `and viewer_follow."status" = 'accepted'`,
+      );
+      expect(normalizedSql).toContain(
+        `owner_follow."follower_id" = "drills"."user_id" ` +
+          `and owner_follow."following_id" = request_context."viewerId" ` +
+          `and owner_follow."status" = 'accepted'`,
+      );
+      expect(normalizedSql).toContain(
+        `pair_block."blocker_id" = request_context."viewerId" ` +
+          `and pair_block."blocked_id" = "drills"."user_id"`,
+      );
+      expect(normalizedSql).toContain(
+        `pair_block."blocker_id" = "drills"."user_id" ` +
+          `and pair_block."blocked_id" = request_context."viewerId"`,
+      );
+      expect(normalizedSql).toContain(`join "drill_training_methods"`);
+      expect(normalizedSql).toContain(`join "drill_tags"`);
+      expect(normalizedSql).toContain(`join "drill_steps"`);
+      expect(normalizedSql).toContain(
+        `("tags"."user_id" is null or "tags"."user_id" = authorized_drill."ownerId")`,
+      );
+      expect(normalizedSql).not.toContain(`"drill_status_tags"`);
+      expect(normalizedSql).not.toContain(`"status_tags"`);
+      return [row];
+    });
+    mocks.execute.mockImplementationOnce(async (query) => {
+      const compiled = new PgDialect().sqlToQuery(query);
+      const normalizedSql = compiled.sql.replace(/\s+/g, " ").trim();
+
+      expect(compiled.params).toEqual([viewerId, drillId]);
+      expect(normalizedSql).toContain(`authorized_drill as materialized (`);
+      expect(normalizedSql).toContain(
+        `select authorized_drill."ownerId", authorized_drill."ownerUsername", ` +
+          `authorized_drill."ownerAvatarUrl", authorized_drill."sharedAt" ` +
+          `from authorized_drill limit 1`,
+      );
+      expect(normalizedSql).not.toContain(`method_payload`);
+      expect(normalizedSql).not.toContain(`step_payload`);
+      expect(normalizedSql).not.toContain(`"drills"."notes"`);
+      expect(normalizedSql).not.toContain(`"drills"."title"`);
+      expect(normalizedSql).toContain(
+        `owner_follow."following_id" = request_context."viewerId" ` +
+          `and owner_follow."status" = 'accepted'`,
+      );
+      expect(normalizedSql).toContain(
+        `pair_block."blocked_id" = request_context."viewerId"`,
+      );
+      return [confirmedAccess];
+    });
+
+    await expect(getSharedDrillById(viewerId, drillId)).resolves.toEqual({
+      drill: {
+        id: drillId,
+        title: row.drillTitle,
+        summary: row.drillSummary,
+        notes: row.drillNotes,
+        trainingMethods: row.trainingMethods,
+        tags: row.tags,
+        customTags: row.customTags,
+        statusTags: [],
+        createdAt: new Date("2026-05-01T01:00:00.000Z"),
+        updatedAt: new Date("2026-05-02T02:00:00.000Z"),
+        steps: row.steps,
+      },
+      owner: {
+        id: ownerId,
+        username: "confirmed_owner",
+        avatarUrl: "/confirmed-avatar.png",
+      },
+      sharedAt: new Date("2026-05-04T04:00:00.000Z"),
+    });
+    expect(mocks.execute).toHaveBeenCalledTimes(2);
+    expect(mocks.select).not.toHaveBeenCalled();
+  });
+
+  it("returns null without a confirmation query when initial access is absent", async () => {
+    mocks.execute.mockResolvedValueOnce([]);
+
+    await expect(getSharedDrillById(viewerId, drillId)).resolves.toBeNull();
+    expect(mocks.execute).toHaveBeenCalledOnce();
+    expect(mocks.select).not.toHaveBeenCalled();
+  });
+
+  it("returns null when access is revoked after hydration", async () => {
+    mocks.execute
+      .mockResolvedValueOnce([{}])
+      .mockResolvedValueOnce([]);
+
+    await expect(getSharedDrillById(viewerId, drillId)).resolves.toBeNull();
+    expect(mocks.execute).toHaveBeenCalledTimes(2);
+    const confirmation = new PgDialect().sqlToQuery(mocks.execute.mock.calls[1]![0]);
+    expect(confirmation.params).toEqual([viewerId, drillId]);
+    expect(confirmation.sql.replace(/\s+/g, " ")).toContain(
+      `from authorized_drill limit 1`,
+    );
+    expect(mocks.select).not.toHaveBeenCalled();
   });
 });
 

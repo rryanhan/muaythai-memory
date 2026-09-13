@@ -1,19 +1,11 @@
-import {
-  and,
-  eq,
-  exists,
-  isNotNull,
-  notExists,
-  or,
-  sql,
-  type SQLWrapper,
-} from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
 import {
+  drillShares,
+  drillSteps,
   drillTags,
   drillTrainingMethods,
-  drillShares,
   drills,
   follows,
   tagCategories,
@@ -22,7 +14,6 @@ import {
   userBlocks,
   users,
 } from "@/db/schema";
-import { getDrillById } from "@/modules/drills/queries";
 import type {
   DrillShareRecipientPage,
   SharedDrillDetailResponse,
@@ -69,6 +60,28 @@ type SharedDrillListQueryRow = {
   sharedAt: Date | string | null;
   sharedAtCursor: string | null;
 };
+
+type SharedDrillDetailQueryRow = {
+  drillId: string;
+  drillTitle: string;
+  drillSummary: string;
+  drillNotes: string | null;
+  trainingMethods: SharedDrillDetailResponse["drill"]["trainingMethods"];
+  tags: SharedDrillDetailResponse["drill"]["tags"];
+  customTags: SharedDrillDetailResponse["drill"]["customTags"];
+  steps: SharedDrillDetailResponse["drill"]["steps"];
+  drillCreatedAt: Date | string;
+  drillUpdatedAt: Date | string;
+  ownerId: string;
+  ownerUsername: string;
+  ownerAvatarUrl: string | null;
+  sharedAt: Date | string;
+};
+
+type SharedDrillAccessQueryRow = Pick<
+  SharedDrillDetailQueryRow,
+  "ownerId" | "ownerUsername" | "ownerAvatarUrl" | "sharedAt"
+>;
 
 export async function getDrillShareRecipientPage(
   ownerUserId: string,
@@ -494,89 +507,213 @@ export async function getSharedDrillById(
   viewerUserId: string,
   drillId: string,
 ): Promise<SharedDrillDetailResponse | null> {
-  const access = await loadSharedAccess(viewerUserId, drillId);
-  if (!access) return null;
-  const drill = await getDrillById(access.ownerId, drillId);
-  if (!drill) return null;
+  // Hydrate only from an authorized row, then recheck access after hydration
+  // so a removal or block committed during the first statement prevents return.
+  const [row] = await db.execute<SharedDrillDetailQueryRow>(sql`
+    with ${sharedDrillAuthorizationCtes(viewerUserId, drillId)},
+    method_payload as (
+      select
+        ${drillTrainingMethods.drillId} as "drillId",
+        jsonb_agg(
+          jsonb_build_object(
+            'id', ${trainingMethods.id},
+            'name', ${trainingMethods.name},
+            'slug', ${trainingMethods.slug},
+            'iconKey', ${trainingMethods.iconKey},
+            'sortOrder', ${trainingMethods.sortOrder}
+          )
+          order by ${trainingMethods.sortOrder}, ${trainingMethods.name}
+        ) as "trainingMethods"
+      from authorized_drill
+      inner join ${drillTrainingMethods}
+        on ${drillTrainingMethods.drillId} = authorized_drill."drillId"
+      inner join ${trainingMethods}
+        on ${trainingMethods.id} = ${drillTrainingMethods.trainingMethodId}
+      where ${trainingMethods.active} = true
+      group by ${drillTrainingMethods.drillId}
+    ),
+    tag_rows as (
+      select
+        ${drillTags.drillId} as "drillId",
+        case when ${tags.kind} = 'custom' then 'custom' else 'standard' end as "kind",
+        jsonb_build_object(
+          'id', ${tags.id},
+          'name', ${tags.name},
+          'slug', ${tags.slug},
+          'kind', case when ${tags.kind} = 'custom' then 'custom' else 'standard' end,
+          'sortOrder', ${tags.sortOrder},
+          'category', case
+            when ${tagCategories.id} is not null
+              and ${tagCategories.name} <> ''
+              and ${tagCategories.slug} <> ''
+            then jsonb_build_object(
+              'id', ${tagCategories.id},
+              'name', ${tagCategories.name},
+              'slug', ${tagCategories.slug}
+            )
+            else null
+          end
+        ) as "tag",
+        ${tagCategories.sortOrder} as "categorySortOrder",
+        ${tags.sortOrder} as "sortOrder",
+        ${tags.name} as "name"
+      from authorized_drill
+      inner join ${drillTags} on ${drillTags.drillId} = authorized_drill."drillId"
+      inner join ${tags} on ${tags.id} = ${drillTags.tagId}
+      left join ${tagCategories} on ${tagCategories.id} = ${tags.categoryId}
+      where ${tags.active} = true
+        and (${tags.userId} is null or ${tags.userId} = authorized_drill."ownerId")
+    ),
+    tag_payload as (
+      select
+        tag_rows."drillId",
+        coalesce(
+          jsonb_agg(
+            tag_rows."tag"
+            order by tag_rows."categorySortOrder", tag_rows."sortOrder", tag_rows."name"
+          ) filter (where tag_rows."kind" = 'standard'),
+          '[]'::jsonb
+        ) as "tags",
+        coalesce(
+          jsonb_agg(
+            tag_rows."tag"
+            order by tag_rows."categorySortOrder", tag_rows."sortOrder", tag_rows."name"
+          ) filter (where tag_rows."kind" = 'custom'),
+          '[]'::jsonb
+        ) as "customTags"
+      from tag_rows
+      group by tag_rows."drillId"
+    ),
+    step_payload as (
+      select
+        ${drillSteps.drillId} as "drillId",
+        jsonb_agg(
+          jsonb_build_object(
+            'id', ${drillSteps.id},
+            'position', ${drillSteps.position},
+            'body', ${drillSteps.body}
+          )
+          order by ${drillSteps.position}
+        ) as "steps"
+      from authorized_drill
+      inner join ${drillSteps} on ${drillSteps.drillId} = authorized_drill."drillId"
+      group by ${drillSteps.drillId}
+    )
+    select
+      ${drills.id} as "drillId",
+      ${drills.title} as "drillTitle",
+      ${drills.summary} as "drillSummary",
+      ${drills.notes} as "drillNotes",
+      coalesce(method_payload."trainingMethods", '[]'::jsonb) as "trainingMethods",
+      coalesce(tag_payload."tags", '[]'::jsonb) as "tags",
+      coalesce(tag_payload."customTags", '[]'::jsonb) as "customTags",
+      coalesce(step_payload."steps", '[]'::jsonb) as "steps",
+      ${drills.createdAt} as "drillCreatedAt",
+      ${drills.updatedAt} as "drillUpdatedAt",
+      authorized_drill."ownerId",
+      authorized_drill."ownerUsername",
+      authorized_drill."ownerAvatarUrl",
+      authorized_drill."sharedAt"
+    from authorized_drill
+    inner join ${drills}
+      on ${drills.id} = authorized_drill."drillId"
+      and ${drills.userId} = authorized_drill."ownerId"
+    left join method_payload on method_payload."drillId" = authorized_drill."drillId"
+    left join tag_payload on tag_payload."drillId" = authorized_drill."drillId"
+    left join step_payload on step_payload."drillId" = authorized_drill."drillId"
+    limit 1
+  `);
 
-  // Recheck after loading the detail so a concurrent removal/block cannot
-  // return content after its share was revoked.
+  if (!row) return null;
   const confirmedAccess = await loadSharedAccess(viewerUserId, drillId);
   if (!confirmedAccess) return null;
 
   return {
-    drill: { ...drill, statusTags: [] },
+    drill: {
+      id: row.drillId,
+      title: row.drillTitle,
+      summary: row.drillSummary,
+      notes: row.drillNotes,
+      trainingMethods: row.trainingMethods,
+      tags: row.tags,
+      customTags: row.customTags,
+      statusTags: [],
+      createdAt: toDate(row.drillCreatedAt),
+      updatedAt: toDate(row.drillUpdatedAt),
+      steps: row.steps,
+    },
     owner: {
       id: confirmedAccess.ownerId,
       username: confirmedAccess.ownerUsername,
       avatarUrl: confirmedAccess.ownerAvatarUrl,
     },
-    sharedAt: confirmedAccess.sharedAt,
+    sharedAt: toDate(confirmedAccess.sharedAt),
   };
 }
 
 async function loadSharedAccess(viewerUserId: string, drillId: string) {
-  const rows = await db
-    .select({
-      ownerId: users.id,
-      ownerUsername: sql<string>`${users.username}`,
-      ownerAvatarUrl: users.avatarUrl,
-      sharedAt: drillShares.createdAt,
-    })
-    .from(drillShares)
-    .innerJoin(drills, eq(drills.id, drillShares.drillId))
-    .innerJoin(users, eq(users.id, drills.userId))
-    .where(and(
-      eq(drillShares.drillId, drillId),
-      eq(drillShares.recipientUserId, viewerUserId),
-      isNotNull(users.username),
-      reciprocalFollowCondition(viewerUserId, drills.userId),
-      notExists(
-        db
-          .select({ value: sql`1` })
-          .from(userBlocks)
-          .where(or(
-            and(
-              eq(userBlocks.blockerId, viewerUserId),
-              eq(userBlocks.blockedId, drills.userId),
-            ),
-            and(
-              eq(userBlocks.blockerId, drills.userId),
-              eq(userBlocks.blockedId, viewerUserId),
-            ),
-          )),
-      ),
-    ))
-    .limit(1);
-  return rows[0] ?? null;
+  const [row] = await db.execute<SharedDrillAccessQueryRow>(sql`
+    with ${sharedDrillAuthorizationCtes(viewerUserId, drillId)}
+    select
+      authorized_drill."ownerId",
+      authorized_drill."ownerUsername",
+      authorized_drill."ownerAvatarUrl",
+      authorized_drill."sharedAt"
+    from authorized_drill
+    limit 1
+  `);
+  return row ?? null;
 }
 
-function reciprocalFollowCondition(
-  viewerUserId: string,
-  ownerUserId: SQLWrapper,
-) {
-  return and(
-    exists(
-      db
-        .select({ value: sql`1` })
-        .from(follows)
-        .where(and(
-          eq(follows.followerId, viewerUserId),
-          eq(follows.followingId, ownerUserId),
-          eq(follows.status, "accepted"),
-        )),
+function sharedDrillAuthorizationCtes(viewerUserId: string, drillId: string) {
+  return sql`
+    request_context as (
+      select
+        ${viewerUserId}::uuid as "viewerId",
+        ${drillId}::uuid as "drillId"
     ),
-    exists(
-      db
-        .select({ value: sql`1` })
-        .from(follows)
-        .where(and(
-          eq(follows.followerId, ownerUserId),
-          eq(follows.followingId, viewerUserId),
-          eq(follows.status, "accepted"),
-        )),
-    ),
-  );
+    authorized_drill as materialized (
+      select
+        ${drills.id} as "drillId",
+        ${drills.userId} as "ownerId",
+        ${users.username} as "ownerUsername",
+        ${users.avatarUrl} as "ownerAvatarUrl",
+        ${drillShares.createdAt} as "sharedAt"
+      from request_context
+      inner join ${drillShares}
+        on ${drillShares.drillId} = request_context."drillId"
+        and ${drillShares.recipientUserId} = request_context."viewerId"
+      inner join ${drills} on ${drills.id} = ${drillShares.drillId}
+      inner join ${users} on ${users.id} = ${drills.userId}
+      where ${users.username} is not null
+        and exists (
+          select 1
+          from ${follows} as viewer_follow
+          where viewer_follow."follower_id" = request_context."viewerId"
+            and viewer_follow."following_id" = ${drills.userId}
+            and viewer_follow."status" = 'accepted'
+        )
+        and exists (
+          select 1
+          from ${follows} as owner_follow
+          where owner_follow."follower_id" = ${drills.userId}
+            and owner_follow."following_id" = request_context."viewerId"
+            and owner_follow."status" = 'accepted'
+        )
+        and not exists (
+          select 1
+          from ${userBlocks} as pair_block
+          where (
+            pair_block."blocker_id" = request_context."viewerId"
+            and pair_block."blocked_id" = ${drills.userId}
+          ) or (
+            pair_block."blocker_id" = ${drills.userId}
+            and pair_block."blocked_id" = request_context."viewerId"
+          )
+        )
+      limit 1
+    )
+  `;
 }
 
 function encodeSharedCursor(cursor: SharedCursor) {
