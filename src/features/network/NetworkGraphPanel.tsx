@@ -489,7 +489,6 @@ export function NetworkGraphPanel({
           className="record-button"
           href="/capture/new?mode=voice&from=network"
           aria-label="Capture drill"
-          prefetch
         >
           <Microphone size={27} weight="regular" aria-hidden="true" />
         </Link>

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { type ComponentProps, useState } from "react";
 import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -7,9 +7,20 @@ import { defaultNetworkLayerOptions, emptyNetworkFilters } from "./types";
 
 const mocks = vi.hoisted(() => ({
   getDrill: vi.fn(),
+  linkProps: vi.fn(),
 }));
 
 vi.mock("@/data/drills", () => ({ getDrill: mocks.getDrill }));
+vi.mock("next/link", () => ({
+  default: ({
+    children,
+    prefetch,
+    ...props
+  }: ComponentProps<"a"> & { prefetch?: boolean | "auto" | null }) => {
+    mocks.linkProps({ href: props.href, prefetch });
+    return <a {...props}>{children}</a>;
+  },
+}));
 vi.mock("./NetworkForceGraph", () => ({
   NetworkForceGraph: ({ active, onDrillSelect }: {
     active: boolean;
@@ -134,6 +145,15 @@ describe("NetworkGraphPanel hidden lifecycle", () => {
       expect(screen.getByTestId("detail-sheet")).toHaveAttribute("data-status", "loaded");
     });
     expect(mocks.getDrill).toHaveBeenCalledTimes(2);
+  });
+
+  it("leaves capture-route prefetch bounded by Next's default policy", () => {
+    render(<Harness active />);
+
+    expect(mocks.linkProps.mock.calls.map(([props]) => props)).toContainEqual({
+      href: "/capture/new?mode=voice&from=network",
+      prefetch: undefined,
+    });
   });
 });
 
