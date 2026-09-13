@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { VideoCamera } from "@phosphor-icons/react/VideoCamera";
 import { useQuery } from "@tanstack/react-query";
@@ -28,7 +28,6 @@ type PendingNavigation = { kind: "route"; destination: string } | { kind: "histo
 
 export function JournalUploadScreen() {
   const router = useRouter();
-  const today = useMemo(() => localToday(), []);
   const upload = useJournalUpload();
   const [selectionError, setSelectionError] = useState<string | null>(null);
   const [coverEditorOpen, setCoverEditorOpen] = useState(false);
@@ -38,12 +37,7 @@ export function JournalUploadScreen() {
   const guardKeyRef = useRef<string | null>(null);
   const atGuardEntryRef = useRef(false);
   const ignoreNextPopRef = useRef(false);
-  const shouldGuard = upload.phase === "idle" && Boolean(
-    upload.draft.file ||
-    upload.draft.caption.trim() ||
-    upload.draft.drillId ||
-    upload.draft.occurredOn !== today,
-  );
+  const shouldGuard = upload.phase === "idle" && upload.hasWork;
   const guardRef = useRef(shouldGuard);
   const locked = upload.busy || upload.phase === "error";
   const drillsQuery = useQuery({
@@ -341,13 +335,6 @@ export function JournalUploadScreen() {
       )}
     </main>
   );
-}
-
-function localToday(): string {
-  const date = new Date();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${date.getFullYear()}-${month}-${day}`;
 }
 
 function formatFileSize(bytes: number): string {

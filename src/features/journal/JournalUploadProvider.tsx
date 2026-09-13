@@ -36,6 +36,10 @@ type JournalDraft = {
   posterStatus: PosterStatus;
 };
 
+type JournalDraftState = JournalDraft & {
+  defaultOccurredOn: string;
+};
+
 type JournalUploadContextValue = {
   draft: JournalDraft;
   phase: UploadPhase;
@@ -64,7 +68,7 @@ export function JournalUploadProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const pathnameRef = useRef(pathname);
   const queryClient = useQueryClient();
-  const [draft, setDraft] = useState<JournalDraft>(() => emptyDraft());
+  const [draft, setDraft] = useState<JournalDraftState>(() => emptyDraft());
   const [phase, setPhase] = useState<UploadPhase>("idle");
   const [failedStage, setFailedStage] = useState<FailedStage>(null);
   const [progress, setProgress] = useState(0);
@@ -79,10 +83,11 @@ export function JournalUploadProvider({ children }: { children: ReactNode }) {
   const posterPromiseRef = useRef<Promise<File | null> | null>(null);
   const posterGenerationRef = useRef(0);
   const posterAbortRef = useRef<AbortController | null>(null);
+  const currentDraft = pathname === "/journal/new"
+    ? refreshPristineDraftDate(draft)
+    : draft;
   const busy = phase === "creating" || phase === "uploading" || phase === "completing";
-  const hasDraftChanges = Boolean(
-    draft.file || draft.caption.trim() || draft.drillId || draft.occurredOn !== localToday(),
-  );
+  const hasDraftChanges = hasJournalDraftChanges(currentDraft);
   const hasWork = hasDraftChanges || busy || phase === "error";
 
   useEffect(() => {
@@ -297,7 +302,7 @@ export function JournalUploadProvider({ children }: { children: ReactNode }) {
   }, [busy, draft, failedStage, intent, queryClient, resetDraft, router]);
 
   const value = useMemo<JournalUploadContextValue>(() => ({
-    draft,
+    draft: currentDraft,
     phase,
     progress,
     error,
@@ -341,7 +346,7 @@ export function JournalUploadProvider({ children }: { children: ReactNode }) {
         });
       posterPromiseRef.current = posterPromise;
       setDraft((current) => ({
-        ...current,
+        ...refreshPristineDraftDate(current),
         file,
         previewUrl,
         durationMs: null,
@@ -356,13 +361,23 @@ export function JournalUploadProvider({ children }: { children: ReactNode }) {
       if (phase === "ready") setPhase("idle");
     },
     setOccurredOn(value) {
-      setDraft((current) => ({ ...current, occurredOn: value }));
+      setDraft((current) => ({
+        ...current,
+        occurredOn: value,
+        defaultOccurredOn: localToday(),
+      }));
     },
     setCaption(value) {
-      setDraft((current) => ({ ...current, caption: value }));
+      setDraft((current) => ({
+        ...refreshPristineDraftDate(current),
+        caption: value,
+      }));
     },
     setDrillId(value) {
-      setDraft((current) => ({ ...current, drillId: value }));
+      setDraft((current) => ({
+        ...refreshPristineDraftDate(current),
+        drillId: value,
+      }));
     },
     setDurationMs(value) {
       setDraft((current) => ({ ...current, durationMs: value }));
@@ -421,7 +436,7 @@ export function JournalUploadProvider({ children }: { children: ReactNode }) {
       setError(null);
       setProgress(0);
     },
-  }), [busy, commitPoster, completedEntryId, discardWork, draft, error, hasWork, phase, progress, startUpload]);
+  }), [busy, commitPoster, completedEntryId, currentDraft, discardWork, error, hasWork, phase, progress, startUpload]);
 
   return (
     <JournalUploadContext.Provider value={value}>
@@ -486,17 +501,39 @@ function JournalUploadRail({
   );
 }
 
-function emptyDraft(): JournalDraft {
+function emptyDraft(occurredOn = localToday()): JournalDraftState {
   return {
     file: null,
     previewUrl: null,
-    occurredOn: localToday(),
+    occurredOn,
     caption: "",
     drillId: "",
     durationMs: null,
     posterPreviewUrl: null,
     posterTimeSeconds: null,
     posterStatus: "empty",
+    defaultOccurredOn: occurredOn,
+  };
+}
+
+function hasJournalDraftChanges(draft: JournalDraftState): boolean {
+  return Boolean(
+    draft.file
+    || draft.caption.trim()
+    || draft.drillId
+    || draft.occurredOn !== draft.defaultOccurredOn,
+  );
+}
+
+function refreshPristineDraftDate(draft: JournalDraftState): JournalDraftState {
+  if (hasJournalDraftChanges(draft)) return draft;
+
+  const today = localToday();
+  if (draft.defaultOccurredOn === today && draft.occurredOn === today) return draft;
+  return {
+    ...draft,
+    occurredOn: today,
+    defaultOccurredOn: today,
   };
 }
 

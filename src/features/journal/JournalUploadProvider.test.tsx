@@ -1,8 +1,9 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const navigationMocks = vi.hoisted(() => ({
+  pathname: "/",
   push: vi.fn(),
   replace: vi.fn(),
 }));
@@ -33,7 +34,7 @@ const posterMocks = vi.hoisted(() => ({
 }));
 
 vi.mock("next/navigation", () => ({
-  usePathname: () => "/",
+  usePathname: () => navigationMocks.pathname,
   useRouter: () => navigationMocks,
 }));
 
@@ -60,6 +61,7 @@ import { JournalApiError } from "@/data/journal-error";
 import { JournalUploadProvider, useJournalUpload } from "./JournalUploadProvider";
 
 beforeEach(() => {
+  navigationMocks.pathname = "/";
   navigationMocks.push.mockReset();
   navigationMocks.replace.mockReset();
   dataMocks.completeJournalEntryUpload.mockReset();
@@ -85,6 +87,102 @@ beforeEach(() => {
   Object.defineProperty(URL, "revokeObjectURL", {
     configurable: true,
     value: vi.fn(),
+  });
+});
+
+describe("JournalUploadProvider draft date baseline", () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(2026, 8, 12, 23, 59));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("stays pristine across midnight and refreshes the default date on journal entry", async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    const view = render(
+      <QueryClientProvider client={queryClient}>
+        <JournalUploadProvider>
+          <DraftStateHarness />
+        </JournalUploadProvider>
+      </QueryClientProvider>,
+    );
+
+    expect(screen.getByTestId("draft-date")).toHaveTextContent("2026-09-12");
+    expect(screen.getByTestId("has-work")).toHaveTextContent("no");
+
+    act(() => vi.setSystemTime(new Date(2026, 8, 13, 0, 1)));
+    fireEvent.click(screen.getByRole("button", { name: "Refresh provider" }));
+    expect(screen.getByTestId("has-work")).toHaveTextContent("no");
+    expect(screen.queryByText("Journal draft waiting")).not.toBeInTheDocument();
+
+    navigationMocks.pathname = "/journal/new";
+    view.rerender(
+      <QueryClientProvider client={queryClient}>
+        <JournalUploadProvider>
+          <DraftStateHarness />
+        </JournalUploadProvider>
+      </QueryClientProvider>,
+    );
+    await waitFor(() => expect(screen.getByTestId("draft-date")).toHaveTextContent("2026-09-13"));
+    expect(screen.getByTestId("has-work")).toHaveTextContent("no");
+
+    fireEvent.click(screen.getByRole("button", { name: "Choose earlier date" }));
+    expect(screen.getByTestId("draft-date")).toHaveTextContent("2026-09-11");
+    expect(screen.getByTestId("has-work")).toHaveTextContent("yes");
+
+    act(() => vi.setSystemTime(new Date(2026, 8, 14, 0, 1)));
+    fireEvent.click(screen.getByRole("button", { name: "Refresh provider" }));
+    expect(screen.getByTestId("draft-date")).toHaveTextContent("2026-09-11");
+    expect(screen.getByTestId("has-work")).toHaveTextContent("yes");
+  });
+
+  it("commits the fresh default date when a related drill is created on another route", async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    const provider = () => (
+      <QueryClientProvider client={queryClient}>
+        <JournalUploadProvider>
+          <DraftStateHarness />
+        </JournalUploadProvider>
+      </QueryClientProvider>
+    );
+    const view = render(provider());
+
+    act(() => vi.setSystemTime(new Date(2026, 8, 13, 0, 1)));
+    navigationMocks.pathname = "/journal/new";
+    view.rerender(provider());
+    expect(screen.getByTestId("draft-date")).toHaveTextContent("2026-09-13");
+    expect(screen.getByTestId("has-work")).toHaveTextContent("no");
+
+    navigationMocks.pathname = "/drills/new";
+    view.rerender(provider());
+    fireEvent.click(screen.getByRole("button", { name: "Choose related drill" }));
+    expect(screen.getByTestId("draft-date")).toHaveTextContent("2026-09-13");
+    expect(screen.getByTestId("drill-id")).toHaveTextContent("00000000-0000-4000-8000-000000000010");
+    expect(screen.getByTestId("has-work")).toHaveTextContent("yes");
+
+    navigationMocks.pathname = "/journal/new";
+    view.rerender(provider());
+    expect(screen.getByTestId("draft-date")).toHaveTextContent("2026-09-13");
+    expect(screen.getByTestId("has-work")).toHaveTextContent("yes");
+  });
+
+  it("preserves an explicitly reselected old default date after midnight", () => {
+    renderProvider(<DraftStateHarness />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Choose earlier date" }));
+    expect(screen.getByTestId("draft-date")).toHaveTextContent("2026-09-11");
+
+    act(() => vi.setSystemTime(new Date(2026, 8, 13, 0, 1)));
+    fireEvent.click(screen.getByRole("button", { name: "Choose original date" }));
+    expect(screen.getByTestId("draft-date")).toHaveTextContent("2026-09-12");
+    expect(screen.getByTestId("has-work")).toHaveTextContent("yes");
   });
 });
 
@@ -361,6 +459,35 @@ function UploadHarness() {
       <output>{upload.phase}</output>
       <output>{upload.error}</output>
       <output data-testid="file-name">{upload.draft.file?.name ?? "none"}</output>
+    </>
+  );
+}
+
+function DraftStateHarness() {
+  const upload = useJournalUpload();
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => upload.setDurationMs(upload.draft.durationMs)}
+      >
+        Refresh provider
+      </button>
+      <button type="button" onClick={() => upload.setOccurredOn("2026-09-11")}>
+        Choose earlier date
+      </button>
+      <button type="button" onClick={() => upload.setOccurredOn("2026-09-12")}>
+        Choose original date
+      </button>
+      <button
+        type="button"
+        onClick={() => upload.setDrillId("00000000-0000-4000-8000-000000000010")}
+      >
+        Choose related drill
+      </button>
+      <output data-testid="draft-date">{upload.draft.occurredOn}</output>
+      <output data-testid="drill-id">{upload.draft.drillId}</output>
+      <output data-testid="has-work">{upload.hasWork ? "yes" : "no"}</output>
     </>
   );
 }
