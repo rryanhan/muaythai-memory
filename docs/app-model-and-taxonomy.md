@@ -1,6 +1,14 @@
 # App Model And Taxonomy
 
-## Core Model
+> **Status: historical taxonomy exploration.** This file preserves design
+> rationale that predates the implemented schema. For current behavior, use
+> `docs/data-model.md` and `docs/ai-capture-spec.md`; the canonical seeded
+> taxonomy catalog is `src/modules/taxonomy/seed-data.ts`, while Postgres is the
+> runtime source of truth. Core Idea is parked and absent
+> from the schema, API, capture output, search, graph, and UI. The active model is
+> Training Methods + standard or owner-scoped Custom Tags + Saved Lists -> Drill.
+
+## Historical Core Model
 
 The main saved object is a Drill.
 
@@ -137,7 +145,7 @@ Tag cleanup rules:
 - Do not create method tags. Use Training Method for `Pad Work`, `Bag Work`, `Partner Drill`, `Clinch`, and `Technical Work`.
 - Prefer concrete leaf tags over broad family labels. Example: `Low Kick` + `Timing`, not `Kicking` + `Low Kick`.
 
-## Core Idea
+## Historical Core Idea Exploration
 
 Core Idea is the main training pattern the drill is teaching, when one is clearly present.
 
@@ -210,7 +218,10 @@ No Core Idea example:
 
 ## Custom Tags
 
-Users should be able to add personal tags.
+The implemented app can select, search, and filter existing owner-scoped Custom
+Tags. App-level creation, rename, and merge controls remain deferred, and AI
+does not suggest or create Custom Tags. The ideas below preserve the earlier
+design exploration.
 
 Examples:
 

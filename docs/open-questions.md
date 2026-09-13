@@ -3,7 +3,9 @@
 ## Naming
 
 - Should grouped drills be called Training Plans, Session Plans, Practice Sets, or Drill Sets?
-- Should the internal field stay `trainingTags` while the UI simply says Tags?
+
+Resolved: the UI says Tags; Drill writes use `tagSlugs`, and reads return `tags`
+plus `customTags`. `trainingTags` remains only in older sample-data shapes.
 
 ## Taxonomy
 
@@ -16,9 +18,9 @@ Resolved for now:
 - Technical Work should be a Training Method for isolated mechanics, technique-first motions, stance transitions, balance drills, and slow reps.
 - Warmup should not be a Muay Thai Training Method in the MVP. It belongs in the future workout, conditioning, or preparation system.
 - The broadest category is called Training Method.
-- Core Idea is now the product language for the main training pattern attached to a drill.
-- Core Idea should be optional. Use one primary Core Idea only when a drill has a clear main idea; leave it empty when forcing one would feel fake.
-- The first-pass Core Idea taxonomy is capped at 25 ideas: Range Finding, Feint To Draw, Jab To Enter, Teep To Interrupt, Hand Trap Entry, Pressure Entry, Slip To Counter, Parry To Counter, Check And Return, Catch And Return, Shell And Return, Roll And Return, Counter Rotation, Exit After Scoring, Angle After Strike, Angle After Defense, Ring Cutting, Stance Switch Attack, Open Stance Attack, Rhythm Change, Frame To Knee, Inside Control, Posture Break, Turn To Attack, Catch To Sweep.
+- Core Idea is parked. It is absent from the current schema, API, capture output,
+  search, graph, and UI; `docs/app-model-and-taxonomy.md` preserves the earlier
+  exploration.
 - Clinch is a Training Method, not a standard Tag.
 
 ## Voice And AI
@@ -39,9 +41,8 @@ Resolved for now:
 - Does Drill Back In need scheduling or reminders beyond its current saved collection?
 - Should future training plans remain separate from Saved Lists?
 
-## Later Systems
+## Current Connections Decisions
 
-- Workout and strength training should become a parallel system later, not part of the MVP.
 - Follows are directed, username-based, and require approval. Follower and
   following counts are visible to signed-in users; private training totals
   require accepted follows in both directions.
@@ -50,6 +51,10 @@ Resolved for now:
   shared Drill.
 - Do not build a generic social feed. Sharing should solve a concrete training
   exchange before adding passive social content.
+- Knowledge graphs remain private.
+
+## Later Systems
+
+- Workout and strength training should become a parallel system later, not part of the MVP.
 - Decide whether a later shared Journal feed should be connections-only or also
   support explicit coach-student and gym/team circles.
-- Knowledge graphs remain private.

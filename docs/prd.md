@@ -1,5 +1,12 @@
 # Product Requirements
 
+> **Current-state note:** This document combines implemented requirements with
+> longer-term product direction. The production app currently includes Network,
+> Training Log, Profile, request-scoped voice or typed capture, private Progress
+> Journal video, Connections, and explicit reciprocal-follow Drill sharing.
+> Training Plans and production Workout or Bridge graphs remain deferred; the
+> workout modes exist only in the static wireframe prototype.
+
 ## Goal
 
 Build an MVP for capturing and organizing Muay Thai drills through voice-first input, AI cleanup, structured categorization, and a visual knowledge graph.
@@ -29,18 +36,19 @@ Warmups and conditioning-style preparation should also live in that later parall
 
 ## Core User Flow
 
-1. User records or uploads a voice memo after training.
-2. AI transcribes the memo.
-3. AI cleans the transcript into a readable drill entry.
+1. User records a voice memo after training or enters a typed note. Audio-file
+   upload is not part of Capture v1.
+2. For voice capture, the configured transcription provider converts the memo
+   to text. Typed notes skip transcription.
+3. AI cleans the typed note or transcript into a readable drill entry.
 4. AI suggests categorization:
    - Training Method
-   - Tags
-   - Core Idea
-   - Custom Tags when useful
+   - Active standard Tags
 5. User reviews and edits the generated drill.
 6. User saves the drill.
-7. Drill appears in both the Network View and the Organized View.
-8. User can browse, search, star, tag, open, edit, and group drills into future training plans.
+7. Drill appears in both the Network View and the Training Log.
+8. User can browse, search, save to lists, tag, open, and edit drills. Training
+   Plan grouping remains deferred.
 
 ## Core Features
 
@@ -55,18 +63,17 @@ Capture should be a persistent action, not a main navigation view.
 The main navigation should have three primary views:
 
 - Network
-- Organized View
+- Training Log
 - Profile
 
-The capture control should be accessible from Network and Organized View.
+The capture control should be accessible from Network and Training Log.
 
 Preferred interaction:
 
-- Tap the mic button to start a voice memo.
-- Hold the mic button to reveal an alternate manual-input icon.
-- While holding, swipe up to the manual-input icon to open manual entry.
+- Tap the mic button to open Capture, then tap Record to start a voice memo.
+- Choose Type Instead for typed capture.
 
-This keeps voice capture as the default path while still making manual entry available without adding another main nav item.
+Hold-and-swipe entry remains a deferred gesture enhancement.
 
 ### AI Cleanup
 
@@ -76,9 +83,7 @@ AI should extract:
 - A cleaned summary.
 - Step-by-step instructions.
 - Suggested Training Methods.
-- Suggested Tags.
-- Suggested Core Idea.
-- Suggested Custom Tags when no standard tag fits well.
+- Suggested active standard Tags.
 
 ### Drill Review
 
@@ -90,20 +95,23 @@ Before saving, users can edit:
 - Notes
 - Training Method
 - Tags
-- Core Idea
-- Custom Tags
+- Existing owner-scoped Custom Tags
+- Saved Lists
 
 ### Knowledge Graph
 
 The Network View should show how drills connect to broader categories.
 
-The Network View can support multiple graph modes:
+The static wireframe explores multiple graph modes:
 
 - Skill Graph: Training Methods -> Drills.
 - Workout Graph: Workout Types -> Exercises / Movements.
 - Bridge Graph: Exercises / Movements -> Muay Thai relevance, Tags, or Core Ideas.
 
 Workout groupings such as circuits, strength sets, warmups, finishers, or training blocks should be saved pathways through exercise nodes, not standalone graph nodes.
+
+Only the Skill Graph is implemented in the production app. Workout and Bridge
+graphs currently use static prototype data and have no production schema or API.
 
 The default Network View should be method-first:
 
@@ -113,28 +121,28 @@ Training Methods -> Drill
 
 Training Method nodes should be visually prominent. Drills should connect directly to their training methods.
 
-Tags, Core Ideas, Custom Tags, and Status should be available as optional layers or filters, not always-on graph nodes. This prevents the graph from becoming too dense.
+Tags, Custom Tags, and Saved Lists are available as optional layers or filters,
+not always-on graph nodes. This prevents the graph from becoming too dense.
 
 Optional graph layers:
 
 - Show Tags.
-- Show Core Ideas.
 - Show Custom Tags.
-- Show Status.
+- Show Saved Lists.
 - Hide Tags.
-- Hide Core Ideas.
 - Hide Custom Tags.
-- Hide Status.
+- Hide Saved Lists.
 
-Status should usually affect views, filters, and visual treatment rather than appearing as normal graph nodes by default.
+Saved Lists usually affect views, filters, and visual treatment and remain
+hidden as graph nodes by default.
 
 Clicking a node in the Network View should open the relevant information:
 
 - Drill node: opens the drill detail page or panel.
 - Training Method node: opens a filtered view of drills in that method.
-- Tag node, when visible: opens a filtered view of drills using that tag.
-- Core Idea node, when visible: opens a filtered view of drills using that idea.
-- Custom Tag node, when visible: opens a filtered view of drills using that custom tag.
+
+Tag, Custom Tag, and Saved List nodes are currently visual context only.
+Activating them as filter shortcuts remains a deferred interaction.
 
 ### Drill States
 
@@ -147,13 +155,14 @@ These remain separate from custom tags because they power persistent collection 
 
 ### Training Plans
 
-Users should be able to group drills into a future training plan or practice set.
+Training Plans are a deferred direction for grouping drills into a practice
+session; there is no current Training Plan schema or UI.
 
 This is not a general fitness workout system. It is a way to turn saved Muay Thai knowledge into something the user can practice.
 
-### Organized View
+### Training Log
 
-The app also needs a conventional organized view for managing the knowledge base.
+The Training Log is the conventional organized view for managing the knowledge base.
 
 This view should support:
 
@@ -161,11 +170,10 @@ This view should support:
 - Filtering by Training Method.
 - Filtering by Tags.
 - Filtering by Custom Tags.
-- Filtering by Status.
+- Filtering by Saved Lists.
 - Opening and editing drill details.
-- Creating and managing Training Plans.
 
-The Network View is for spatial memory, discovery, and seeing relationships. The Organized View is for clarity, management, and fast retrieval.
+The Network View is for spatial memory, discovery, and seeing relationships. The Training Log is for clarity, management, and fast retrieval.
 
 ## Success Criteria
 

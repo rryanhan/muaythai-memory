@@ -2,7 +2,8 @@
 
 ## Purpose
 
-This document defines how we should turn the current wireframe into a scalable fullstack app without locking ourselves into brittle data decisions.
+This document records the current fullstack architecture and the remaining
+directions carried forward from the original wireframe plan.
 
 The product should feel:
 
@@ -28,30 +29,29 @@ In plain language:
 - Give the graph lightweight node/edge payloads instead of full drill records.
 - Keep transcription and AI cleanup asynchronous from form editing so the app does not freeze.
 
-## First Product Scope
+## Current Product Scope
 
-Build the Muay Thai drill system first.
+Implemented now:
 
-Do now:
+- Authentication, profile onboarding, and first-drill guidance.
+- Drill creation, editing, detail, and Saved Lists.
+- Training Methods, standard Tags, and owner-scoped Custom Tags.
+- Training Log search and filtering.
+- Network graph data and optional Tag, Custom Tag, and Saved List layers.
+- Request-scoped voice transcription and editable AI cleanup drafts.
+- Profile editing, public avatars, and private Progress Journal video uploads.
+- Directed Connections and explicit read-only Drill sharing with reciprocal
+  accepted follows.
 
-- Users.
-- Drill creation and editing.
-- Training Methods.
-- Standard Tags.
-- Custom Tags.
-- Status Tags.
-- Library search/filter.
-- Network graph data.
-- Drill detail.
+Deferred:
 
-Do later:
+- Workout/exercise backend and production Workout or Bridge graphs.
+- Training Plans.
+- Durable capture audio, background capture jobs, and AI workers.
+- Shared Journal entries, a generic social feed, and shared knowledge graphs.
 
-- Workout/exercise backend.
-- Training plans.
-- Progress journal video uploads.
-- Social/shared knowledge webs.
-
-Active capture v1 uses ephemeral local Whisper transcription and editable AI cleanup drafts. Durable upload/job infrastructure remains deferred until production needs it.
+Capture v1 keeps audio and transcripts ephemeral. Local development can use a
+private Whisper server while hosted environments use OpenAI transcription.
 
 Workouts already have a model, but they should not slow down the first backend pass.
 
@@ -59,16 +59,17 @@ Workouts already have a model, but they should not slow down the first backend p
 
 ```txt
 Mobile Web App / PWA
+  |-- Supabase Auth
+  |-- direct TUS journal-video upload --> Supabase Storage
   |
-  | HTTP API
-  |
-Backend App
-  |
-  |-- Postgres
-  |-- Object Storage
-  |-- Job Queue
-  |-- AI Worker
+  `-- Next.js pages and typed HTTP API
+        |-- Postgres
+        |-- Supabase Storage administration and signed reads
+        `-- request-scoped local Whisper, Ollama, or OpenAI providers
 ```
+
+There is no capture job queue or AI worker in the current runtime. Those remain
+options only if durable capture processing becomes necessary.
 
 Start as a modular monolith.
 
@@ -83,17 +84,23 @@ Microservices would add operational complexity before the product needs them.
 
 ## Backend Modules
 
-Suggested backend module boundaries:
+Current backend module boundaries:
 
 ```txt
 auth
-users
-taxonomy
+capture
+connections
 drills
 graph
-capture
+journal
+media
+onboarding
 profile
+sharing
+taxonomy
 ```
+
+`src/modules/README.md` is the concise source of truth for these boundaries.
 
 ### auth
 
@@ -104,8 +111,9 @@ Owns:
 - Verified current-user lookup and public app-user synchronization.
 - Per-user authorization at every server query and mutation boundary.
 
-The browser uses Supabase only for authentication. Drill, graph, taxonomy, and
-capture data continue to flow through typed Next API routes and Drizzle.
+The browser uses Supabase directly for authentication and signed TUS Journal
+video uploads. Drill, graph, taxonomy, capture, Journal metadata, and signed-read
+authorization continue to flow through typed Next API routes and Drizzle.
 
 Current authorization is enforced in those server modules by passing the
 verified user id into every read and write. Domain tables remain server-only:
@@ -147,9 +155,10 @@ npm run db:claim-dev-user -- --email fighter@example.com --display-name "Fighter
 The command validates the Auth user with the service-role client and moves the
 `Dev Fighter` drills and custom tags in one transaction.
 
-### users
+### User data (shared ownership)
 
-Owns:
+User data spans auth, onboarding, profile, and connections rather than a
+standalone `users` module. Together they own:
 
 - Profile.
 - Avatar.
@@ -195,12 +204,12 @@ The graph module should not own drill data. It reads from drills and taxonomy, t
 
 Owns:
 
-- Voice memo upload.
-- Transcription jobs.
+- Request-only voice transcription.
 - AI cleanup drafts.
-- Draft confirmation.
+- Database-backed capture quotas.
 
-Capture should produce a draft. It should not silently create a saved drill until the user confirms it.
+Capture produces an ephemeral draft. The drills module saves it only after the
+user reviews and submits the normal Drill form.
 
 ### profile
 
@@ -209,16 +218,20 @@ Owns:
 - Favourite drills.
 - Drill Back In queue.
 - Display name and profile avatar.
-- Progress journal entries.
-- Private training clip uploads.
+- Profile and Training Method totals.
 
 Profile avatars use the public Supabase Storage bucket `profile-avatars`.
 Uploads pass through the authenticated Next API so the service-role key never
 reaches the browser. The API verifies JPEG, PNG, and WebP signatures, enforces a
 5 MB limit, and stores versioned objects under the authenticated user id. The
 Profile editor crops the selected image to a square 1024px WebP before upload.
-public URL is stored in `users.avatar_url`; replacing or removing an avatar
+The public URL is stored in `users.avatar_url`; replacing or removing an avatar
 cleans up superseded objects on a best-effort basis.
+
+### journal
+
+Owns private Progress Journal entries, signed media reads, resumable video
+upload intents, poster images, and abandoned-upload cleanup.
 
 Journal video uses a private `journal-media` bucket with one-hour signed reads
 and direct TUS resumable uploads. Upload intents are created by the authenticated
@@ -240,15 +253,22 @@ Owns:
 - Unfollow, directional blocking, and a basic report path.
 - Database-backed search, follow, and report limits plus an outgoing-request cap.
 - Public follower/following counts and reciprocal-follow training totals.
-- Explicit, read-only sharing of individual Drills with reciprocal accepted follows.
 
-Discovery and limited profiles return only username and avatar. Email, private
-names, location, journal metadata, and graph data remain inaccessible. Accepted
-reciprocal accepted follows additionally receive aggregate Drill and Training Method counts.
+Public identity fields are limited to username and avatar. Discovery responses
+also include viewer-relative relationship state, and fighter profiles include
+public follower/following counts. Email, private names, location, Journal
+metadata, and graph data remain inaccessible. Accepted reciprocal follows
+additionally receive aggregate Drill and Training Method counts.
 Individual Drills stay private unless their owner creates a `drill_shares`
 grant; those responses omit Saved Lists and Journal media and are revoked on
 unfollow or block. A future connections-only Journal option must separately
 authorize every metadata and signed-media request.
+
+### sharing
+
+Owns explicit, read-only sharing of individual Drills with reciprocal accepted
+follows. Sharing never exposes Saved Lists, Journal media, or the owner's full
+Training Log.
 
 ## Database Approach
 
@@ -258,22 +278,25 @@ Core Muay Thai tables:
 
 ```txt
 users
-drills
-drill_steps
-training_methods
-drill_training_methods
-tag_categories
-tags
-drill_tags
-status_tags
-drill_status_tags
-journal_entries
-journal_media
+auth_recovery_grants
 follows
 user_blocks
 friend_reports
 friend_rate_limits
+capture_rate_limits
+training_methods
+tag_categories
+tags
+status_tags
+drills
+drill_creation_keys
+drill_steps
+drill_training_methods
+drill_tags
+drill_status_tags
 drill_shares
+journal_entries
+journal_media
 ```
 
 Later tables, only if durable capture history or background processing is introduced:
@@ -318,9 +341,9 @@ drill_tags
 
 This lets us rename, merge, hide, or add tags without schema churn.
 
-### Keep status separate from tags
+### Keep Saved Lists separate from tags
 
-Status Tags should not be normal training tags.
+Saved Lists (`status_tags` in the schema) should not be normal training tags.
 
 Examples:
 
@@ -353,40 +376,19 @@ Examples:
 
 ## Frontend Architecture
 
-Use product-domain modules, not tiny abstract component folders.
-
-Suggested structure:
+Use product-domain modules, not tiny abstract component folders. The current
+high-level structure is:
 
 ```txt
 src/
-  app/
-    AppShell.tsx
-    routes.tsx
-
-  modules/
-    network/
-    library/
-    capture/
-    profile/
-    taxonomy/
-    drills/
-
-  components/
-    BottomNav.tsx
-    BottomSheet.tsx
-    IconButton.tsx
-    SearchInput.tsx
-    Chip.tsx
-    SegmentedControl.tsx
-
-  data/
-    api.ts
-    queries.ts
-    cache.ts
-
-  styles/
-    tokens.css
-    globals.css
+  app/         Next App Router pages, layouts, and API route handlers
+  components/  cross-feature app, navigation, provider, and shared UI
+  config/      runtime configuration and product limits
+  data/        typed browser API clients and DTO exports
+  db/          Drizzle schema, client, seeds, and database verifiers
+  features/    user-facing UI grouped by product surface
+  lib/         framework and Supabase integration helpers
+  modules/     server-side domain contracts, queries, and mutations
 ```
 
 ## Frontend Module Rules
@@ -421,13 +423,13 @@ Keep graph physics/rendering separate from normal app state so performance probl
 
 ### capture
 
-Owns voice memo and manual input flows.
+Owns voice memo and typed-note AI capture flows.
 
 Capture produces a draft. The drills module saves confirmed drills.
 
 ### profile
 
-Composes user info, status drill collections, and progress journal.
+Composes user info, Saved List collections, and Progress Journal.
 
 Profile should reuse drill components instead of creating separate drill displays.
 
@@ -437,11 +439,12 @@ Reuse components when they represent the same product concept.
 
 Good reuse:
 
-- `DrillDetail` from graph, library, profile, and search.
-- `TagPicker` from network filters and library filters.
-- `TrainingMethodBadge` wherever Training Methods appear.
-- `DrillTagLine` in list rows and compact profile sections.
-- `BottomSheet` for filters, drill detail, capture, and upload.
+- `DrillDetailContent` across owned and shared routes and the Network detail
+  sheet.
+- `SavedListActions` across the owned Drill route and Network detail sheet.
+- `badgeByIconKey` across forms, Training Log, Network, Profile, and fighter
+  profiles.
+- `SheetLoadingFallback` for lazily loaded Training Log and Network sheets.
 
 Avoid bad reuse:
 
@@ -459,12 +462,11 @@ Keep workflows separate.
 
 ## API Strategy
 
-Use simple HTTP endpoints first.
+The app uses typed Next route handlers. Current-user loading for the main app is
+server-side rather than a `GET /api/me` request. Representative active
+endpoints are:
 
-Suggested first endpoints:
-
-```txt
-GET    /api/me
+```text
 GET    /api/taxonomy
 
 GET    /api/drills
@@ -472,45 +474,49 @@ POST   /api/drills
 GET    /api/drills/:id
 PATCH  /api/drills/:id
 DELETE /api/drills/:id
+PATCH  /api/drills/:id/saved-lists
 
-POST   /api/drills/:id/status
-DELETE /api/drills/:id/status/:statusId
+GET    /api/graph
+GET    /api/graph?method=pad-work
+GET    /api/graph?tag=uppercut
 
-GET    /api/graph/muay-thai
-GET    /api/graph/muay-thai?method=pad-work
-GET    /api/graph/muay-thai?tag=uppercut
+GET    /api/profile/overview
+PATCH  /api/profile
 ```
 
 Active capture endpoints:
 
-```txt
+```text
 POST   /api/capture/transcribe
 POST   /api/capture/draft
 ```
 
-Later production job endpoints:
+Possible later capture-job endpoints, only if durable processing is introduced:
 
-```txt
+```text
 POST   /api/capture/audio
 GET    /api/capture/jobs/:id
 POST   /api/capture/jobs/:id/confirm
-
-GET    /api/profile/status/starred
-GET    /api/profile/status/drill-back-in
 ```
 
 Active journal endpoints:
 
-```txt
+```text
 GET    /api/journal
 POST   /api/journal/uploads
 GET    /api/journal/:id
 PATCH  /api/journal/:id
+POST   /api/journal/:id/upload-token
 POST   /api/journal/:id/poster
 POST   /api/journal/:id/complete
 DELETE /api/journal/:id
 GET    /api/drills/:id/journal-preview
 ```
+
+Connections and sharing use the handlers under `/api/connections`,
+`/api/follows`, `/api/follow-requests`, `/api/fighters`,
+`/api/drills/:id/shares`, and `/api/shared-drills`. The route files under
+`src/app/api` are the authoritative inventory.
 
 `GET /api/journal` accepts an optional owned `drillId` filter. Journal upload
 state lives in a root client provider so one TUS upload can continue through
@@ -559,16 +565,15 @@ Cache reads, not truth.
 
 The database decides what is real. The cache makes the app feel instant.
 
-### Frontend cache
+### Frontend state and cache
 
-Cache:
+TanStack Query currently caches:
 
 - Taxonomy.
-- Training Method badges.
-- Drill list summary.
-- Graph payload.
-- Recently opened drill details.
-- AI capture drafts.
+- Training Log Drill-list responses.
+
+Training Method badges are static, preloaded assets. Network graph payloads and
+opened Drill details currently use surface-local state and fetch on demand.
 
 Use stale-while-revalidate:
 
@@ -584,18 +589,19 @@ This matters because users may open the app at the gym, after training, or with 
 
 Start without Redis unless needed.
 
-Add Redis later for:
+Consider Redis later only if scale requires it, for:
 
 - Expensive graph payloads.
-- Job status lookup.
-- Rate limiting.
+- Future durable-job status lookup.
+- High-volume rate limiting if the current Postgres counters become a
+  bottleneck.
 - Session acceleration.
 
 ## AI Capture Flow
 
 ```txt
 User records voice memo
-  -> request-only audio is sent to local Whisper
+  -> request-only audio is sent to the configured local Whisper or hosted OpenAI provider
   -> ephemeral transcript returns
   -> AI generates text and selects active taxonomy values in one structured response
   -> user taxonomy edits remain protected while AI runs
@@ -613,22 +619,13 @@ AI should assist capture, not secretly mutate the user's knowledge base.
 
 ## Performance Rules
 
-### App open
+### Route loading
 
-Load only:
+Load only the current route's required data and shared user shell. Keep
+off-route surfaces, Drill details, media, and future Workout graph data lazy.
 
-- Current user.
-- Taxonomy.
-- Recent or cached drill summary.
-- Cached graph summary.
-
-Lazy-load:
-
-- Full library.
-- Full graph details.
-- Drill detail records.
-- Audio/video.
-- Workout graph.
+The exact query mix differs by route; avoid turning this guidance into one
+global preload list.
 
 ### Graph
 
@@ -659,6 +656,9 @@ If a save fails, revert and show a clear message.
 
 ## Implementation Phases
 
+Phases 1 through 5 describe implemented product slices. Phase 6 remains
+deferred; the static wireframe is not a production workout backend.
+
 ### Phase 1: Muay Thai Backend Foundation
 
 - Pick stack.
@@ -680,7 +680,7 @@ If a save fails, revert and show a clear message.
 ### Phase 3: Capture
 
 - Add browser recording.
-- Add request-only local transcription.
+- Add request-only transcription through configurable local or hosted providers.
 - Add schema-constrained AI taxonomy selection.
 - Add edit-safe AI cleanup.
 - Add draft review and normal drill save.
@@ -717,7 +717,7 @@ If a save fails, revert and show a clear message.
 - Training Methods are graph anchors.
 - Tags are concrete and visual where possible.
 - Core Idea is parked, not active MVP UI.
-- Status Tags are separate from normal Tags.
+- Saved Lists (`status_tags` in the schema) are separate from normal Tags.
 - Custom Tags are hidden from graph by default.
 - Shadowboxing is a Tag, not a Training Method.
 - Clinch is a Training Method, not a Tag.

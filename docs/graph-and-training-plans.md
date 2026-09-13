@@ -1,5 +1,10 @@
 # Graph And Training Plans
 
+> **Current-state note:** The production app implements the Skill Graph only,
+> with Training Method, Drill, standard Tag, Custom Tag, and Saved List nodes.
+> Workout and Bridge graphs exist only in the static wireframe prototype.
+> Training Plans have no production schema or UI and remain deferred.
+
 ## Graph Purpose
 
 The Network View should help users see their personal Muay Thai knowledge base as a connected map.
@@ -12,7 +17,8 @@ It should answer:
 - Which drills could be grouped into a future training plan?
 - What have I neglected?
 
-The product should also have a more conventional Organized View for searching, filtering, opening, and editing saved drills. The Network View is not the only way to use the app.
+The product also has the Training Log for searching, filtering, opening, and
+editing saved drills. The Network View is not the only way to use the app.
 
 ## Graph Structure
 
@@ -33,7 +39,8 @@ Pad Work ---------------------- Slip Right Step-Through Uppercut
 
 This keeps the first view readable and gives users clear anchor nodes.
 
-Tags, Custom Tags, and Status should be optional graph layers. They are useful, but they should not all appear by default.
+Tags, Custom Tags, and Saved Lists should be optional graph layers. They are
+useful, but they should not all appear by default.
 
 Optional expanded graph:
 
@@ -46,21 +53,21 @@ southpaw-transition ----------/
 Focus ------------------------/
 ```
 
-This avoids forcing every tag and status marker into the graph at once.
+This avoids forcing every tag and Saved List marker into the graph at once.
 
 ## Visual Rules
 
-First-pass visual ideas:
+Historical and future visual ideas (not all implemented):
 
 - Largest nodes: Training Methods.
 - Drill nodes: saved drill entries, connected directly to relevant training methods by default.
 - Tag nodes: optional layer.
 - Custom Tag nodes: optional layer.
-- Status nodes: optional layer, hidden by default.
+- Saved List nodes: optional layer, hidden by default.
 - Brightness: frequency or recency of use.
 - Line thickness: uniform for now.
 - Special colored lines: drills grouped into a Training Plan.
-- Status: affects filters and drill-node styling by default.
+- Saved Lists affect filters and drill-node styling by default.
 
 The graph should feel alive but not arbitrary. Avoid visual rules that imply data the app does not actually have.
 
@@ -68,13 +75,17 @@ The graph should feel alive but not arbitrary. Avoid visual rules that imply dat
 
 Clicking a node should open the information behind that node.
 
-- Drill node: opens the full drill details, including summary, steps, notes, primary training method badge, tags, status, and related plans.
-- Training Method node: focuses the graph on drills connected to that method. Connected nodes and edges stay bright while unrelated nodes dim. Tapping the same method, tapping the background, or clearing the focus chip returns to the full graph.
-- Tag node, when visible: opens a filtered view of drills connected to that tag.
-- Custom Tag node, when visible: opens a filtered view of drills connected to that custom tag.
-- Status node, when visible: opens a filtered view of drills with that status.
+- Drill node: opens the full drill details, including the primary Training
+  Method, summary, steps, notes, and Tags. Saved List actions remain separate
+  controls around the detail surface.
+- Training Method node: focuses the graph on drills connected to that method.
+  Connected nodes and edges stay bright while unrelated nodes dim. Tapping the
+  same method or clearing the focus chip returns to the full graph.
+- Tag, Custom Tag, and Saved List nodes are currently visual context only.
+  Activating them as filter shortcuts remains deferred.
 
-The graph should not be purely decorative. Every visible node should be usable as a navigation point.
+Drill and Training Method nodes are the current navigation points; optional
+layer nodes still communicate relationships even before they become interactive.
 
 ## Views
 
@@ -85,7 +96,7 @@ Potential Network View modes:
 - Focus View: emphasizes favourite, active, frequently accessed, or recently practiced drills.
 - Plan View: shows drills grouped into a Training Plan.
 
-Current graph-mode direction:
+Static wireframe graph-mode exploration:
 
 - Skill Graph: the default Muay Thai memory map. Shows Training Methods connected to Drill nodes.
 - Workout Graph: a parallel physical-prep map. Shows Workout Type anchors connected to Exercise / Movement nodes.
@@ -105,21 +116,24 @@ Med Ball Rotational Throw -> Landmine Punch Press -> Plyo Push-Up -> Hollow Hold
 
 Selecting a saved pathway should dim unrelated nodes, brighten the included Exercise / Movement nodes, and draw a unique colored route between them.
 
-The default Skill Graph and the Workout Graph should remain separate unless the user intentionally chooses Bridge Graph.
+If Workout and Bridge graphs are implemented later, the default Skill Graph and
+the Workout Graph should remain separate unless the user intentionally chooses
+Bridge Graph.
 
 ## Graph Filters
 
 The Network View should have clear toggles for graph layers.
 
-The exact filter set needs a later pass. For now, filters should stay intentionally limited.
+The production graph exposes optional standard Tag, Custom Tag, and Saved List
+layers. The broader set below is retained as future design exploration.
 
-Suggested toggles:
+Suggested future toggles:
 
 - Training Methods
 - Drills
 - Tags
 - Custom Tags
-- Status
+- Saved Lists
 - Training Plans
 
 Default state:
@@ -128,7 +142,7 @@ Default state:
 - Drills: on
 - Tags: off
 - Custom Tags: off
-- Status: off
+- Saved Lists: off
 - Training Plans: off unless viewing a plan
 
 This lets the graph move between a clean context map and a denser relationship map.
@@ -145,17 +159,25 @@ Action rail:
 
 Network Controls opens layer and filter settings for the graph.
 
-Search searches by keyword across drill title, summary, training method, tags, custom tags, and status. Tapping the search icon opens an inline curved search input extending from the icon. Typing previews matching nodes live. Tapping the search icon again with text in the input commits that keyword as an active search filter and retracts the input. Tapping it again with an empty input creates no filter and retracts the input. Multiple search keywords can be active at once, and the search icon should change color while the inline input is open or committed search filters exist. Search results should show matching nodes plus enough connected nodes to preserve context.
+Search covers Drill title, summary, Training Methods, Tags, Custom Tags, and
+Saved Lists. Tapping the search icon opens an inline curved input. Typing
+previews matching nodes live; tapping the icon with text commits the keyword and
+retracts the input, while tapping with an empty input simply closes it. Multiple
+keywords can remain active. The icon changes color while the input is open, and
+committed searches remain visible as active-state chips. Search results retain
+enough connected nodes to preserve context.
 
-Capture opens the voice memo flow by default. Holding the capture icon should reveal a manual-input option, and swiping up to that icon should open manual entry.
+Capture opens the voice memo flow by default. Production uses a Type Instead
+action for typed AI capture; the separate Add Drill route provides fully manual
+entry. Hold-and-swipe remains a deferred gesture enhancement.
 
 When search, focus, or filters are active, the graph should show dismissible active-state chips such as `Search: uppercut`, `Tags on`, or `Focus: Pad Work`.
 
 Training Methods should have distinctive icons. They are the core graph anchors and filter logic, so they should feel more memorable than plain text labels. The first pass can use Phosphor icons, with custom logo marks explored later.
 
-## Organized View
+## Training Log
 
-The Organized View should present the same knowledge base in a more conventional structure.
+The Training Log presents the same knowledge base in a more conventional structure.
 
 Possible layouts:
 

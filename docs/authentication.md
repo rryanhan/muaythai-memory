@@ -70,8 +70,9 @@ email in the same browser that requested it.
 
 Authenticated users must finish `/onboarding/profile` and either complete or
 skip `/onboarding/first-drill` before normal product pages and APIs are
-available. Username is required and future-public. First name, last name, and
-location are optional and private.
+available. Username is required and visible to other onboarded users through
+exact discovery and fighter-profile links. First name, last name, and location
+are optional and private.
 
 The first-drill guide opens the production Capture Drill recorder and teaches
 voice capture, typed AI capture, and manual Add Drill in that order. Every path

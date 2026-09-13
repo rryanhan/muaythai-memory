@@ -1,42 +1,46 @@
 # Data Model
 
-## MVP Entities
+## Current Drill Model
 
-The MVP should keep the core model small.
+The implemented Drill model keeps the core relationships small:
 
 ```txt
 Training Methods + Tags + Custom Tags -> Drill
 ```
 
-Status and Training Plans are useful product concepts, but they do not need to be part of the initial AI capture output. Saved drills can still have user-set Status markers after capture.
+Saved Lists are user-selected relationships and are deliberately excluded from
+AI capture output. Training Plans remain deferred.
 
 ## Drill
 
 A Drill is the main saved object.
 
-Required MVP fields:
+Every Drill summary response includes:
 
 - `id`
 - `title`
-- `steps`
+- `summary`
 - `trainingMethods`
-- `trainingTags`
+- `tags`
 - `customTags`
+- `statusTags`
 - `createdAt`
 - `updatedAt`
 
-Optional MVP fields:
+The Drill detail response additionally includes:
 
-- `summary`
-- `status`
-- `notes`
+- `steps`
+- nullable `notes`
 
-Optional later fields:
+Possible later fields:
 
 - `lastPracticedAt`
 - `practiceCount`
-- `sourceTranscript`
 - `trainingPlanIds`
+
+The schema retains a reserved nullable `source_transcript` column, but Capture
+v1 deliberately does not write it; original audio and transcripts remain
+request/session-only.
 
 ## Training Method
 
@@ -60,7 +64,9 @@ Warmup should not be a first-pass Training Method. It belongs in the later worko
 
 ## Tag
 
-Tags are predefined Muay Thai labels the app understands. The current data field is `trainingTags`, but the UI should usually say Tags.
+Tags are predefined Muay Thai labels the app understands. Drill writes use
+`tagSlugs`, reads return `tags`, and the UI says Tags. The older
+`trainingTags` name remains only in historical fixtures.
 
 Tags are organized under browse categories, but only the leaf tags should be stored. Category names such as `Boxing`, `Kicking`, `Defense`, and `Footwork` are not saved as tags because they overlap with more useful leaf tags.
 
@@ -83,9 +89,13 @@ Tags should be optional graph nodes. They should be visible through filters, sea
 
 Core Idea is not part of the active MVP UI.
 
-We tested it as a single primary training pattern attached to a Drill, but it risks forcing users into a word-first interpretation of something that is usually visual and body-led. For now, keep the interface focused on Training Methods, concrete Tags, Custom Tags, and Status.
+We tested it as a single primary training pattern attached to a Drill, but it
+risks forcing users into a word-first interpretation of something that is
+usually visual and body-led. For now, keep the interface focused on Training
+Methods, concrete Tags, Custom Tags, and Saved Lists.
 
-Existing mock data may still contain `coreIdea` values for recovery/reference, but the app should not display or filter by Core Idea in the current wireframe.
+Historical sample data still contains `coreIdea` values for reference, but the
+production app does not display or filter by Core Idea.
 
 Possible later fields if we bring this back:
 
@@ -102,15 +112,18 @@ Active Saved Lists:
 - `Favourite` (`starred` remains the stable backend slug)
 - `Drill Back In`
 
-First-pass storage:
-
-- `status`: array of strings
+Current storage is normalized through `status_tags` and the
+`drill_status_tags` join table. API writes identify Saved Lists by slug and API
+reads return `statusTags`; there is no string-array `status` column on `drills`.
 
 Saved Lists should not be generated as part of the default AI capture output. The user can add or remove them while creating or editing a Drill.
 
 ## Custom Tag
 
-Custom Tags are user-created or AI-suggested tags that do not fit the standard taxonomy.
+Custom Tags are owner-scoped taxonomy rows that do not fit the standard
+taxonomy. The current UI can select, search, and filter existing Custom Tags.
+App-level creation, rename, and merge controls remain deferred, and AI does not
+suggest or create Custom Tags.
 
 Examples:
 
@@ -133,10 +146,14 @@ Journal metadata lives in Postgres:
 - `journal_media`: entry relationship, private video path, private poster-frame path, MIME type, byte size, duration
 
 Uploads begin as `uploading` and become visible only after the private video and
-poster objects are confirmed and the entry moves to `ready`. The poster column
-remains nullable only for compatibility with legacy entries. Deleting an entry permanently
-removes both its database records and video. Video bytes never pass through the
-Next server and are never public.
+poster objects are confirmed and the entry moves to `ready`. `poster_path` is
+nullable while an upload is active and is required when the entry becomes
+ready. Deletion removes the Storage objects, marks the row as a `deleted`
+tombstone, and lets bounded maintenance physically remove old tombstones after
+the recovery window. If cleanup fails, the code attempts to retain a hidden
+`deleted` tombstone; otherwise the stale operation claim remains eligible for
+maintenance recovery and the API reports failure. Video bytes never pass
+through the Next server and are never public.
 
 Ready-entry metadata may be edited without replacing the stored video. The date,
 caption, and optional owned Drill relationship remain user-scoped. The client may
@@ -193,8 +210,9 @@ Optional layers:
 
 - Tags
 - Custom Tags
-- Status
-- Training Plans
+- Saved Lists
+
+Training Plans remain a deferred layer with no current schema or UI.
 
 This keeps the first graph readable while still allowing deeper relationship views.
 
