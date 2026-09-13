@@ -39,6 +39,7 @@ const LibraryIndexPanel = lazy(
 export function LibraryView() {
   const [filters, setFilters] = useState<LibraryFilters>(emptyLibraryFilters);
   const [indexOpen, setIndexOpen] = useState(false);
+  const [taxonomyRequested, setTaxonomyRequested] = useState(false);
   const [tagPanelOpen, setTagPanelOpen] = useState(false);
   const [tagPanelMounted, setTagPanelMounted] = useState(false);
   const [draftTagSlugs, setDraftTagSlugs] = useState<string[]>([]);
@@ -68,6 +69,7 @@ export function LibraryView() {
   const taxonomyQuery = useQuery({
     queryKey: taxonomyQueryKey,
     queryFn: ({ signal }) => getTaxonomy({ requestInit: { signal } }),
+    enabled: taxonomyRequested,
     staleTime: 10 * 60 * 1000,
   });
   const drillListQuery = useQuery({
@@ -165,6 +167,7 @@ export function LibraryView() {
 
   function handleTagPanelOpenChange(open: boolean) {
     if (open) {
+      setTaxonomyRequested(true);
       setTagPanelMounted(true);
       setDraftTagSlugs(filters.tagSlugs);
       setDraftStatusTagSlugs(filters.statusTagSlugs);
@@ -189,7 +192,10 @@ export function LibraryView() {
         className="index-spine"
         aria-label="Open Training Method index"
         aria-expanded={indexOpen}
-        onClick={() => setIndexOpen((open) => !open)}
+        onClick={() => {
+          if (!indexOpen) setTaxonomyRequested(true);
+          setIndexOpen((open) => !open);
+        }}
       >
         <span aria-hidden="true" />
       </button>

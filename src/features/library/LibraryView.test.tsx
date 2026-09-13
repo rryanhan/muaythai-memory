@@ -83,6 +83,7 @@ describe("LibraryView", () => {
     });
     expect(mocks.getDrills).toHaveBeenCalledTimes(2);
     expect(mocks.getDrills.mock.calls[1]?.[0]).toMatchObject({ keywords: ["muay"] });
+    expect(mocks.getTaxonomy).not.toHaveBeenCalled();
   });
 
   it("cancels a pending keyword request when the input is cleared", async () => {
@@ -108,8 +109,13 @@ describe("LibraryView", () => {
     const { container } = renderLibrary();
     const trigger = screen.getByRole("button", { name: "Open Training Method index" });
     expect(mocks.indexPanelRequested).not.toHaveBeenCalled();
+    expect(mocks.getTaxonomy).not.toHaveBeenCalled();
 
     await user.click(trigger);
+    await waitFor(() => expect(mocks.getTaxonomy).toHaveBeenCalledOnce());
+    expect(mocks.getTaxonomy).toHaveBeenCalledWith({
+      requestInit: { signal: expect.any(AbortSignal) },
+    });
 
     const dialog = await screen.findByRole("dialog", { name: "Training Method index" });
     const close = screen.getByRole("button", { name: "Close" });
@@ -160,6 +166,27 @@ describe("LibraryView", () => {
 
     request.resolve(emptyDrillResponse);
     expect(await screen.findByText("No drills found")).toBeInTheDocument();
+  });
+
+  it("requests taxonomy only after a taxonomy-dependent surface opens", async () => {
+    mocks.getDrills.mockResolvedValue(emptyDrillResponse);
+    const user = userEvent.setup();
+    renderLibrary();
+
+    expect(await screen.findByText("No drills found")).toBeInTheDocument();
+    expect(mocks.getDrills).toHaveBeenCalledOnce();
+    expect(mocks.getTaxonomy).not.toHaveBeenCalled();
+
+    const trigger = screen.getByRole("button", { name: "Filter by tags" });
+    await user.click(trigger);
+    await waitFor(() => expect(mocks.getTaxonomy).toHaveBeenCalledOnce());
+    expect(mocks.getTaxonomy).toHaveBeenCalledWith({
+      requestInit: { signal: expect.any(AbortSignal) },
+    });
+
+    await user.click(trigger);
+    await user.click(trigger);
+    expect(mocks.getTaxonomy).toHaveBeenCalledOnce();
   });
 });
 
