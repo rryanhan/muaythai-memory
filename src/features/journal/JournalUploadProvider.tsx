@@ -76,6 +76,7 @@ export function JournalUploadProvider({ children }: { children: ReactNode }) {
   const [intent, setIntent] = useState<JournalUploadIntentResponse | null>(null);
   const [completedEntryId, setCompletedEntryId] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const uploadPendingRef = useRef(false);
   const intentRef = useRef<JournalUploadIntentResponse | null>(null);
   const previewUrlRef = useRef<string | null>(null);
   const posterPreviewUrlRef = useRef<string | null>(null);
@@ -170,9 +171,17 @@ export function JournalUploadProvider({ children }: { children: ReactNode }) {
 
   const startUpload = useCallback(async () => {
     const file = draft.file;
-    if (!file || busy) return;
-    const poster = posterFileRef.current ?? await posterPromiseRef.current;
+    if (!file || busy || uploadPendingRef.current) return;
+    uploadPendingRef.current = true;
+    let poster: File | null;
+    try {
+      poster = posterFileRef.current ?? await posterPromiseRef.current;
+    } catch (posterError) {
+      uploadPendingRef.current = false;
+      throw posterError;
+    }
     if (!poster) {
+      uploadPendingRef.current = false;
       setError("Choose a cover before uploading this journal entry.");
       return;
     }
@@ -300,6 +309,7 @@ export function JournalUploadProvider({ children }: { children: ReactNode }) {
       setError(uploadError instanceof Error ? uploadError.message : "Journal entry could not be uploaded.");
     } finally {
       if (abortRef.current === controller) abortRef.current = null;
+      uploadPendingRef.current = false;
     }
   }, [busy, draft, failedStage, intent, queryClient, resetDraft, router]);
 

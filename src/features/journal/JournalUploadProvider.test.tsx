@@ -263,6 +263,32 @@ describe("JournalUploadProvider poster replacement", () => {
 });
 
 describe("JournalUploadProvider intent recovery", () => {
+  it("starts only one upload when invoked twice in the same event", async () => {
+    const currentIntent = uploadIntent(
+      "11111111-1111-4111-8111-111111111111",
+      "user/entry/video.mp4",
+      "token",
+    );
+    let resolveCreate: ((intent: typeof currentIntent) => void) | undefined;
+    dataMocks.createJournalUpload.mockImplementation(() => new Promise((resolve) => {
+      resolveCreate = resolve;
+    }));
+    dataMocks.completeJournalEntryUpload.mockResolvedValue({ id: currentIntent.entryId });
+
+    renderProvider(<UploadHarness />);
+    await chooseReadyFile();
+
+    fireEvent.click(screen.getByRole("button", { name: "Start upload twice" }));
+    await waitFor(() => expect(dataMocks.createJournalUpload).toHaveBeenCalledOnce());
+
+    act(() => resolveCreate?.(currentIntent));
+    await screen.findByText("ready");
+
+    expect(uploadMocks.uploadJournalVideo).toHaveBeenCalledOnce();
+    expect(dataMocks.uploadJournalEntryPoster).toHaveBeenCalledOnce();
+    expect(dataMocks.completeJournalEntryUpload).toHaveBeenCalledOnce();
+  });
+
   it("refreshes an expired upload token without creating a second entry", async () => {
     const oldIntent = uploadIntent(
       "11111111-1111-4111-8111-111111111111",
@@ -520,6 +546,15 @@ function UploadHarness({
       </button>
       <button type="button" onClick={() => void upload.startUpload()}>
         Start upload
+      </button>
+      <button
+        type="button"
+        onClick={() => {
+          void upload.startUpload();
+          void upload.startUpload();
+        }}
+      >
+        Start upload twice
       </button>
       <button type="button" onClick={() => void upload.cancelUpload()}>
         Cancel upload
