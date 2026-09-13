@@ -30,6 +30,7 @@ import {
 import {
   createDrill,
   CreateDrillValidationError,
+  setDrillSavedList,
   updateDrill,
   UpdateDrillValidationError,
 } from "./mutations";
@@ -200,6 +201,47 @@ describe("drill taxonomy validation", () => {
   });
 });
 
+describe("Saved List mutation serialization", () => {
+  it("locks the owned drill before changing its Saved List relationships", async () => {
+    const ownedDrillQuery = selectBuilder([{ id: drillId }]);
+    const statusQuery = selectBuilder([{
+      id: statusId,
+      name: "Favourite",
+      slug: "starred",
+      sortOrder: 10,
+    }]);
+    const insertQuery = insertBuilder();
+    const tx = {
+      select: vi.fn()
+        .mockReturnValueOnce(ownedDrillQuery)
+        .mockReturnValueOnce(statusQuery),
+      insert: vi.fn().mockReturnValue(insertQuery),
+    };
+    mocks.transaction.mockImplementation(async (
+      callback: (transaction: typeof tx) => Promise<unknown>,
+    ) => callback(tx));
+
+    await expect(setDrillSavedList(userId, drillId, {
+      slug: "starred",
+      selected: true,
+    })).resolves.toEqual({
+      drillId,
+      status: {
+        id: statusId,
+        name: "Favourite",
+        slug: "starred",
+        sortOrder: 10,
+      },
+      selected: true,
+    });
+
+    expect(ownedDrillQuery.for).toHaveBeenCalledOnce();
+    expect(ownedDrillQuery.for).toHaveBeenCalledWith("update", { of: drills });
+    expect(statusQuery.for).not.toHaveBeenCalled();
+    expect(insertQuery.onConflictDoNothing).toHaveBeenCalledOnce();
+  });
+});
+
 function drillInput(overrides: Record<string, unknown> = {}) {
   return {
     title: "Rear kick entry",
@@ -278,6 +320,30 @@ function mutationBuilder() {
   builder.set.mockReturnValue(builder);
   builder.values.mockReturnValue(builder);
   builder.where.mockReturnValue(builder);
+  return builder;
+}
+
+function selectBuilder(rows: unknown[]) {
+  const builder = {
+    for: vi.fn(),
+    from: vi.fn(),
+    limit: vi.fn(),
+    where: vi.fn(),
+  };
+  builder.from.mockReturnValue(builder);
+  builder.where.mockReturnValue(builder);
+  builder.for.mockReturnValue(builder);
+  builder.limit.mockResolvedValue(rows);
+  return builder;
+}
+
+function insertBuilder() {
+  const builder = {
+    onConflictDoNothing: vi.fn(),
+    values: vi.fn(),
+  };
+  builder.values.mockReturnValue(builder);
+  builder.onConflictDoNothing.mockResolvedValue(undefined);
   return builder;
 }
 

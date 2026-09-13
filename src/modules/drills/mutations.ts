@@ -349,6 +349,7 @@ export async function setDrillSavedList(
       .select({ id: drills.id })
       .from(drills)
       .where(and(eq(drills.id, drillId), eq(drills.userId, userId)))
+      .for("update", { of: drills })
       .limit(1);
 
     if (!ownedDrill) {
