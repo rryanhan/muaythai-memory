@@ -149,11 +149,12 @@ export function JournalUploadProvider({ children }: { children: ReactNode }) {
         await deleteJournalEntry(stagedEntryId);
       } catch (deleteError) {
         if (!(deleteError instanceof JournalApiError && deleteError.status === 404)) {
+          const discardError = deleteError instanceof Error
+            ? deleteError
+            : new Error("Journal upload could not be discarded. Try again.");
           setPhase("error");
-          setError(deleteError instanceof Error
-            ? deleteError.message
-            : "Journal upload could not be discarded. Try again.");
-          return;
+          setError(discardError.message);
+          throw discardError;
         }
       }
     }
@@ -428,7 +429,9 @@ export function JournalUploadProvider({ children }: { children: ReactNode }) {
     },
     startUpload,
     async cancelUpload() {
-      await discardWork();
+      // discardWork rejects so navigation-sensitive callers can stop. The
+      // provider already exposes the failure through phase/error here.
+      await discardWork().catch(() => undefined);
     },
     discardWork,
     clearCompleted() {

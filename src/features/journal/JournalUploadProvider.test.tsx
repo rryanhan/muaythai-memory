@@ -451,6 +451,35 @@ describe("JournalUploadProvider intent recovery", () => {
     await waitFor(() => expect(screen.getByTestId("file-name")).toHaveTextContent("none"));
     expect(dataMocks.deleteJournalEntry).toHaveBeenCalledTimes(2);
   });
+
+  it("rejects discardWork when the staged entry cannot be deleted", async () => {
+    const currentIntent = uploadIntent(
+      "11111111-1111-4111-8111-111111111111",
+      "user/entry/video.mp4",
+      "token",
+    );
+    let discardWork: (() => Promise<void>) | null = null;
+    dataMocks.createJournalUpload.mockResolvedValue(currentIntent);
+    uploadMocks.uploadJournalVideo.mockRejectedValueOnce(new Error("Network interrupted."));
+    dataMocks.deleteJournalEntry.mockRejectedValueOnce(
+      new JournalApiError("Journal video could not be removed. Try again.", 503),
+    );
+
+    renderProvider(
+      <UploadHarness captureDiscardWork={(nextDiscardWork) => { discardWork = nextDiscardWork; }} />,
+    );
+    await chooseReadyFile();
+    fireEvent.click(screen.getByRole("button", { name: "Start upload" }));
+    await screen.findByText("Network interrupted.");
+
+    expect(discardWork).not.toBeNull();
+    await act(async () => {
+      await expect(discardWork!()).rejects.toThrow("Journal video could not be removed. Try again.");
+    });
+
+    expect(screen.getByTestId("file-name")).toHaveTextContent("round.mp4");
+    expect(screen.getByText("Journal video could not be removed. Try again.")).toBeInTheDocument();
+  });
 });
 
 function PosterHarness() {
@@ -474,8 +503,13 @@ function PosterHarness() {
   );
 }
 
-function UploadHarness() {
+function UploadHarness({
+  captureDiscardWork,
+}: {
+  captureDiscardWork?: (discardWork: () => Promise<void>) => void;
+} = {}) {
   const upload = useJournalUpload();
+  captureDiscardWork?.(upload.discardWork);
   return (
     <>
       <button

@@ -63,6 +63,7 @@ describe("SignOutButton", () => {
     await user.click(screen.getByRole("button", { name: "Sign out" }));
     expect(mocks.discardWork).toHaveBeenCalledOnce();
     expect(mocks.loadStarted).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "Signing out..." })).toBeDisabled();
 
     await act(async () => discard.resolve());
 
@@ -72,6 +73,30 @@ describe("SignOutButton", () => {
     expect(clear).toHaveBeenCalledOnce();
     expect(mocks.replace).toHaveBeenCalledWith("/auth/sign-in");
     expect(mocks.refresh).toHaveBeenCalledOnce();
+    confirm.mockRestore();
+  });
+
+  it("stays signed in when the active journal upload cannot be discarded", async () => {
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+    const queryClient = new QueryClient();
+    const clear = vi.spyOn(queryClient, "clear");
+    const user = userEvent.setup();
+    mocks.hasWork = true;
+    mocks.discardWork.mockRejectedValue(new Error("cleanup failed"));
+    renderButton(queryClient);
+
+    await user.click(screen.getByRole("button", { name: "Sign out" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Could not discard the active journal upload. Try again.",
+    );
+    expect(screen.getByRole("button", { name: "Sign out" })).toBeEnabled();
+    expect(mocks.loadStarted).not.toHaveBeenCalled();
+    expect(mocks.createClient).not.toHaveBeenCalled();
+    expect(mocks.signOut).not.toHaveBeenCalled();
+    expect(clear).not.toHaveBeenCalled();
+    expect(mocks.replace).not.toHaveBeenCalled();
+    expect(mocks.refresh).not.toHaveBeenCalled();
     confirm.mockRestore();
   });
 

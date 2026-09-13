@@ -25,10 +25,18 @@ export function SignOutButton({ className, errorClassName }: SignOutButtonProps)
     if (journalUpload.hasWork) {
       const confirmed = window.confirm("Discard the active journal upload and sign out?");
       if (!confirmed) return;
-      await journalUpload.discardWork();
     }
     setPending(true);
     setErrorMessage(null);
+    if (journalUpload.hasWork) {
+      try {
+        await journalUpload.discardWork();
+      } catch {
+        setPending(false);
+        setErrorMessage("Could not discard the active journal upload. Try again.");
+        return;
+      }
+    }
     try {
       const { createSupabaseBrowserClient } = await loadSupabaseBrowserClientModule();
       const supabase = createSupabaseBrowserClient();

@@ -11,6 +11,7 @@ export function JournalDiscardSheet({
   onDiscard,
   title = "Discard journal entry?",
   description = "Your selected video and unsaved entry details will be lost.",
+  error = null,
   stayLabel = "Keep editing",
   discardLabel = "Discard entry",
 }: {
@@ -20,6 +21,7 @@ export function JournalDiscardSheet({
   onDiscard: () => void;
   title?: string;
   description?: string;
+  error?: string | null;
   stayLabel?: string;
   discardLabel?: string;
 }) {
@@ -39,6 +41,7 @@ export function JournalDiscardSheet({
           <Drawer.Description asChild>
             <p>{description}</p>
           </Drawer.Description>
+          {error && <p className={styles.formError} role="alert">{error}</p>}
           <div className={styles.sheetActions}>
             <button type="button" disabled={pending} data-drawer-initial-focus onClick={onStay}>{stayLabel}</button>
             <button type="button" disabled={pending} data-danger="true" onClick={onDiscard}>

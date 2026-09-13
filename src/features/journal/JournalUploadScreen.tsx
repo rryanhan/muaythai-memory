@@ -7,6 +7,11 @@ import { useQuery } from "@tanstack/react-query";
 import { RoutedBottomNav } from "@/components/navigation/RoutedBottomNav";
 import { getDrills } from "@/data/drills";
 import type { DrillFilterInput } from "@/data/types";
+import {
+  isHistoryGuardState,
+  restoreHistoryGuard,
+  type HistoryGuardEntry,
+} from "@/features/onboarding/history-guard";
 import { JournalDatePicker } from "./JournalDatePicker";
 import { JournalCoverEditor } from "./JournalCoverEditor";
 import { JournalDiscardSheet } from "./JournalDiscardSheet";
@@ -24,7 +29,11 @@ const allDrillFilters: DrillFilterInput = {
   statusMode: "all",
 };
 
-type PendingNavigation = { kind: "route"; destination: string } | { kind: "history" } | null;
+type PendingNavigation =
+  | { kind: "route"; destination: string }
+  | { kind: "history"; delta: number | null; entryKey: string | null }
+  | null;
+const journalUploadGuardMarker = "__journalGuard";
 
 export function JournalUploadScreen() {
   const router = useRouter();
@@ -33,10 +42,24 @@ export function JournalUploadScreen() {
   const [coverEditorOpen, setCoverEditorOpen] = useState(false);
   const [discardOpen, setDiscardOpen] = useState(false);
   const [discarding, setDiscarding] = useState(false);
+  const [discardError, setDiscardError] = useState<string | null>(null);
+  const [restoringHistory, setRestoringHistory] = useState(false);
   const [pendingNavigation, setPendingNavigation] = useState<PendingNavigation>(null);
+  const pendingNavigationRef = useRef<PendingNavigation>(null);
   const guardKeyRef = useRef<string | null>(null);
-  const atGuardEntryRef = useRef(false);
-  const ignoreNextPopRef = useRef(false);
+  const guardEntryRef = useRef<HistoryGuardEntry | null>(null);
+  const baseEntryRef = useRef<HistoryGuardEntry | null>(null);
+  const guardIndexRef = useRef<number | null>(null);
+  const guardNavigationKeyRef = useRef<string | null>(null);
+  const restoringToIndexRef = useRef<number | null>(null);
+  const fallbackRestoringRef = useRef(false);
+  const releasedTraversalKeyRef = useRef<string | null>(null);
+  const deferredDiscardCompletionRef = useRef<(() => void) | null>(null);
+  const navigationReleasedRef = useRef(false);
+  const mountedRef = useRef(false);
+  const discardPendingRef = useRef(false);
+  const discardFailedRef = useRef(false);
+  const discardOperationRef = useRef(0);
   const shouldGuard = upload.phase === "idle" && upload.hasWork;
   const guardRef = useRef(shouldGuard);
   const locked = upload.busy || upload.phase === "error";
@@ -46,95 +69,363 @@ export function JournalUploadScreen() {
     staleTime: 60 * 1000,
   });
 
+  const releaseHistoryGuard = useCallback((action: () => void) => {
+    const guardKey = guardKeyRef.current;
+    const baseEntry = baseEntryRef.current;
+    if (
+      guardKey
+      && baseEntry
+      && isHistoryGuardState(window.history.state, journalUploadGuardMarker, guardKey)
+    ) {
+      window.history.replaceState(baseEntry.state, "", baseEntry.url);
+    }
+    guardKeyRef.current = null;
+    guardEntryRef.current = null;
+    baseEntryRef.current = null;
+    guardIndexRef.current = null;
+    guardNavigationKeyRef.current = null;
+    restoringToIndexRef.current = null;
+    action();
+  }, []);
+
+  const traverseHistory = useCallback((delta: number) => {
+    window.history.go(delta);
+  }, []);
+
   useEffect(() => {
-    guardRef.current = shouldGuard;
-    if (shouldGuard && !guardKeyRef.current) {
+    if (!upload.hasWork) discardFailedRef.current = false;
+    const guarded = (shouldGuard || discardPendingRef.current || discardFailedRef.current)
+      && !navigationReleasedRef.current;
+    guardRef.current = guarded;
+    if (guarded && !guardKeyRef.current) {
       const guardKey = `journal-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      const baseEntry: HistoryGuardEntry = {
+        key: guardKey,
+        state: { ...(window.history.state ?? {}) },
+        url: window.location.href,
+      };
+      const guardEntry: HistoryGuardEntry = {
+        key: guardKey,
+        state: { ...baseEntry.state, [journalUploadGuardMarker]: guardKey },
+        url: baseEntry.url,
+      };
       guardKeyRef.current = guardKey;
-      atGuardEntryRef.current = true;
-      window.history.pushState({ ...window.history.state, __journalGuard: guardKey }, "", window.location.href);
+      baseEntryRef.current = baseEntry;
+      guardEntryRef.current = guardEntry;
+      window.history.replaceState(guardEntry.state, "", guardEntry.url);
+      guardIndexRef.current = currentHistoryIndex();
+      guardNavigationKeyRef.current = currentHistoryEntryKey();
       return;
     }
-    if (!shouldGuard && guardKeyRef.current) {
-      const guardKey = guardKeyRef.current;
-      guardKeyRef.current = null;
-      if (atGuardEntryRef.current && window.history.state?.__journalGuard === guardKey) {
-        ignoreNextPopRef.current = true;
-        atGuardEntryRef.current = false;
-        window.history.back();
-      }
+    if (!guarded && guardKeyRef.current) {
+      releaseHistoryGuard(() => {});
     }
-  }, [shouldGuard]);
+  }, [releaseHistoryGuard, shouldGuard, upload.hasWork]);
 
   useEffect(() => {
     function handlePopState(event: PopStateEvent) {
-      if (ignoreNextPopRef.current) {
-        ignoreNextPopRef.current = false;
-        atGuardEntryRef.current = event.state?.__journalGuard === guardKeyRef.current;
-        return;
+      if (
+        releasedTraversalKeyRef.current
+        && currentHistoryEntryKey() === releasedTraversalKeyRef.current
+      ) {
+        releasedTraversalKeyRef.current = null;
+        discardPendingRef.current = false;
       }
       const guardKey = guardKeyRef.current;
-      if (!guardRef.current || !guardKey) return;
-      if (event.state?.__journalGuard === guardKey) {
-        atGuardEntryRef.current = true;
+      const guardEntry = guardEntryRef.current;
+      if (!guardRef.current || !guardKey || !guardEntry) return;
+
+      const currentIndex = currentHistoryIndex();
+      const restoringToIndex = restoringToIndexRef.current;
+      if (
+        restoringToIndex !== null
+        && currentIndex === restoringToIndex
+        && isHistoryGuardState(event.state, journalUploadGuardMarker, guardKey)
+      ) {
+        event.stopImmediatePropagation();
+        restoringToIndexRef.current = null;
+        setRestoringHistory(false);
+        const completeDiscard = deferredDiscardCompletionRef.current;
+        deferredDiscardCompletionRef.current = null;
+        completeDiscard?.();
         return;
       }
-      atGuardEntryRef.current = false;
-      setPendingNavigation({ kind: "history" });
+
+      event.stopImmediatePropagation();
+      setDiscardOpen(true);
+      const guardIndex = guardIndexRef.current;
+      if (guardIndex !== null && currentIndex !== null && guardIndex !== currentIndex) {
+        if (!pendingNavigationRef.current) {
+          const navigation: PendingNavigation = {
+            kind: "history",
+            delta: currentIndex - guardIndex,
+            entryKey: currentHistoryEntryKey(),
+          };
+          pendingNavigationRef.current = navigation;
+          setPendingNavigation(navigation);
+        }
+        restoringToIndexRef.current = guardIndex;
+        setRestoringHistory(true);
+        const navigationApi = window.navigation;
+        const guardNavigationKey = guardNavigationKeyRef.current;
+        if (navigationApi && guardNavigationKey) {
+          const finishFailedRestoration = () => {
+            if (!mountedRef.current || restoringToIndexRef.current !== guardIndex) return;
+            fallbackRestoringRef.current = true;
+            try {
+              restoreHistoryGuard(guardEntry);
+              guardIndexRef.current = currentHistoryIndex();
+              guardNavigationKeyRef.current = currentHistoryEntryKey();
+              const pendingNavigation = pendingNavigationRef.current;
+              if (pendingNavigation?.kind === "history") {
+                const fallbackNavigation: PendingNavigation = {
+                  ...pendingNavigation,
+                  // pushState placed the attempted target immediately behind
+                  // the replacement guard, regardless of the original jump.
+                  delta: -1,
+                };
+                pendingNavigationRef.current = fallbackNavigation;
+                setPendingNavigation(fallbackNavigation);
+              }
+            } catch {
+              // The attempted history entry remains current; a confirmed
+              // discard can still release to its absolute Navigation API key.
+              guardIndexRef.current = currentHistoryIndex();
+              guardNavigationKeyRef.current = currentHistoryEntryKey();
+            } finally {
+              restoringToIndexRef.current = null;
+              setRestoringHistory(false);
+              fallbackRestoringRef.current = false;
+              const completeDiscard = deferredDiscardCompletionRef.current;
+              deferredDiscardCompletionRef.current = null;
+              completeDiscard?.();
+            }
+          };
+          try {
+            observeNavigationFailure(
+              navigationApi.traverseTo(guardNavigationKey),
+              finishFailedRestoration,
+            );
+          } catch {
+            finishFailedRestoration();
+          }
+        } else {
+          traverseHistory(guardIndex - currentIndex);
+        }
+      } else {
+        // Older engines without a usable Navigation API index cannot traverse
+        // back to the unchanged guard deterministically. Pushing a copy still
+        // protects the draft and leaves the attempted entry directly behind it,
+        // but necessarily sacrifices any later forward entries.
+        if (!pendingNavigationRef.current) {
+          const navigation: PendingNavigation = {
+            kind: "history",
+            delta: null,
+            entryKey: null,
+          };
+          pendingNavigationRef.current = navigation;
+          setPendingNavigation(navigation);
+        }
+        fallbackRestoringRef.current = true;
+        try {
+          restoreHistoryGuard(guardEntry);
+        } finally {
+          fallbackRestoringRef.current = false;
+          const completeDiscard = deferredDiscardCompletionRef.current;
+          deferredDiscardCompletionRef.current = null;
+          completeDiscard?.();
+        }
+      }
+    }
+
+    function handleNavigate(event: NavigateEvent) {
+      if (event.navigationType !== "traverse" || !event.destination.sameDocument) return;
+
+      const releasedTraversalKey = releasedTraversalKeyRef.current;
+      if (releasedTraversalKey && event.destination.key === releasedTraversalKey) return;
+
+      const restoringToIndex = restoringToIndexRef.current;
+      if (
+        restoringToIndex !== null
+        && event.destination.index === restoringToIndex
+      ) {
+        return;
+      }
+
+      if (discardPendingRef.current) {
+        event.preventDefault();
+        return;
+      }
+      if (!guardRef.current) return;
+      event.preventDefault();
+      if (pendingNavigationRef.current) return;
+
+      const guardIndex = guardIndexRef.current;
+      const destinationIndex = event.destination.index;
+      const navigation: PendingNavigation = {
+        kind: "history",
+        delta: guardIndex !== null && Number.isSafeInteger(destinationIndex)
+          ? destinationIndex - guardIndex
+          : null,
+        entryKey: event.destination.key || null,
+      };
+      pendingNavigationRef.current = navigation;
+      setPendingNavigation(navigation);
       setDiscardOpen(true);
     }
-    window.addEventListener("popstate", handlePopState);
-    return () => window.removeEventListener("popstate", handlePopState);
-  }, []);
+
+    mountedRef.current = true;
+    const navigationApi = window.navigation;
+    // The cancelable precommit event closes the discard-vs-traversal race.
+    // Engines without Navigation API support fall back to restoring as soon as
+    // their committed popstate arrives; they cannot pre-cancel an in-flight step.
+    window.addEventListener("popstate", handlePopState, { capture: true });
+    navigationApi?.addEventListener("navigate", handleNavigate);
+    return () => {
+      mountedRef.current = false;
+      discardOperationRef.current += 1;
+      window.removeEventListener("popstate", handlePopState, { capture: true });
+      navigationApi?.removeEventListener("navigate", handleNavigate);
+      const guardKey = guardKeyRef.current;
+      const baseEntry = baseEntryRef.current;
+      if (
+        guardKey
+        && baseEntry
+        && isHistoryGuardState(window.history.state, journalUploadGuardMarker, guardKey)
+      ) {
+        window.history.replaceState(baseEntry.state, "", baseEntry.url);
+      }
+      guardKeyRef.current = null;
+      guardEntryRef.current = null;
+      baseEntryRef.current = null;
+      guardIndexRef.current = null;
+      guardNavigationKeyRef.current = null;
+      restoringToIndexRef.current = null;
+      fallbackRestoringRef.current = false;
+      releasedTraversalKeyRef.current = null;
+      deferredDiscardCompletionRef.current = null;
+      pendingNavigationRef.current = null;
+      discardPendingRef.current = false;
+      discardFailedRef.current = false;
+    };
+  }, [traverseHistory]);
 
   const navigateWithoutPrompt = useCallback((destination: string) => {
+    if (discardPendingRef.current || restoringToIndexRef.current !== null) return;
     guardRef.current = false;
-    const guardKey = guardKeyRef.current;
-    guardKeyRef.current = null;
-    if (guardKey && atGuardEntryRef.current && window.history.state?.__journalGuard === guardKey) {
-      ignoreNextPopRef.current = true;
-      window.addEventListener("popstate", () => router.push(destination), { once: true });
-      window.history.back();
-      return;
-    }
-    router.push(destination);
-  }, [router]);
+    navigationReleasedRef.current = true;
+    setDiscardOpen(false);
+    setPendingNavigation(null);
+    pendingNavigationRef.current = null;
+    setRestoringHistory(false);
+    releaseHistoryGuard(() => router.push(destination));
+  }, [releaseHistoryGuard, router]);
 
   function requestNavigation(destination: string) {
-    if (upload.phase !== "idle" || !guardRef.current) {
+    if (discardPendingRef.current || restoringToIndexRef.current !== null) return;
+    if (
+      !guardRef.current
+      || (upload.phase !== "idle" && !discardFailedRef.current)
+    ) {
       navigateWithoutPrompt(destination);
       return;
     }
-    setPendingNavigation({ kind: "route", destination });
+    if (!pendingNavigationRef.current) {
+      const navigation: PendingNavigation = { kind: "route", destination };
+      pendingNavigationRef.current = navigation;
+      setPendingNavigation(navigation);
+    }
+    setDiscardError(null);
     setDiscardOpen(true);
   }
 
   function stay() {
-    if (pendingNavigation?.kind === "history" && !atGuardEntryRef.current) {
-      ignoreNextPopRef.current = true;
-      atGuardEntryRef.current = true;
-      window.history.forward();
-    }
+    if (discardPendingRef.current || restoringToIndexRef.current !== null) return;
     setDiscardOpen(false);
+    setDiscardError(null);
     setPendingNavigation(null);
+    pendingNavigationRef.current = null;
   }
 
   async function discard() {
+    if (discardPendingRef.current || restoringToIndexRef.current !== null) return;
+    discardPendingRef.current = true;
+    setDiscardError(null);
+    const operation = discardOperationRef.current + 1;
+    discardOperationRef.current = operation;
     setDiscarding(true);
-    await upload.discardWork();
-    const navigation = pendingNavigation;
-    setDiscardOpen(false);
-    setPendingNavigation(null);
-    setDiscarding(false);
-
-    if (navigation?.kind === "history") {
-      guardRef.current = false;
-      guardKeyRef.current = null;
-      ignoreNextPopRef.current = true;
-      window.history.back();
+    try {
+      await upload.discardWork();
+    } catch (error) {
+      if (mountedRef.current && discardOperationRef.current === operation) {
+        discardPendingRef.current = false;
+        discardFailedRef.current = true;
+        setDiscardError(error instanceof Error
+          ? error.message
+          : "Journal upload could not be discarded. Try again.");
+        setDiscarding(false);
+      }
       return;
     }
-    navigateWithoutPrompt(navigation?.destination ?? "/?view=profile");
+    if (!mountedRef.current || discardOperationRef.current !== operation) return;
+
+    const completeDiscard = () => {
+      if (!mountedRef.current || discardOperationRef.current !== operation) return;
+      const navigation = pendingNavigationRef.current ?? pendingNavigation;
+      discardFailedRef.current = false;
+      setDiscardOpen(false);
+      setDiscardError(null);
+      setPendingNavigation(null);
+      pendingNavigationRef.current = null;
+      setDiscarding(false);
+
+      if (navigation?.kind === "history") {
+        guardRef.current = false;
+        navigationReleasedRef.current = true;
+        releaseHistoryGuard(() => {
+          const navigationApi = window.navigation;
+          if (navigation.entryKey && navigationApi) {
+            releasedTraversalKeyRef.current = navigation.entryKey;
+            const fallback = () => {
+              if (!mountedRef.current || discardOperationRef.current !== operation) return;
+              releasedTraversalKeyRef.current = null;
+              discardPendingRef.current = false;
+              if (navigation.delta !== null) traverseHistory(navigation.delta);
+              else window.history.back();
+            };
+            try {
+              observeNavigationCommit(
+                navigationApi.traverseTo(navigation.entryKey),
+                () => {
+                  if (!mountedRef.current || discardOperationRef.current !== operation) return;
+                  releasedTraversalKeyRef.current = null;
+                  discardPendingRef.current = false;
+                },
+                fallback,
+              );
+            } catch {
+              fallback();
+            }
+            return;
+          }
+          discardPendingRef.current = false;
+          if (navigation.delta !== null) {
+            traverseHistory(navigation.delta);
+            return;
+          }
+          window.history.back();
+        });
+        return;
+      }
+      discardPendingRef.current = false;
+      navigateWithoutPrompt(navigation?.destination ?? "/?view=profile");
+    };
+
+    if (restoringToIndexRef.current !== null || fallbackRestoringRef.current) {
+      deferredDiscardCompletionRef.current = completeDiscard;
+      return;
+    }
+    completeDiscard();
   }
 
   function selectFile(nextFile: File | null) {
@@ -320,7 +611,13 @@ export function JournalUploadScreen() {
       </form>
 
       <RoutedBottomNav activeView="profile" onNavigate={(destination) => requestNavigation(destination)} />
-      <JournalDiscardSheet open={discardOpen} pending={discarding} onStay={stay} onDiscard={() => void discard()} />
+      <JournalDiscardSheet
+        open={discardOpen}
+        pending={discarding || restoringHistory}
+        error={discardError}
+        onStay={stay}
+        onDiscard={() => void discard()}
+      />
       {coverEditorOpen && upload.draft.file && upload.draft.previewUrl && (
         <JournalCoverEditor
           file={upload.draft.file}
@@ -335,6 +632,38 @@ export function JournalUploadScreen() {
       )}
     </main>
   );
+}
+
+function currentHistoryIndex(): number | null {
+  const index = window.navigation?.currentEntry?.index;
+  return typeof index === "number" && Number.isSafeInteger(index) && index >= 0 ? index : null;
+}
+
+function currentHistoryEntryKey(): string | null {
+  const key = window.navigation?.currentEntry?.key;
+  return typeof key === "string" && key.length > 0 ? key : null;
+}
+
+function observeNavigationFailure(
+  result: NavigationResult,
+  onFailure: () => void,
+): void {
+  const committed = result.committed;
+  if (committed) void committed.catch(onFailure);
+  const finished = result.finished;
+  if (finished && finished !== committed) void finished.catch(onFailure);
+}
+
+function observeNavigationCommit(
+  result: NavigationResult,
+  onCommit: () => void,
+  onFailure: () => void,
+): void {
+  const commitSignal = result.committed ?? result.finished;
+  if (commitSignal) void commitSignal.then(onCommit, onFailure);
+  if (result.finished && result.finished !== commitSignal) {
+    void result.finished.catch(() => undefined);
+  }
 }
 
 function formatFileSize(bytes: number): string {
