@@ -13,7 +13,7 @@ import type {
 
 type JournalCursor = {
   occurredOn: string;
-  createdAt: Date;
+  createdAt: string;
   id: string;
 };
 
@@ -62,10 +62,13 @@ export async function listJournalEntries(
   const cursorCondition = cursor
     ? or(
         lt(journalEntries.occurredOn, cursor.occurredOn),
-        and(eq(journalEntries.occurredOn, cursor.occurredOn), lt(journalEntries.createdAt, cursor.createdAt)),
         and(
           eq(journalEntries.occurredOn, cursor.occurredOn),
-          eq(journalEntries.createdAt, cursor.createdAt),
+          sql<boolean>`${journalEntries.createdAt} < ${cursor.createdAt}::timestamptz`,
+        ),
+        and(
+          eq(journalEntries.occurredOn, cursor.occurredOn),
+          sql<boolean>`${journalEntries.createdAt} = ${cursor.createdAt}::timestamptz`,
           lt(journalEntries.id, cursor.id),
         ),
       )
@@ -77,6 +80,10 @@ export async function listJournalEntries(
       occurredOn: journalEntries.occurredOn,
       caption: journalEntries.caption,
       createdAt: journalEntries.createdAt,
+      createdAtCursor: sql<string>`to_char(
+        ${journalEntries.createdAt} at time zone 'UTC',
+        'YYYY-MM-DD"T"HH24:MI:SS.US"Z"'
+      )`,
       drillId: drills.id,
       drillTitle: drills.title,
       durationMs: journalMedia.durationMs,
@@ -106,7 +113,11 @@ export async function listJournalEntries(
   return {
     entries: visibleRows.map((row) => toSummary(row, row.posterPath ? posterUrls.get(row.posterPath) ?? null : null)),
     nextCursor: hasMore && lastRow
-      ? encodeJournalCursor({ occurredOn: lastRow.occurredOn, createdAt: lastRow.createdAt, id: lastRow.id })
+      ? encodeJournalCursor({
+          occurredOn: lastRow.occurredOn,
+          createdAt: lastRow.createdAtCursor,
+          id: lastRow.id,
+        })
       : null,
   };
 }
@@ -324,11 +335,7 @@ async function signPosterPath(path: string | null): Promise<string | null> {
 }
 
 export function encodeJournalCursor(cursor: JournalCursor): string {
-  return Buffer.from(JSON.stringify({
-    occurredOn: cursor.occurredOn,
-    createdAt: cursor.createdAt.toISOString(),
-    id: cursor.id,
-  })).toString("base64url");
+  return Buffer.from(JSON.stringify(cursor)).toString("base64url");
 }
 
 export function decodeJournalCursor(value: string): JournalCursor {
@@ -338,7 +345,7 @@ export function decodeJournalCursor(value: string): JournalCursor {
     );
     return {
       occurredOn: parsed.occurredOn,
-      createdAt: new Date(parsed.createdAt),
+      createdAt: parsed.createdAt,
       id: parsed.id,
     };
   } catch {

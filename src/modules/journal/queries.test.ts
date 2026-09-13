@@ -1,3 +1,4 @@
+import { sql, type SQL } from "drizzle-orm";
 import { PgDialect } from "drizzle-orm/pg-core";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -8,10 +9,11 @@ const mocks = vi.hoisted(() => ({
   createSupabaseAdminClient: vi.fn(),
   execute: vi.fn(),
   from: vi.fn(),
+  select: vi.fn(),
 }));
 
 vi.mock("@/db/client", () => ({
-  db: { execute: mocks.execute },
+  db: { execute: mocks.execute, select: mocks.select },
 }));
 
 vi.mock("@/lib/supabase/admin", () => ({
@@ -23,6 +25,7 @@ import {
   encodeJournalCursor,
   getJournalPreviewForDrill,
   JournalCursorError,
+  listJournalEntries,
 } from "./queries";
 
 const userId = "11111111-1111-4111-8111-111111111111";
@@ -33,7 +36,7 @@ describe("journal cursors", () => {
   it("round-trips the canonical encoded cursor", () => {
     const cursor = {
       occurredOn: "2026-08-10",
-      createdAt: new Date("2026-08-10T12:00:00.000Z"),
+      createdAt: "2026-08-10T12:00:00.123456Z",
       id: entryId,
     };
 
@@ -70,6 +73,58 @@ describe("journal cursors", () => {
     const encoded = Buffer.from(JSON.stringify(payload)).toString("base64url");
 
     expect(() => decodeJournalCursor(encoded)).toThrow(JournalCursorError);
+  });
+
+  it("binds the full-precision timestamp directly in both keyset branches", async () => {
+    const createdAtCursor = "2026-08-10T12:00:00.123456Z";
+    const cursor = encodeJournalCursor({
+      occurredOn: "2026-08-10",
+      createdAt: createdAtCursor,
+      id: entryId,
+    });
+    let whereCondition: SQL | undefined;
+    const chain = {
+      from: vi.fn(),
+      innerJoin: vi.fn(),
+      leftJoin: vi.fn(),
+      where: vi.fn(),
+      orderBy: vi.fn(),
+      limit: vi.fn(),
+    };
+    chain.from.mockReturnValue(chain);
+    chain.innerJoin.mockReturnValue(chain);
+    chain.leftJoin.mockReturnValue(chain);
+    chain.where.mockImplementation((condition: SQL) => {
+      whereCondition = condition;
+      return chain;
+    });
+    chain.orderBy.mockReturnValue(chain);
+    chain.limit.mockResolvedValue([{
+      id: entryId,
+      occurredOn: "2026-08-09",
+      caption: null,
+      createdAt: new Date("2026-08-09T12:00:00.123Z"),
+      createdAtCursor: "2026-08-09T12:00:00.123456Z",
+      drillId: null,
+      drillTitle: null,
+      durationMs: null,
+      mimeType: "video/mp4",
+      posterPath: null,
+    }]);
+    mocks.select.mockReturnValueOnce(chain);
+
+    await listJournalEntries(userId, { cursor, drillId });
+
+    expect(whereCondition).toBeDefined();
+    const compiled = new PgDialect().sqlToQuery(sql`select 1 where ${whereCondition!}`);
+    expect(compiled.sql).toMatch(
+      /"journal_entries"\."created_at" < \$\d+::timestamptz/,
+    );
+    expect(compiled.sql).toMatch(
+      /"journal_entries"\."created_at" = \$\d+::timestamptz/,
+    );
+    expect(compiled.params.filter((value) => value === createdAtCursor)).toHaveLength(2);
+    expect(compiled.params.some((value) => value instanceof Date)).toBe(false);
   });
 });
 
