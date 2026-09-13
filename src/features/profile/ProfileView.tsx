@@ -51,7 +51,12 @@ export function ProfileView({ currentUser }: ProfileViewProps) {
   return (
     <section className={styles.root} aria-label="Profile">
       <header className={styles.header}>
-        <ProfileAvatar profile={currentUser} className={styles.avatar} imageClassName={styles.avatarImage} />
+        <ProfileAvatar
+          profile={currentUser}
+          className={styles.avatar}
+          imageClassName={styles.avatarImage}
+          priority
+        />
         <div className={styles.identity}>
           <p className="eyebrow">Profile</p>
           <h1>{currentUser.username ? `@${currentUser.username}` : currentUser.displayName}</h1>

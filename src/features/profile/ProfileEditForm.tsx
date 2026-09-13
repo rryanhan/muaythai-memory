@@ -190,7 +190,12 @@ export function ProfileEditForm({
       <section className={styles.photoSection} aria-labelledby="profile-photo-heading">
         <div>
           <p className="eyebrow" id="profile-photo-heading">Profile Photo</p>
-          <ProfileAvatar profile={previewProfile} className={styles.avatar} imageClassName={styles.avatarImage} />
+          <ProfileAvatar
+            profile={previewProfile}
+            className={styles.avatar}
+            imageClassName={styles.avatarImage}
+            priority
+          />
         </div>
         <div className={styles.photoActions}>
           <label className={styles.fileButton}>

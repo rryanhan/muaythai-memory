@@ -145,6 +145,7 @@ export function FighterProfileScreen({
           profile={{ displayName: fighter.profile.username, avatarUrl: fighter.profile.avatarUrl }}
           className={styles.heroAvatar}
           imageClassName={styles.avatarImage}
+          priority
         />
         <h1>@{fighter.profile.username}</h1>
         <div className={styles.fighterSocialCounts} aria-label="Connection counts">

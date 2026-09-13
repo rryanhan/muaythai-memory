@@ -6,9 +6,15 @@ type ProfileAvatarProps = {
   profile: Pick<CurrentAppUser, "displayName" | "avatarUrl">;
   className?: string;
   imageClassName?: string;
+  priority?: boolean;
 };
 
-export function ProfileAvatar({ profile, className, imageClassName }: ProfileAvatarProps) {
+export function ProfileAvatar({
+  profile,
+  className,
+  imageClassName,
+  priority = false,
+}: ProfileAvatarProps) {
   const rootClassName = [styles.root, className].filter(Boolean).join(" ");
   const avatarImageClassName = [styles.image, imageClassName].filter(Boolean).join(" ");
 
@@ -22,8 +28,8 @@ export function ProfileAvatar({ profile, className, imageClassName }: ProfileAva
           className={avatarImageClassName}
           src={profile.avatarUrl}
           alt=""
-          loading="eager"
-          fetchPriority="high"
+          loading={priority ? "eager" : "lazy"}
+          fetchPriority={priority ? "high" : "auto"}
           decoding="async"
         />
       )}
