@@ -1,6 +1,8 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { Profiler, type ProfilerOnRenderCallback } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { GraphResponse } from "@/data";
+import type { PhysicsSimulation } from "./network-physics";
 import type { NetworkGraphVisualState } from "./types";
 
 const mocks = vi.hoisted(() => ({
@@ -132,18 +134,136 @@ describe("NetworkForceGraph accessible activation", () => {
     expect(onMethodSelect).toHaveBeenCalledOnce();
     expect(onDrillSelect).toHaveBeenCalledOnce();
   });
+
+  it("commits simulation coordinates without reconciling the React tree per frame", async () => {
+    const onRender = vi.fn<ProfilerOnRenderCallback>();
+    renderGraph({ onRender });
+
+    const drillElement = await screen.findByRole("button", { name: "Open drill Rear kick return" });
+    await waitFor(() => expect(mocks.runNetworkSimulation).toHaveBeenCalled());
+
+    const [simulation, commitFrame] = mocks.runNetworkSimulation.mock.lastCall as unknown as [
+      PhysicsSimulation,
+      (current: PhysicsSimulation) => void,
+    ];
+    const drillNode = simulation.nodes.find((node) => node.id === `drill:${drillId}`);
+    const drillLink = simulation.links.find(
+      (link) => link.source.id === `drill:${drillId}` || link.target.id === `drill:${drillId}`,
+    );
+    expect(drillNode).toBeDefined();
+    expect(drillLink).toBeDefined();
+
+    const reactCommitCount = onRender.mock.calls.length;
+    const fullCoolingRunFrameCount = 244;
+    for (let frame = 0; frame < fullCoolingRunFrameCount; frame += 1) {
+      act(() => {
+        drillNode!.x += 0.25;
+        drillNode!.y -= 0.125;
+        commitFrame(simulation);
+      });
+    }
+
+    expect(drillElement).toHaveAttribute(
+      "transform",
+      `translate(${drillNode!.x}, ${drillNode!.y})`,
+    );
+    const edgeElement = document.querySelector<SVGLineElement>(
+      `[data-link-id="${drillLink!.id}"]`,
+    );
+    expect(edgeElement).toHaveAttribute("x1", String(drillLink!.source.x));
+    expect(edgeElement).toHaveAttribute("y1", String(drillLink!.source.y));
+    expect(edgeElement).toHaveAttribute("x2", String(drillLink!.target.x));
+    expect(edgeElement).toHaveAttribute("y2", String(drillLink!.target.y));
+    expect(onRender).toHaveBeenCalledTimes(reactCommitCount);
+  });
+
+  it("ignores stale frame commits after replacing the topology or unmounting", async () => {
+    const onDrillSelect = vi.fn();
+    const onMethodSelect = vi.fn();
+    const view = renderGraph({ onDrillSelect, onMethodSelect });
+
+    const initialDrillElement = await screen.findByRole("button", {
+      name: "Open drill Rear kick return",
+    });
+    const removedLayerElement = screen.getByText("Clinch entry").closest<SVGGElement>(
+      ".network-force-label-node",
+    );
+    expect(removedLayerElement).not.toBeNull();
+    await waitFor(() => expect(mocks.runNetworkSimulation).toHaveBeenCalledTimes(1));
+
+    const [staleSimulation, staleCommitFrame] = mocks.runNetworkSimulation.mock.calls[0] as unknown as [
+      PhysicsSimulation,
+      (current: PhysicsSimulation) => void,
+    ];
+    const staleDrillNode = staleSimulation.nodes.find((node) => node.id === `drill:${drillId}`)!;
+    const staleLayerNode = staleSimulation.nodes.find((node) => node.id === "tag:clinch-entry")!;
+    const replacementGraph: GraphResponse = {
+      ...graph,
+      nodes: graph.nodes.filter((node) => node.id !== "tag:clinch-entry"),
+      edges: graph.edges.filter((edge) => edge.id !== "tag:clinch-entry:drill"),
+    };
+
+    view.rerender(
+      <NetworkForceGraph
+        active
+        graph={replacementGraph}
+        badgeByIconKey={{}}
+        focusedMethodSlugs={[]}
+        visualState={visualState}
+        onMethodSelect={onMethodSelect}
+        onDrillSelect={onDrillSelect}
+      />,
+    );
+    await waitFor(() => expect(mocks.runNetworkSimulation).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(screen.queryByText("Clinch entry")).not.toBeInTheDocument());
+
+    const currentDrillElement = screen.getByRole("button", { name: "Open drill Rear kick return" });
+    expect(currentDrillElement).toBe(initialDrillElement);
+    const [currentSimulation, currentCommitFrame] = mocks.runNetworkSimulation.mock.calls[1] as unknown as [
+      PhysicsSimulation,
+      (current: PhysicsSimulation) => void,
+    ];
+    const currentDrillNode = currentSimulation.nodes.find((node) => node.id === `drill:${drillId}`)!;
+    act(() => {
+      currentDrillNode.x += 23;
+      currentDrillNode.y -= 11;
+      currentCommitFrame(currentSimulation);
+    });
+    const currentTransform = currentDrillElement.getAttribute("transform");
+    const removedTransform = removedLayerElement!.getAttribute("transform");
+
+    act(() => {
+      staleDrillNode.x -= 500;
+      staleLayerNode.y += 500;
+      staleCommitFrame(staleSimulation);
+    });
+    expect(currentDrillElement).toHaveAttribute("transform", currentTransform);
+    expect(removedLayerElement).toHaveAttribute("transform", removedTransform);
+
+    view.unmount();
+    act(() => {
+      currentDrillNode.x += 500;
+      staleLayerNode.y += 500;
+      currentCommitFrame(currentSimulation);
+      staleCommitFrame(staleSimulation);
+    });
+    expect(currentDrillElement).toHaveAttribute("transform", currentTransform);
+    expect(removedLayerElement).toHaveAttribute("transform", removedTransform);
+  });
 });
 
 function renderGraph({
   focusedMethodSlugs = [],
   onDrillSelect = vi.fn(),
   onMethodSelect = vi.fn(),
+  onRender,
 }: {
   focusedMethodSlugs?: string[];
   onDrillSelect?: (drillId: string) => void;
   onMethodSelect?: (slug: string | undefined) => void;
+  onRender?: ProfilerOnRenderCallback;
 } = {}) {
-  return render(
+  const component = (
     <NetworkForceGraph
       active
       graph={graph}
@@ -152,7 +272,13 @@ function renderGraph({
       visualState={visualState}
       onMethodSelect={onMethodSelect}
       onDrillSelect={onDrillSelect}
-    />,
+    />
+  );
+
+  return render(
+    onRender
+      ? <Profiler id="network-force-graph" onRender={onRender}>{component}</Profiler>
+      : component,
   );
 }
 

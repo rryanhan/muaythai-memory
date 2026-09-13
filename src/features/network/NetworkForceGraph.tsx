@@ -77,6 +77,8 @@ export function NetworkForceGraph({
   const frameRef = useRef<HTMLDivElement | null>(null);
   const svgRef = useRef<SVGSVGElement | null>(null);
   const cameraRef = useRef<SVGGElement | null>(null);
+  const nodeElementsRef = useRef<Map<string, SVGGElement>>(new Map());
+  const linkElementsRef = useRef<Map<string, SVGLineElement>>(new Map());
   const zoomBehaviorRef = useRef<ZoomBehavior<SVGSVGElement, unknown> | null>(null);
   const positionsRef = useRef<Map<string, StoredPosition>>(new Map());
   const simulationRef = useRef<PhysicsSimulation | null>(null);
@@ -106,12 +108,42 @@ export function NetworkForceGraph({
   const focusedMethodSet = useMemo(() => new Set(focusedMethodSlugs), [focusedMethodSlugs]);
   const semanticNodeScale = getSemanticNodeScale(cameraTransform.k, initialCameraTransform.k);
 
+  const captureNodeElement = useCallback((element: SVGGElement | null) => {
+    if (!element) return;
+
+    const nodeId = element.dataset.nodeId;
+    if (!nodeId) return;
+    nodeElementsRef.current.set(nodeId, element);
+
+    return () => {
+      if (nodeElementsRef.current.get(nodeId) === element) {
+        nodeElementsRef.current.delete(nodeId);
+      }
+    };
+  }, []);
+
+  const captureLinkElement = useCallback((element: SVGLineElement | null) => {
+    if (!element) return;
+
+    const linkId = element.dataset.linkId;
+    if (!linkId) return;
+    linkElementsRef.current.set(linkId, element);
+
+    return () => {
+      if (linkElementsRef.current.get(linkId) === element) {
+        linkElementsRef.current.delete(linkId);
+      }
+    };
+  }, []);
+
   const applyZoomTransform = useCallback((transform: ZoomTransform) => {
     setCameraTransform(transform);
     setZoomLevel(transform.k < farZoomThreshold ? "far" : "near");
   }, []);
 
   const commitSimulationFrame = useCallback((simulation: PhysicsSimulation) => {
+    if (simulationRef.current !== simulation) return;
+
     for (const node of simulation.nodes) {
       positionsRef.current.set(node.id, {
         x: node.x,
@@ -119,8 +151,24 @@ export function NetworkForceGraph({
         anchorX: node.anchorX,
         anchorY: node.anchorY,
       });
+
+      nodeElementsRef.current
+        .get(node.id)
+        ?.setAttribute("transform", `translate(${node.x}, ${node.y})`);
     }
 
+    for (const link of simulation.links) {
+      const element = linkElementsRef.current.get(link.id);
+      if (!element) continue;
+
+      element.setAttribute("x1", String(link.source.x));
+      element.setAttribute("y1", String(link.source.y));
+      element.setAttribute("x2", String(link.target.x));
+      element.setAttribute("y2", String(link.target.y));
+    }
+  }, []);
+
+  const commitSimulationTopology = useCallback((simulation: PhysicsSimulation) => {
     setPhysicsNodes([...simulation.nodes]);
     setPhysicsLinks([...simulation.links]);
   }, []);
@@ -185,14 +233,18 @@ export function NetworkForceGraph({
 
     simulationRef.current = simulation;
     commitSimulationFrame(simulation);
+    commitSimulationTopology(simulation);
     if (activeRef.current) runNetworkSimulation(simulation, commitSimulationFrame);
 
     return () => {
       if (simulation.frame) {
         cancelAnimationFrame(simulation.frame);
       }
+      if (simulationRef.current === simulation) {
+        simulationRef.current = null;
+      }
     };
-  }, [badgeByIconKey, commitSimulationFrame, graph, layoutSize, viewportSize]);
+  }, [badgeByIconKey, commitSimulationFrame, commitSimulationTopology, graph, layoutSize, viewportSize]);
 
   useEffect(() => {
     const svg = svgRef.current;
@@ -372,8 +424,10 @@ export function NetworkForceGraph({
 
               return (
                 <line
+                  ref={captureLinkElement}
                   key={link.id}
                   className="network-force-edge"
+                  data-link-id={link.id}
                   x1={link.source.x}
                   y1={link.source.y}
                   x2={link.target.x}
@@ -392,6 +446,7 @@ export function NetworkForceGraph({
 
               return (
                 <g
+                  ref={captureNodeElement}
                   key={node.id}
                   className="network-force-node network-force-drill-node"
                   data-node-id={node.id}
@@ -435,6 +490,7 @@ export function NetworkForceGraph({
 
               return (
                 <g
+                  ref={captureNodeElement}
                   key={node.id}
                   className="network-force-node network-force-method-node"
                   data-node-id={node.id}
@@ -492,6 +548,7 @@ export function NetworkForceGraph({
 
               return (
                 <g
+                  ref={captureNodeElement}
                   key={node.id}
                   className="network-force-node network-force-label-node"
                   data-node-id={node.id}
