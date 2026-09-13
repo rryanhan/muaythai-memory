@@ -3,6 +3,7 @@ import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DRILL_LIMITS } from "@/config/domain-limits";
+import type { TaxonomyResponse } from "@/data/types";
 import { AddDrillForm } from "./AddDrillForm";
 
 const mocks = vi.hoisted(() => ({
@@ -26,24 +27,37 @@ vi.mock("@/data/drills", () => ({
   updateDrill: mocks.updateDrill,
 }));
 
+const taxonomyFixture: TaxonomyResponse = {
+  customTags: [],
+  standardTags: [],
+  statusTags: [],
+  tagCategories: [],
+  trainingMethods: [
+    {
+      id: "00000000-0000-4000-8000-000000000301",
+      name: "Pad Work",
+      slug: "pad-work",
+      iconKey: "pad-work",
+      sortOrder: 1,
+    },
+  ],
+};
+
 describe("AddDrillForm creation commit", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.getTaxonomy.mockResolvedValue({
-      customTags: [],
-      standardTags: [],
-      statusTags: [],
-      tagCategories: [],
-      trainingMethods: [
-        {
-          id: "00000000-0000-4000-8000-000000000301",
-          name: "Pad Work",
-          slug: "pad-work",
-          iconKey: "pad-work",
-          sortOrder: 1,
-        },
-      ],
+    mocks.getTaxonomy.mockResolvedValue(taxonomyFixture);
+  });
+
+  it("renders server-provided taxonomy immediately without a client request", async () => {
+    renderForm(<AddDrillForm initialTaxonomy={taxonomyFixture} />);
+
+    expect(screen.getByLabelText("Title")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Pad Work" })).toBeInTheDocument();
+    await act(async () => {
+      await Promise.resolve();
     });
+    expect(mocks.getTaxonomy).not.toHaveBeenCalled();
   });
 
   it("locks Cancel during Save and focuses a recoverable request error", async () => {

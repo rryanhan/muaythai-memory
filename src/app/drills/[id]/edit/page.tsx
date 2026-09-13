@@ -9,6 +9,7 @@ import { DeleteDrillSection } from "@/features/drills/DeleteDrillSection";
 import { getDrillById } from "@/modules/drills/queries";
 import routeStyles from "@/features/drills/DrillRouteShell.module.css";
 import { requireCurrentPageUserId } from "@/modules/auth/page-user";
+import { getTaxonomy } from "@/modules/taxonomy/queries";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -49,7 +50,13 @@ export default async function EditDrillPage({ params }: EditDrillPageProps) {
   }
 
   const userId = await requireCurrentPageUserId(`/drills/${parsedParams.data.id}/edit`);
-  const drill = await getCachedDrillById(userId, parsedParams.data.id);
+  const [drill, initialTaxonomy] = await Promise.all([
+    getCachedDrillById(userId, parsedParams.data.id),
+    getTaxonomy(userId).catch((error: unknown) => {
+      console.error("Could not preload the edit-drill taxonomy.", error);
+      return undefined;
+    }),
+  ]);
 
   if (!drill) {
     notFound();
@@ -66,7 +73,7 @@ export default async function EditDrillPage({ params }: EditDrillPageProps) {
         <h1>Edit Drill</h1>
         <p>Adjust the steps, notes, tags, and saved-list markers.</p>
       </section>
-      <AddDrillForm mode="edit" initialDrill={drill} />
+      <AddDrillForm mode="edit" initialDrill={drill} initialTaxonomy={initialTaxonomy} />
       <DeleteDrillSection drillId={drill.id} drillTitle={drill.title} />
       <RoutedBottomNav activeView="library" />
     </main>

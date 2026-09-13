@@ -22,7 +22,12 @@ import { getBuiltInStatusFilters } from "@/features/shared/tag-filter-helpers";
 import type { ApiError } from "@/data/api-core";
 import { createDrill, updateDrill } from "@/data/drills";
 import { getTaxonomy } from "@/data/taxonomy";
-import type { CreateDrillInput, DrillDetail, TrainingMethodDto } from "@/data/types";
+import type {
+  CreateDrillInput,
+  DrillDetail,
+  TaxonomyResponse,
+  TrainingMethodDto,
+} from "@/data/types";
 import { AddDrillSkeleton } from "./AddDrillSkeleton";
 import {
   hasPendingDrillCleanup,
@@ -37,6 +42,7 @@ import styles from "./DrillForm.module.css";
 type AddDrillFormProps = {
   mode?: "create" | "edit";
   initialDrill?: DrillDetail;
+  initialTaxonomy?: TaxonomyResponse;
   initialValues?: DrillFormInitialValues;
   cleanupState?: DrillFormCleanupState;
   textFieldsPending?: boolean;
@@ -53,6 +59,7 @@ export type { DrillFormCleanupState, DrillFormInitialValues } from "./drill-form
 export function AddDrillForm({
   mode = "create",
   initialDrill,
+  initialTaxonomy,
   initialValues,
   cleanupState,
   textFieldsPending = false,
@@ -97,6 +104,7 @@ export function AddDrillForm({
   const taxonomyQuery = useQuery({
     queryKey: taxonomyQueryKey,
     queryFn: ({ signal }) => getTaxonomy({ requestInit: { signal } }),
+    initialData: initialTaxonomy,
     staleTime: 10 * 60 * 1000,
   });
   const saveMutation = useMutation({

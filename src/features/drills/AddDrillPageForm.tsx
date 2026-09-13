@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { ComponentType } from "react";
 import { useRouter } from "next/navigation";
 import { createOnboardingFirstDrill } from "@/data/onboarding";
+import type { TaxonomyResponse } from "@/data/types";
 import captureStyles from "@/features/capture/Capture.module.css";
 import type { CaptureDiscardSheetProps } from "@/features/capture/CaptureDiscardSheet";
 import { useJournalUpload } from "@/features/journal/JournalUploadProvider";
@@ -63,11 +64,13 @@ export function AddDrillPageForm({
   onboarding = false,
   nextPath = "/",
   replay = false,
+  initialTaxonomy,
 }: {
   fromJournal: boolean;
   onboarding?: boolean;
   nextPath?: string;
   replay?: boolean;
+  initialTaxonomy?: TaxonomyResponse;
 }) {
   const router = useRouter();
   const journalUpload = useJournalUpload();
@@ -255,6 +258,7 @@ export function AddDrillPageForm({
     return (
       <>
         <AddDrillForm
+          initialTaxonomy={initialTaxonomy}
           createAction={createOnboardingFirstDrill}
           onDirtyChange={handleDirtyChange}
           onCreationCommitChange={handleCreationCommitChange}
@@ -303,10 +307,11 @@ export function AddDrillPageForm({
     );
   }
 
-  if (!fromJournal) return <AddDrillForm />;
+  if (!fromJournal) return <AddDrillForm initialTaxonomy={initialTaxonomy} />;
 
   return (
     <AddDrillForm
+      initialTaxonomy={initialTaxonomy}
       onCancel={() => router.replace("/journal/new")}
       onSaveSuccess={(drillId) => {
         journalUpload.setDrillId(drillId);

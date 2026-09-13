@@ -9,6 +9,7 @@ import {
   requireCurrentPageUserId,
   requireProfileOnboardedPageUserId,
 } from "@/modules/auth/page-user";
+import { getTaxonomy } from "@/modules/taxonomy/queries";
 
 export const metadata: Metadata = {
   title: "Add Drill | Muay Thai Memory",
@@ -25,13 +26,18 @@ export default async function AddDrillPage({
   const onboarding = params.onboarding === "1";
   const replay = params.replay === "1";
   const nextPath = safeInternalPath(params.next);
+  let userId: string;
   if (onboarding) {
     const returnParams = new URLSearchParams({ onboarding: "1", next: nextPath });
     if (replay) returnParams.set("replay", "1");
-    await requireProfileOnboardedPageUserId(`/drills/new?${returnParams.toString()}`);
+    userId = await requireProfileOnboardedPageUserId(`/drills/new?${returnParams.toString()}`);
   } else {
-    await requireCurrentPageUserId("/drills/new");
+    userId = await requireCurrentPageUserId("/drills/new");
   }
+  const initialTaxonomy = await getTaxonomy(userId).catch((error: unknown) => {
+    console.error("Could not preload the new-drill taxonomy.", error);
+    return undefined;
+  });
 
   return (
     <main className={routeStyles.formPage}>
@@ -47,6 +53,7 @@ export default async function AddDrillPage({
         </section>
         <AddDrillPageForm
           fromJournal={fromJournal}
+          initialTaxonomy={initialTaxonomy}
           onboarding={onboarding}
           nextPath={nextPath}
           replay={replay}
