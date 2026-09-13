@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useId, useRef } from "react";
+import { useId, useRef } from "react";
 import { createPortal } from "react-dom";
+import { useModalFallbackAccessibility } from "@/components/shared/useModalFallbackAccessibility";
 
 type DiscardSheetFallbackProps = {
   backdropClassName: string;
@@ -31,50 +32,33 @@ export function DiscardSheetFallback({
   const titleId = useId();
   const descriptionId = useId();
   const statusId = useId();
+  const backdropRef = useRef<HTMLDivElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
   const stayButtonRef = useRef<HTMLButtonElement>(null);
-  const discardButtonRef = useRef<HTMLButtonElement>(null);
-  const returnFocusRef = useRef<HTMLElement | null>(null);
-
-  useEffect(() => {
-    returnFocusRef.current = document.activeElement instanceof HTMLElement
-      ? document.activeElement
-      : null;
-    stayButtonRef.current?.focus();
-
-    return () => {
-      const returnFocus = returnFocusRef.current;
-      returnFocusRef.current = null;
-      if (returnFocus?.isConnected) returnFocus.focus();
-    };
-  }, []);
+  const handleKeyDown = useModalFallbackAccessibility({
+    backdropRef,
+    dialogRef,
+    initialFocusRef: stayButtonRef,
+    onEscape: onStay,
+  });
 
   return createPortal(
     <>
-      <div className={backdropClassName} aria-hidden="true" onClick={onStay} />
       <div
+        ref={backdropRef}
+        className={backdropClassName}
+        aria-hidden="true"
+        onClick={onStay}
+      />
+      <div
+        ref={dialogRef}
         className={sheetClassName}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
         aria-describedby={statusMessage ? `${descriptionId} ${statusId}` : descriptionId}
-        onKeyDown={(event) => {
-          if (event.key === "Escape") {
-            event.preventDefault();
-            onStay();
-            return;
-          }
-
-          if (event.key !== "Tab") return;
-          event.preventDefault();
-          const buttons = [stayButtonRef.current, discardButtonRef.current]
-            .filter((button): button is HTMLButtonElement => button !== null);
-          const activeIndex = buttons.indexOf(document.activeElement as HTMLButtonElement);
-          const direction = event.shiftKey ? -1 : 1;
-          const nextIndex = activeIndex === -1
-            ? event.shiftKey ? buttons.length - 1 : 0
-            : (activeIndex + direction + buttons.length) % buttons.length;
-          buttons[nextIndex]?.focus();
-        }}
+        tabIndex={-1}
+        onKeyDown={handleKeyDown}
       >
         <div className="sheet-handle" aria-hidden="true" />
         <h2 id={titleId}>{title}</h2>
@@ -88,7 +72,7 @@ export function DiscardSheetFallback({
           <button ref={stayButtonRef} type="button" onClick={onStay}>
             {stayLabel}
           </button>
-          <button ref={discardButtonRef} type="button" onClick={onDiscard}>
+          <button type="button" onClick={onDiscard}>
             {discardLabel}
           </button>
         </div>
