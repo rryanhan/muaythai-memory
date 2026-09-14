@@ -29,6 +29,7 @@ const mocks = vi.hoisted(() => ({
   bucketInfo: vi.fn(),
   bucketList: vi.fn(),
   bucketRemove: vi.fn(),
+  buckets: [] as object[],
   createJournalPosterObjectPath: vi.fn(),
   createSupabaseAdminClient: vi.fn(),
   deleteFailures: 0,
@@ -126,30 +127,31 @@ beforeEach(() => {
     mocks.objects = mocks.objects.filter((path) => !paths.includes(path));
     return { data: [], error: null };
   });
+  mocks.buckets = [];
   mocks.createJournalPosterObjectPath.mockReset().mockImplementation(
     () => mocks.posterPaths.shift() ?? firstPosterPath,
   );
-  mocks.createSupabaseAdminClient.mockReset().mockReturnValue({
-    storage: {
-      from: () => ({
-        createSignedUploadUrl: (...args: unknown[]) => {
-          recordStorageCall("signed upload token");
-          return mocks.bucketCreateSignedUploadUrl(...args);
-        },
-        info: (...args: unknown[]) => {
-          recordStorageCall("info");
-          return mocks.bucketInfo(...args);
-        },
-        list: (...args: unknown[]) => {
-          recordStorageCall("list");
-          return mocks.bucketList(...args);
-        },
-        remove: (...args: unknown[]) => {
-          recordStorageCall("remove");
-          return mocks.bucketRemove(...args);
-        },
-      }),
-    },
+  mocks.createSupabaseAdminClient.mockReset().mockImplementation(() => {
+    const bucket = {
+      createSignedUploadUrl: (...args: unknown[]) => {
+        recordStorageCall("signed upload token");
+        return mocks.bucketCreateSignedUploadUrl(...args);
+      },
+      info: (...args: unknown[]) => {
+        recordStorageCall("info");
+        return mocks.bucketInfo(...args);
+      },
+      list: (...args: unknown[]) => {
+        recordStorageCall("list");
+        return mocks.bucketList(...args);
+      },
+      remove: (...args: unknown[]) => {
+        recordStorageCall("remove");
+        return mocks.bucketRemove(...args);
+      },
+    };
+    mocks.buckets.push(bucket);
+    return { storage: { from: () => bucket } };
   });
   mocks.deleteFailures = 0;
   mocks.forUpdate.mockReset();
@@ -349,6 +351,19 @@ describe("journal media operation claims", () => {
     });
     expect(mocks.bucketRemove).toHaveBeenCalledWith([firstPosterPath]);
     expect(mocks.objects).toEqual(["user/entry/video.mp4", oldPosterPath]);
+  });
+
+  it("constructs one admin client and reuses its bucket for poster upload and cleanup", async () => {
+    await expect(saveJournalPoster(
+      "user",
+      "entry",
+      new File(["poster"], "poster.webp", { type: "image/webp" }),
+    )).resolves.toBeUndefined();
+
+    expect(mocks.createSupabaseAdminClient).toHaveBeenCalledOnce();
+    expect(mocks.uploadJournalPosterObject).toHaveBeenCalledOnce();
+    expect(mocks.uploadJournalPosterObject.mock.calls[0]?.[4]).toBe(mocks.buckets[0]);
+    expect(mocks.bucketRemove).toHaveBeenCalledWith([oldPosterPath]);
   });
 
   it("uses the newest poster claim and never deletes the winning current poster", async () => {

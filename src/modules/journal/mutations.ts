@@ -191,7 +191,7 @@ export async function saveJournalPoster(userId: string, entryId: string, file: F
   const claim = await claimPosterSave(userId, entryId);
 
   try {
-    await uploadJournalPosterObject(userId, entryId, file, posterPath);
+    await uploadJournalPosterObject(userId, entryId, file, posterPath, bucket);
   } catch (error) {
     const cleanupError = await cleanupUncommittedPoster(bucket, userId, entryId, posterPath);
     await releaseOperation(userId, entryId, "poster", claim.token);

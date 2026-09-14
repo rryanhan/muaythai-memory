@@ -23,6 +23,11 @@ export class JournalPosterError extends Error {
   }
 }
 
+type JournalPosterStorageBucket = Pick<
+  ReturnType<ReturnType<typeof createSupabaseAdminClient>["storage"]["from"]>,
+  "upload"
+>;
+
 export function createJournalPosterObjectPath(
   userId: string,
   entryId: string,
@@ -37,6 +42,7 @@ export async function uploadJournalPosterObject(
   entryId: string,
   file: File,
   requestedPath?: string,
+  bucket?: JournalPosterStorageBucket,
 ): Promise<string> {
   const { bytes, mimeType } = await validateJournalPoster(file);
   const extension = mimeType === "image/webp" ? "webp" : "jpg";
@@ -50,7 +56,8 @@ export async function uploadJournalPosterObject(
   if (!expectedName.test(objectName)) {
     throw new JournalPosterError("Journal poster path did not match its image format.");
   }
-  const { error } = await createSupabaseAdminClient().storage.from(JOURNAL_MEDIA_BUCKET).upload(path, bytes, {
+  const storageBucket = bucket ?? createSupabaseAdminClient().storage.from(JOURNAL_MEDIA_BUCKET);
+  const { error } = await storageBucket.upload(path, bytes, {
     cacheControl: "31536000",
     contentType: mimeType,
     upsert: true,

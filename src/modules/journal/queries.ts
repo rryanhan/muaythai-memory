@@ -206,19 +206,15 @@ export async function getJournalPreviewForDrill(
     posterPath: snapshot.posterPath,
   };
 
-  const bucket = createSupabaseAdminClient().storage.from(JOURNAL_MEDIA_BUCKET);
-  const [{ data, error }, posterUrl] = await Promise.all([
-    bucket.createSignedUrl(latest.storagePath, JOURNAL_PLAYBACK_URL_SECONDS),
-    signPosterPath(latest.posterPath),
-  ]);
-  if (error || !data?.signedUrl) {
-    throw new Error(`Journal playback URL failed: ${error?.message ?? "No URL returned."}`);
-  }
+  const { playbackUrl, posterUrl } = await signJournalMediaPaths(
+    latest.storagePath,
+    latest.posterPath,
+  );
 
   return {
     entry: {
       ...toSummary(latest, posterUrl),
-      playbackUrl: data.signedUrl,
+      playbackUrl,
     },
     total: snapshot.total,
   };
@@ -237,16 +233,14 @@ export async function getJournalEntryById(userId: string, id: string): Promise<J
   const row = await getOwnedJournalRow(userId, id, "ready");
   if (!row) return null;
 
-  const bucket = createSupabaseAdminClient().storage.from(JOURNAL_MEDIA_BUCKET);
-  const [{ data, error }, posterUrl] = await Promise.all([
-    bucket.createSignedUrl(row.storagePath, JOURNAL_PLAYBACK_URL_SECONDS),
-    signPosterPath(row.posterPath),
-  ]);
-  if (error || !data?.signedUrl) throw new Error(`Journal playback URL failed: ${error?.message ?? "No URL returned."}`);
+  const { playbackUrl, posterUrl } = await signJournalMediaPaths(
+    row.storagePath,
+    row.posterPath,
+  );
 
   return {
     ...toSummary(row, posterUrl),
-    playbackUrl: data.signedUrl,
+    playbackUrl,
   };
 }
 
@@ -325,13 +319,41 @@ async function signPosterPaths(paths: Array<string | null>): Promise<Map<string,
   );
 }
 
-async function signPosterPath(path: string | null): Promise<string | null> {
-  if (!path) return null;
-  const { data, error } = await createSupabaseAdminClient().storage
-    .from(JOURNAL_MEDIA_BUCKET)
-    .createSignedUrl(path, JOURNAL_PLAYBACK_URL_SECONDS);
-  if (error || !data?.signedUrl) return null;
-  return data.signedUrl;
+async function signJournalMediaPaths(
+  storagePath: string,
+  posterPath: string | null,
+): Promise<{ playbackUrl: string; posterUrl: string | null }> {
+  const bucket = createSupabaseAdminClient().storage.from(JOURNAL_MEDIA_BUCKET);
+
+  if (!posterPath) {
+    const { data, error } = await bucket.createSignedUrl(
+      storagePath,
+      JOURNAL_PLAYBACK_URL_SECONDS,
+    );
+    if (error || !data?.signedUrl) {
+      throw new Error(`Journal playback URL failed: ${error?.message ?? "No URL returned."}`);
+    }
+    return { playbackUrl: data.signedUrl, posterUrl: null };
+  }
+
+  const { data, error } = await bucket.createSignedUrls(
+    [storagePath, posterPath],
+    JOURNAL_PLAYBACK_URL_SECONDS,
+  );
+  if (error || !data) {
+    throw new Error(`Journal playback URL failed: ${error?.message ?? "No URL returned."}`);
+  }
+
+  const playback = data.find((entry) => entry.path === storagePath);
+  if (playback?.error || !playback?.signedUrl) {
+    throw new Error(`Journal playback URL failed: ${playback?.error ?? "No URL returned."}`);
+  }
+
+  const poster = data.find((entry) => entry.path === posterPath);
+  return {
+    playbackUrl: playback.signedUrl,
+    posterUrl: poster?.error || !poster?.signedUrl ? null : poster.signedUrl,
+  };
 }
 
 export function encodeJournalCursor(cursor: JournalCursor): string {

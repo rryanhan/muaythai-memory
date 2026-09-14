@@ -6,6 +6,7 @@ import { JOURNAL_PLAYBACK_URL_SECONDS } from "./constants";
 
 const mocks = vi.hoisted(() => ({
   createSignedUrl: vi.fn(),
+  createSignedUrls: vi.fn(),
   createSupabaseAdminClient: vi.fn(),
   execute: vi.fn(),
   from: vi.fn(),
@@ -133,7 +134,11 @@ describe("getJournalPreviewForDrill", () => {
   beforeEach(() => {
     mocks.execute.mockReset();
     mocks.createSignedUrl.mockReset();
-    mocks.from.mockReset().mockReturnValue({ createSignedUrl: mocks.createSignedUrl });
+    mocks.createSignedUrls.mockReset();
+    mocks.from.mockReset().mockReturnValue({
+      createSignedUrl: mocks.createSignedUrl,
+      createSignedUrls: mocks.createSignedUrls,
+    });
     mocks.createSupabaseAdminClient.mockReset().mockReturnValue({
       storage: { from: mocks.from },
     });
@@ -236,8 +241,9 @@ describe("getJournalPreviewForDrill", () => {
     expect(preview?.entry?.createdAt).toEqual(mediaBackedCreatedAt);
   });
 
-  it("signs playback and poster URLs concurrently while keeping poster failure best-effort", async () => {
+  it("signs playback and poster URLs in one request and matches reordered results by path", async () => {
     const posterPath = `${userId}/${entryId}/poster.webp`;
+    const storagePath = `${userId}/${entryId}/clip.mp4`;
     mocks.execute.mockResolvedValueOnce([
       readySnapshot({
         createdAt: new Date("2026-08-10T12:00:00.000Z"),
@@ -245,28 +251,46 @@ describe("getJournalPreviewForDrill", () => {
         total: 1,
       }),
     ]);
-    const playbackSigning = deferred<{
-      data: { signedUrl: string };
-      error: null;
-    }>();
-    const posterSigning = deferred<{
-      data: null;
-      error: { message: string };
-    }>();
-    mocks.createSignedUrl.mockImplementation((path: string) => (
-      path === posterPath ? posterSigning.promise : playbackSigning.promise
-    ));
-
-    const preview = getJournalPreviewForDrill(userId, drillId);
-    await vi.waitFor(() => expect(mocks.createSignedUrl).toHaveBeenCalledTimes(2));
-
-    posterSigning.resolve({ data: null, error: { message: "Poster signing failed." } });
-    playbackSigning.resolve({
-      data: { signedUrl: "https://storage.test/playback" },
+    mocks.createSignedUrls.mockResolvedValueOnce({
+      data: [
+        { path: posterPath, signedUrl: "https://storage.test/poster", error: null },
+        { path: storagePath, signedUrl: "https://storage.test/playback", error: null },
+      ],
       error: null,
     });
 
-    await expect(preview).resolves.toMatchObject({
+    await expect(getJournalPreviewForDrill(userId, drillId)).resolves.toMatchObject({
+      entry: {
+        playbackUrl: "https://storage.test/playback",
+        posterUrl: "https://storage.test/poster",
+      },
+    });
+    expect(mocks.createSignedUrls).toHaveBeenCalledWith(
+      [storagePath, posterPath],
+      JOURNAL_PLAYBACK_URL_SECONDS,
+    );
+    expect(mocks.createSignedUrl).not.toHaveBeenCalled();
+  });
+
+  it("keeps a per-item poster signing failure best-effort", async () => {
+    const posterPath = `${userId}/${entryId}/poster.webp`;
+    const storagePath = `${userId}/${entryId}/clip.mp4`;
+    mocks.execute.mockResolvedValueOnce([
+      readySnapshot({
+        createdAt: new Date("2026-08-10T12:00:00.000Z"),
+        posterPath,
+        total: 1,
+      }),
+    ]);
+    mocks.createSignedUrls.mockResolvedValueOnce({
+      data: [
+        { path: storagePath, signedUrl: "https://storage.test/playback", error: null },
+        { path: posterPath, signedUrl: null, error: "Poster signing failed." },
+      ],
+      error: null,
+    });
+
+    await expect(getJournalPreviewForDrill(userId, drillId)).resolves.toMatchObject({
       entry: {
         playbackUrl: "https://storage.test/playback",
         posterUrl: null,
@@ -274,7 +298,15 @@ describe("getJournalPreviewForDrill", () => {
     });
   });
 
-  it("rejects the preview when required playback signing fails", async () => {
+  it.each([
+    ["an item error", [
+      { path: `${userId}/${entryId}/clip.mp4`, signedUrl: null, error: "Playback signing failed." },
+      { path: `${userId}/${entryId}/poster.webp`, signedUrl: "https://storage.test/poster", error: null },
+    ], "Playback signing failed."],
+    ["a missing result", [
+      { path: `${userId}/${entryId}/poster.webp`, signedUrl: "https://storage.test/poster", error: null },
+    ], "No URL returned."],
+  ])("rejects the preview when required playback signing has %s", async (_case, data, message) => {
     const posterPath = `${userId}/${entryId}/poster.webp`;
     mocks.execute.mockResolvedValueOnce([
       readySnapshot({
@@ -283,64 +315,88 @@ describe("getJournalPreviewForDrill", () => {
         total: 1,
       }),
     ]);
-    mocks.createSignedUrl
-      .mockResolvedValueOnce({
-        data: null,
-        error: { message: "Playback signing failed." },
-      })
-      .mockResolvedValueOnce({
-        data: { signedUrl: "https://storage.test/poster" },
-        error: null,
-      });
+    mocks.createSignedUrls.mockResolvedValueOnce({ data, error: null });
 
     await expect(getJournalPreviewForDrill(userId, drillId))
-      .rejects.toThrow("Journal playback URL failed: Playback signing failed.");
+      .rejects.toThrow(`Journal playback URL failed: ${message}`);
+  });
+
+  it("rejects the preview when the combined signing request fails", async () => {
+    mocks.execute.mockResolvedValueOnce([
+      readySnapshot({
+        createdAt: new Date("2026-08-10T12:00:00.000Z"),
+        posterPath: `${userId}/${entryId}/poster.webp`,
+        total: 1,
+      }),
+    ]);
+    mocks.createSignedUrls.mockResolvedValueOnce({
+      data: null,
+      error: { message: "Storage unavailable." },
+    });
+
+    await expect(getJournalPreviewForDrill(userId, drillId))
+      .rejects.toThrow("Journal playback URL failed: Storage unavailable.");
   });
 });
 
 describe("getJournalEntryById", () => {
   beforeEach(() => {
     mocks.createSignedUrl.mockReset();
-    mocks.from.mockReset().mockReturnValue({ createSignedUrl: mocks.createSignedUrl });
+    mocks.createSignedUrls.mockReset();
+    mocks.from.mockReset().mockReturnValue({
+      createSignedUrl: mocks.createSignedUrl,
+      createSignedUrls: mocks.createSignedUrls,
+    });
     mocks.createSupabaseAdminClient.mockReset().mockReturnValue({
       storage: { from: mocks.from },
     });
     mocks.select.mockReset();
   });
 
-  it("starts detail playback and poster signing before either request settles", async () => {
+  it("signs detail playback and poster URLs in one request", async () => {
     const posterPath = `${userId}/${entryId}/poster.webp`;
+    const storagePath = `${userId}/${entryId}/clip.mp4`;
     const query = chainBuilder();
     query.limit.mockResolvedValueOnce([ownedReadyRow(posterPath)]);
     mocks.select.mockReturnValueOnce(query);
-    const playbackSigning = deferred<{
-      data: { signedUrl: string };
-      error: null;
-    }>();
-    const posterSigning = deferred<{
-      data: { signedUrl: string };
-      error: null;
-    }>();
-    mocks.createSignedUrl.mockImplementation((path: string) => (
-      path === posterPath ? posterSigning.promise : playbackSigning.promise
-    ));
-
-    const detail = getJournalEntryById(userId, entryId);
-    await vi.waitFor(() => expect(mocks.createSignedUrl).toHaveBeenCalledTimes(2));
-
-    posterSigning.resolve({
-      data: { signedUrl: "https://storage.test/poster" },
+    mocks.createSignedUrls.mockResolvedValueOnce({
+      data: [
+        { path: storagePath, signedUrl: "https://storage.test/playback", error: null },
+        { path: posterPath, signedUrl: "https://storage.test/poster", error: null },
+      ],
       error: null,
     });
-    playbackSigning.resolve({
+
+    await expect(getJournalEntryById(userId, entryId)).resolves.toMatchObject({
+      playbackUrl: "https://storage.test/playback",
+      posterUrl: "https://storage.test/poster",
+    });
+    expect(mocks.createSignedUrls).toHaveBeenCalledWith(
+      [storagePath, posterPath],
+      JOURNAL_PLAYBACK_URL_SECONDS,
+    );
+    expect(mocks.createSignedUrl).not.toHaveBeenCalled();
+  });
+
+  it("preserves single-path detail signing when there is no poster", async () => {
+    const storagePath = `${userId}/${entryId}/clip.mp4`;
+    const query = chainBuilder();
+    query.limit.mockResolvedValueOnce([ownedReadyRow(null)]);
+    mocks.select.mockReturnValueOnce(query);
+    mocks.createSignedUrl.mockResolvedValueOnce({
       data: { signedUrl: "https://storage.test/playback" },
       error: null,
     });
 
-    await expect(detail).resolves.toMatchObject({
+    await expect(getJournalEntryById(userId, entryId)).resolves.toMatchObject({
       playbackUrl: "https://storage.test/playback",
-      posterUrl: "https://storage.test/poster",
+      posterUrl: null,
     });
+    expect(mocks.createSignedUrl).toHaveBeenCalledWith(
+      storagePath,
+      JOURNAL_PLAYBACK_URL_SECONDS,
+    );
+    expect(mocks.createSignedUrls).not.toHaveBeenCalled();
   });
 });
 
@@ -413,15 +469,4 @@ function chainBuilder() {
   chain.leftJoin.mockReturnValue(chain);
   chain.where.mockReturnValue(chain);
   return chain;
-}
-
-function deferred<T>(): {
-  promise: Promise<T>;
-  resolve: (value: T) => void;
-} {
-  let resolve: (value: T) => void = () => {};
-  const promise = new Promise<T>((nextResolve) => {
-    resolve = nextResolve;
-  });
-  return { promise, resolve };
 }
