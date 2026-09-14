@@ -1,5 +1,10 @@
 import { getTaxonomy } from "@/modules/taxonomy/queries";
-import { drillMatchesFilters, listDrills, normalizeDrillFilters } from "@/modules/drills/queries";
+import {
+  drillMatchesFilters,
+  hasActiveDrillFilters,
+  listDrills,
+  normalizeDrillFilters,
+} from "@/modules/drills/queries";
 import type { DrillFilters, DrillListResponse, DrillSummary } from "@/modules/drills/contracts";
 import type { TaxonomyResponse } from "@/modules/taxonomy/contracts";
 import type { GraphEdge, GraphNode, GraphOptions, GraphResponse } from "./contracts";
@@ -61,17 +66,33 @@ function buildMuayThaiGraph(
   normalizedOptions: GraphOptions,
 ): GraphResponse {
   const allDrills = drillList.drills;
-  const matchedDrills = allDrills.filter((drill) => drillMatchesFilters(drill, normalizedFilters));
-  const hasActiveFilters = hasFilters(normalizedFilters);
+  const hasActiveFilters = hasActiveDrillFilters(normalizedFilters);
+  const matchedDrills = hasActiveFilters
+    ? allDrills.filter((drill) => drillMatchesFilters(drill, normalizedFilters))
+    : allDrills;
   const hasMethodFilters = normalizedFilters.methodSlugs.length > 0;
-  const matchedDrillIds = new Set(matchedDrills.map((drill) => drill.id));
+  const matchedDrillIds = hasActiveFilters
+    ? new Set(matchedDrills.map((drill) => drill.id))
+    : undefined;
   const layerDrills = hasActiveFilters ? matchedDrills : allDrills;
   const selectedMethodSlugs = new Set(normalizedFilters.methodSlugs);
-  const activeMethodSlugs = hasMethodFilters ? selectedMethodSlugs : collectMethodSlugs(matchedDrills, []);
-  const visibleTagSlugs = collectTagSlugs(layerDrills, normalizedFilters.tagSlugs);
-  const visibleStatusSlugs = collectStatusSlugs(layerDrills, normalizedFilters.statusTagSlugs);
-  const activeTagSlugs = hasActiveFilters ? collectTagSlugs(matchedDrills, normalizedFilters.tagSlugs) : new Set<string>();
-  const activeStatusSlugs = hasActiveFilters
+  const selectedTagSlugs = new Set(normalizedFilters.tagSlugs);
+  const selectedStatusSlugs = new Set(normalizedFilters.statusTagSlugs);
+  const activeMethodSlugs = hasMethodFilters
+    ? selectedMethodSlugs
+    : hasActiveFilters
+      ? collectMethodSlugs(matchedDrills, [])
+      : new Set<string>();
+  const visibleTagSlugs = normalizedOptions.showTags
+    ? collectTagSlugs(layerDrills, normalizedFilters.tagSlugs)
+    : new Set<string>();
+  const visibleStatusSlugs = normalizedOptions.showStatusTags
+    ? collectStatusSlugs(layerDrills, normalizedFilters.statusTagSlugs)
+    : new Set<string>();
+  const activeTagSlugs = hasActiveFilters && (normalizedOptions.showTags || normalizedOptions.showCustomTags)
+    ? collectTagSlugs(matchedDrills, normalizedFilters.tagSlugs)
+    : new Set<string>();
+  const activeStatusSlugs = hasActiveFilters && normalizedOptions.showStatusTags
     ? collectStatusSlugs(matchedDrills, normalizedFilters.statusTagSlugs)
     : new Set<string>();
   const nodes: GraphNode[] = [];
@@ -80,7 +101,7 @@ function buildMuayThaiGraph(
   // "active" is a rendering hint for dimming unrelated graph context. We still
   // return inactive nodes so the frontend can preserve spatial orientation.
   for (const method of taxonomy.trainingMethods) {
-    const selected = normalizedFilters.methodSlugs.includes(method.slug);
+    const selected = selectedMethodSlugs.has(method.slug);
     nodes.push({
       id: methodNodeId(method.slug),
       entityId: method.id,
@@ -97,14 +118,14 @@ function buildMuayThaiGraph(
   // Drill nodes always exist in the graph payload. Filters affect active/matched
   // state, not whether the client can keep the network stable.
   for (const drill of allDrills) {
-    const active = !hasActiveFilters || matchedDrillIds.has(drill.id);
+    const active = matchedDrillIds?.has(drill.id) ?? true;
     nodes.push({
       id: drillNodeId(drill.id),
       entityId: drill.id,
       type: "drill",
       label: drill.title,
       active,
-      matched: matchedDrillIds.has(drill.id),
+      matched: active,
       selected: false,
     });
 
@@ -121,7 +142,7 @@ function buildMuayThaiGraph(
 
   if (normalizedOptions.showTags) {
     for (const tag of taxonomy.standardTags) {
-      const selected = normalizedFilters.tagSlugs.includes(tag.slug);
+      const selected = selectedTagSlugs.has(tag.slug);
       if (!visibleTagSlugs.has(tag.slug) && !selected) continue;
 
       nodes.push({
@@ -143,13 +164,13 @@ function buildMuayThaiGraph(
     const customTagsBySlug = new Map(layerDrills.flatMap((drill) => drill.customTags).map((tag) => [tag.slug, tag]));
 
     for (const tag of taxonomy.customTags) {
-      if (normalizedFilters.tagSlugs.includes(tag.slug)) {
+      if (selectedTagSlugs.has(tag.slug)) {
         customTagsBySlug.set(tag.slug, tag);
       }
     }
 
     for (const tag of customTagsBySlug.values()) {
-      const selected = normalizedFilters.tagSlugs.includes(tag.slug);
+      const selected = selectedTagSlugs.has(tag.slug);
       nodes.push({
         id: customTagNodeId(tag.slug),
         entityId: tag.id,
@@ -167,7 +188,7 @@ function buildMuayThaiGraph(
 
   if (normalizedOptions.showStatusTags) {
     for (const status of taxonomy.statusTags) {
-      const selected = normalizedFilters.statusTagSlugs.includes(status.slug);
+      const selected = selectedStatusSlugs.has(status.slug);
       if (!visibleStatusSlugs.has(status.slug) && !selected) continue;
 
       nodes.push({
@@ -183,10 +204,10 @@ function buildMuayThaiGraph(
     }
 
     for (const drill of layerDrills) {
-      const drillActive = !hasActiveFilters || matchedDrillIds.has(drill.id);
+      const drillActive = matchedDrillIds?.has(drill.id) ?? true;
 
       for (const status of drill.statusTags) {
-        if (!visibleStatusSlugs.has(status.slug) && !normalizedFilters.statusTagSlugs.includes(status.slug)) continue;
+        if (!visibleStatusSlugs.has(status.slug) && !selectedStatusSlugs.has(status.slug)) continue;
 
         edges.push({
           id: edgeId(statusNodeId(status.slug), drillNodeId(drill.id), "statusTag"),
@@ -214,11 +235,11 @@ function addTagEdges(
   drills: DrillSummary[],
   tagType: "tag" | "customTag",
   hasActiveFilters: boolean,
-  matchedDrillIds: Set<string>,
+  matchedDrillIds: Set<string> | undefined,
   activeTagSlugs: Set<string>,
 ) {
   for (const drill of drills) {
-    const drillActive = !hasActiveFilters || matchedDrillIds.has(drill.id);
+    const drillActive = matchedDrillIds?.has(drill.id) ?? true;
     const drillTags = tagType === "tag" ? drill.tags : drill.customTags;
 
     for (const tag of drillTags) {
@@ -232,15 +253,6 @@ function addTagEdges(
       });
     }
   }
-}
-
-function hasFilters(filters: DrillFilters): boolean {
-  return (
-    filters.keywords.length > 0 ||
-    filters.methodSlugs.length > 0 ||
-    filters.tagSlugs.length > 0 ||
-    filters.statusTagSlugs.length > 0
-  );
 }
 
 function collectMethodSlugs(drills: DrillSummary[], selectedSlugs: string[]): Set<string> {

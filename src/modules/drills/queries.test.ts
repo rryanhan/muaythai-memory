@@ -1,5 +1,6 @@
 import { PgDialect } from "drizzle-orm/pg-core";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { DrillFilters, DrillSummary } from "./contracts";
 
 const mocks = vi.hoisted(() => ({
   execute: vi.fn(),
@@ -11,10 +12,13 @@ vi.mock("@/db/client", () => ({
 }));
 
 import {
+  drillMatchesFilters,
   getDrillById,
   getDrillSummariesByOwnerPairs,
   getOwnedDrillHeader,
+  hasActiveDrillFilters,
   listDrills,
+  normalizeDrillFilters,
 } from "./queries";
 
 const userId = "11111111-1111-4111-8111-111111111111";
@@ -23,6 +27,77 @@ const drillId = "22222222-2222-4222-8222-222222222222";
 beforeEach(() => {
   mocks.execute.mockReset();
   mocks.select.mockReset();
+});
+
+describe("drillMatchesFilters", () => {
+  it("does not read drill fields when no filters are active", () => {
+    const accessed: string[] = [];
+    const filters = normalizeDrillFilters();
+
+    expect(hasActiveDrillFilters(filters)).toBe(false);
+    expect(drillMatchesFilters(createObservedDrill(accessed), filters)).toBe(true);
+    expect(accessed).toEqual([]);
+  });
+
+  it.each([
+    {
+      label: "method",
+      filters: { methodSlugs: ["boxing"] },
+      accessed: ["trainingMethods"],
+    },
+    {
+      label: "tags",
+      filters: { tagSlugs: ["sharp"] },
+      accessed: ["tags", "customTags"],
+    },
+    {
+      label: "status",
+      filters: { statusTagSlugs: ["starred"] },
+      accessed: ["statusTags"],
+    },
+  ])("reads only the relation projection required by a $label filter", ({
+    filters,
+    accessed: expectedAccesses,
+  }) => {
+    const accessed: string[] = [];
+
+    expect(drillMatchesFilters(
+      createObservedDrill(accessed),
+      normalizeDrillFilters(filters),
+    )).toBe(true);
+    expect(accessed).toEqual(expectedAccesses);
+  });
+
+  it("does not build the search haystack after an earlier filter rejects the drill", () => {
+    const accessed: string[] = [];
+
+    expect(drillMatchesFilters(
+      createObservedDrill(accessed),
+      normalizeDrillFilters({ methodSlugs: ["sparring"], keywords: ["jab"] }),
+    )).toBe(false);
+    expect(accessed).toEqual(["trainingMethods"]);
+  });
+
+  it.each([
+    [{}, true],
+    [{ methodSlugs: ["boxing"] }, true],
+    [{ methodSlugs: ["sparring"] }, false],
+    [{ tagSlugs: ["jab", "sharp"] }, true],
+    [{ tagSlugs: ["jab", "missing"] }, false],
+    [{ tagSlugs: ["missing", "sharp"], tagMode: "any" as const }, true],
+    [{ statusTagSlugs: ["starred"] }, true],
+    [{ statusTagSlugs: ["reviewed"] }, false],
+    [{ keywords: ["step", "boxing"] }, true],
+    [{ keywords: ["step", "missing"] }, false],
+    [{ methodSlugs: ["boxing"], tagSlugs: ["jab"], keywords: ["starred"] }, true],
+  ] satisfies Array<[Partial<DrillFilters>, boolean]>)(
+    "preserves filter output for %#",
+    (filters, expected) => {
+      expect(
+        drillMatchesFilters(observedDrillValues, normalizeDrillFilters(filters)),
+      ).toBe(expected);
+    },
+  );
 });
 
 describe("getOwnedDrillHeader", () => {
@@ -412,6 +487,72 @@ describe("getDrillSummariesByOwnerPairs", () => {
     expect(statement.sql).toContain('join "drill_status_tags"');
   });
 });
+
+const observedDrillValues: DrillSummary = {
+  id: drillId,
+  title: "Jab entry",
+  summary: "Step in behind the jab.",
+  trainingMethods: [{
+    id: "33333333-3333-4333-8333-333333333333",
+    name: "Boxing",
+    slug: "boxing",
+    iconKey: "boxing",
+    sortOrder: 1,
+  }],
+  tags: [{
+    id: "44444444-4444-4444-8444-444444444444",
+    name: "Jab",
+    slug: "jab",
+    kind: "standard",
+    sortOrder: 1,
+    category: null,
+  }],
+  customTags: [{
+    id: "55555555-5555-4555-8555-555555555555",
+    name: "Sharp",
+    slug: "sharp",
+    kind: "custom",
+    sortOrder: 1,
+    category: null,
+  }],
+  statusTags: [{
+    id: "66666666-6666-4666-8666-666666666666",
+    name: "Starred",
+    slug: "starred",
+    sortOrder: 1,
+  }],
+  createdAt: new Date("2026-09-11T00:00:00Z"),
+  updatedAt: new Date("2026-09-11T00:00:00Z"),
+};
+
+function createObservedDrill(accessed: string[]): DrillSummary {
+  return Object.defineProperties({
+    id: observedDrillValues.id,
+    createdAt: observedDrillValues.createdAt,
+    updatedAt: observedDrillValues.updatedAt,
+  }, {
+    title: observedProperty("title", observedDrillValues.title, accessed),
+    summary: observedProperty("summary", observedDrillValues.summary, accessed),
+    trainingMethods: observedProperty(
+      "trainingMethods",
+      observedDrillValues.trainingMethods,
+      accessed,
+    ),
+    tags: observedProperty("tags", observedDrillValues.tags, accessed),
+    customTags: observedProperty("customTags", observedDrillValues.customTags, accessed),
+    statusTags: observedProperty("statusTags", observedDrillValues.statusTags, accessed),
+  }) as DrillSummary;
+}
+
+function observedProperty<T>(name: string, value: T, accessed: string[]): PropertyDescriptor {
+  return {
+    enumerable: true,
+    get() {
+      accessed.push(name);
+      return value;
+    },
+  };
+}
 
 function queryReturning(rows: unknown[], captureWhere: (query: unknown) => void = () => undefined) {
   const builder = {

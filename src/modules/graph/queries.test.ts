@@ -3,6 +3,7 @@ import type { DrillFilters, DrillListResponse } from "@/modules/drills/contracts
 import type { TaxonomyResponse } from "@/modules/taxonomy/contracts";
 
 const mocks = vi.hoisted(() => ({
+  drillMatchesFilters: vi.fn(),
   getTaxonomy: vi.fn(),
   listDrills: vi.fn(),
 }));
@@ -15,6 +16,9 @@ vi.mock("@/modules/drills/queries", async (importOriginal) => {
   const original = await importOriginal<typeof import("@/modules/drills/queries")>();
   return {
     ...original,
+    drillMatchesFilters: mocks.drillMatchesFilters.mockImplementation(
+      original.drillMatchesFilters,
+    ),
     listDrills: mocks.listDrills,
   };
 });
@@ -24,6 +28,7 @@ import { getInitialNetworkData, getMuayThaiGraph } from "./queries";
 const userId = "11111111-1111-4111-8111-111111111111";
 
 beforeEach(() => {
+  mocks.drillMatchesFilters.mockClear();
   mocks.getTaxonomy.mockReset().mockResolvedValue(taxonomy);
   mocks.listDrills.mockReset().mockResolvedValue(drillList);
 });
@@ -43,8 +48,71 @@ describe("network graph query planning", () => {
       {},
       { includeTags: false, includeStatusTags: false },
     );
+    expect(mocks.drillMatchesFilters).not.toHaveBeenCalled();
+    expect(graph).toEqual({
+      nodes: [
+        {
+          id: "method:boxing",
+          entityId: taxonomy.trainingMethods[0]?.id,
+          type: "trainingMethod",
+          label: "Boxing",
+          slug: "boxing",
+          iconKey: "boxing",
+          active: true,
+          matched: false,
+          selected: false,
+        },
+        {
+          id: `drill:${drillList.drills[0]?.id}`,
+          entityId: drillList.drills[0]?.id,
+          type: "drill",
+          label: "Jab entry",
+          active: true,
+          matched: true,
+          selected: false,
+        },
+      ],
+      edges: [{
+        id: `method:method:boxing->drill:${drillList.drills[0]?.id}`,
+        from: "method:boxing",
+        to: `drill:${drillList.drills[0]?.id}`,
+        type: "method",
+        active: true,
+      }],
+      filters: emptyFilters,
+      options: {
+        showTags: false,
+        showCustomTags: false,
+        showStatusTags: false,
+      },
+    });
+  });
+
+  it("does not read hidden relation layers while building the default graph", async () => {
+    const relationAccesses: string[] = [];
+    const defaultDrill = drillList.drills[0];
+    if (!defaultDrill) throw new Error("Expected the graph test fixture to contain a drill");
+
+    mocks.listDrills.mockResolvedValue({
+      ...drillList,
+      drills: [Object.defineProperties({
+        ...defaultDrill,
+        tags: undefined,
+        customTags: undefined,
+        statusTags: undefined,
+      }, {
+        tags: observedRelation("tags", defaultDrill.tags, relationAccesses),
+        customTags: observedRelation("customTags", defaultDrill.customTags, relationAccesses),
+        statusTags: observedRelation("statusTags", defaultDrill.statusTags, relationAccesses),
+      })],
+    });
+
+    const graph = await getMuayThaiGraph(userId);
+
     expect(graph.nodes.map((node) => node.type)).toEqual(["trainingMethod", "drill"]);
     expect(graph.edges.map((edge) => edge.type)).toEqual(["method"]);
+    expect(relationAccesses).toEqual([]);
+    expect(mocks.drillMatchesFilters).not.toHaveBeenCalled();
   });
 
   it("loads visible taxonomy layers and their drill relations on demand", async () => {
@@ -116,6 +184,7 @@ describe("network graph query planning", () => {
       { label: "Sparring round", active: false },
     ]);
     expect(graph.edges.filter((edge) => edge.type === "method")).toHaveLength(2);
+    expect(mocks.drillMatchesFilters).toHaveBeenCalledTimes(2);
   });
 
   it("hydrates associations required by hidden-layer filters", async () => {
@@ -223,3 +292,13 @@ const drillList: DrillListResponse = {
   total: 1,
   filters: emptyFilters,
 };
+
+function observedRelation<T>(name: string, value: T, accesses: string[]): PropertyDescriptor {
+  return {
+    enumerable: true,
+    get() {
+      accesses.push(name);
+      return value;
+    },
+  };
+}

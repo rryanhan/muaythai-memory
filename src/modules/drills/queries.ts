@@ -51,7 +51,9 @@ export async function listDrills(
       normalizedFilters.statusTagSlugs.length > 0,
     database: options.database,
   });
-  const filteredDrills = allDrills.filter((drill) => drillMatchesFilters(drill, normalizedFilters));
+  const filteredDrills = hasActiveDrillFilters(normalizedFilters)
+    ? allDrills.filter((drill) => drillMatchesFilters(drill, normalizedFilters))
+    : allDrills;
 
   return {
     drills: filteredDrills,
@@ -251,27 +253,34 @@ export function normalizeDrillFilters(filters: Partial<DrillFilters> = {}): Dril
   };
 }
 
+export function hasActiveDrillFilters(filters: DrillFilters): boolean {
+  return (
+    filters.keywords.length > 0 ||
+    filters.methodSlugs.length > 0 ||
+    filters.tagSlugs.length > 0 ||
+    filters.statusTagSlugs.length > 0
+  );
+}
+
 export function drillMatchesFilters(drill: DrillSummary, filters: DrillFilters): boolean {
-  const methodSlugs = drill.trainingMethods.map((method) => method.slug);
-  const tagSlugs = [...drill.tags, ...drill.customTags].map((tag) => tag.slug);
-  const statusSlugs = drill.statusTags.map((status) => status.slug);
+  if (filters.methodSlugs.length > 0) {
+    const methodSlugs = drill.trainingMethods.map((method) => method.slug);
+    if (!hasAny(methodSlugs, filters.methodSlugs)) return false;
+  }
+
+  if (filters.tagSlugs.length > 0) {
+    const tagSlugs = [...drill.tags, ...drill.customTags].map((tag) => tag.slug);
+    if (!matchesListFilter(tagSlugs, filters.tagSlugs, filters.tagMode)) return false;
+  }
+
+  if (filters.statusTagSlugs.length > 0) {
+    const statusSlugs = drill.statusTags.map((status) => status.slug);
+    if (!matchesListFilter(statusSlugs, filters.statusTagSlugs, filters.statusMode)) return false;
+  }
+
+  if (filters.keywords.length === 0) return true;
+
   const haystack = buildDrillSearchHaystack(drill);
-
-  if (filters.methodSlugs.length > 0 && !hasAny(methodSlugs, filters.methodSlugs)) {
-    return false;
-  }
-
-  if (filters.tagSlugs.length > 0 && !matchesListFilter(tagSlugs, filters.tagSlugs, filters.tagMode)) {
-    return false;
-  }
-
-  if (
-    filters.statusTagSlugs.length > 0 &&
-    !matchesListFilter(statusSlugs, filters.statusTagSlugs, filters.statusMode)
-  ) {
-    return false;
-  }
-
   return filters.keywords.every((keyword) => haystack.includes(keyword.toLowerCase()));
 }
 

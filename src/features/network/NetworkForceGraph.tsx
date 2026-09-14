@@ -177,13 +177,6 @@ export function NetworkForceGraph({
     if (simulationRef.current !== simulation) return;
 
     for (const node of simulation.nodes) {
-      positionsRef.current.set(node.id, {
-        x: node.x,
-        y: node.y,
-        anchorX: node.anchorX,
-        anchorY: node.anchorY,
-      });
-
       nodeElementsRef.current
         .get(node.id)
         ?.setAttribute("transform", `translate(${node.x}, ${node.y})`);
@@ -252,7 +245,8 @@ export function NetworkForceGraph({
       cancelAnimationFrame(simulationRef.current.frame);
     }
 
-    const graphModel = buildGraphModel(graph, badgeByIconKey, positionsRef.current, layoutSize);
+    const storedPositions = positionsRef.current;
+    const graphModel = buildGraphModel(graph, badgeByIconKey, storedPositions, layoutSize);
     const simulation: PhysicsSimulation = {
       alpha: 1,
       frame: null,
@@ -272,6 +266,7 @@ export function NetworkForceGraph({
       if (simulation.frame) {
         cancelAnimationFrame(simulation.frame);
       }
+      snapshotSimulationPositions(simulation, storedPositions);
       if (simulationRef.current === simulation) {
         simulationRef.current = null;
       }
@@ -613,6 +608,20 @@ export function NetworkForceGraph({
       </button>
     </div>
   );
+}
+
+function snapshotSimulationPositions(
+  simulation: PhysicsSimulation,
+  positions: Map<string, StoredPosition>,
+): void {
+  for (const node of simulation.nodes) {
+    positions.set(node.id, {
+      x: node.x,
+      y: node.y,
+      anchorX: node.anchorX,
+      anchorY: node.anchorY,
+    });
+  }
 }
 
 function setNodeVisualCompensation(element: SVGGElement, compensation: number): void {

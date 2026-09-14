@@ -14,15 +14,16 @@ export async function fetchJson<T>(
 ): Promise<T> {
   const url = resolveApiUrl(path, options.baseUrl);
   const fetcher = options.fetcher ?? fetch;
+  const headers = mergeHeaders(
+    { Accept: "application/json" },
+    options.headers,
+    requestInit.headers,
+  );
   const response = await fetcher(url, {
     ...options.requestInit,
     ...requestInit,
     method: requestInit.method ?? "GET",
-    headers: {
-      Accept: "application/json",
-      ...options.headers,
-      ...requestInit.headers,
-    },
+    headers,
   });
 
   const responseBody = await readResponseBody(response);
@@ -44,6 +45,20 @@ export async function fetchJson<T>(
     }
     throw error;
   }
+}
+
+function mergeHeaders(...layers: Array<HeadersInit | undefined>): Headers {
+  const merged = new Headers();
+
+  for (const layer of layers) {
+    if (!layer) continue;
+
+    new Headers(layer).forEach((value, name) => {
+      merged.set(name, value);
+    });
+  }
+
+  return merged;
 }
 
 async function readResponseBody(response: Response): Promise<unknown> {

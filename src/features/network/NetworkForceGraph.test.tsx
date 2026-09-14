@@ -365,6 +365,57 @@ describe("NetworkForceGraph accessible activation", () => {
     expect(addedVisual).toHaveAttribute("transform", currentCompensation);
   });
 
+  it("seeds replacement topology from the latest simulation coordinates", async () => {
+    const onDrillSelect = vi.fn();
+    const onMethodSelect = vi.fn();
+    const view = renderGraph({ onDrillSelect, onMethodSelect });
+
+    await screen.findByRole("button", { name: "Open drill Rear kick return" });
+    await waitFor(() => expect(mocks.runNetworkSimulation).toHaveBeenCalledTimes(1));
+
+    const [initialSimulation] = mocks.runNetworkSimulation.mock.calls[0] as unknown as [
+      PhysicsSimulation,
+    ];
+    const initialDrillNode = initialSimulation.nodes.find(
+      (node) => node.id === `drill:${drillId}`,
+    )!;
+    const latestPosition = {
+      x: initialDrillNode.x + 137,
+      y: initialDrillNode.y - 83,
+      anchorX: initialDrillNode.anchorX + 41,
+      anchorY: initialDrillNode.anchorY - 29,
+    };
+
+    Object.assign(initialDrillNode, latestPosition);
+    const replacementGraph: GraphResponse = {
+      ...graph,
+      nodes: graph.nodes.filter((node) => node.id !== "tag:clinch-entry"),
+      edges: graph.edges.filter((edge) => edge.id !== "tag:clinch-entry:drill"),
+    };
+
+    view.rerender(
+      <NetworkForceGraph
+        active
+        graph={replacementGraph}
+        badgeByIconKey={{}}
+        focusedMethodSlugs={[]}
+        visualState={visualState}
+        onMethodSelect={onMethodSelect}
+        onDrillSelect={onDrillSelect}
+      />,
+    );
+
+    await waitFor(() => expect(mocks.runNetworkSimulation).toHaveBeenCalledTimes(2));
+    const [replacementSimulation] = mocks.runNetworkSimulation.mock.calls[1] as unknown as [
+      PhysicsSimulation,
+    ];
+    const replacementDrillNode = replacementSimulation.nodes.find(
+      (node) => node.id === `drill:${drillId}`,
+    );
+
+    expect(replacementDrillNode).toMatchObject(latestPosition);
+  });
+
   it("ignores stale frame commits after replacing the topology or unmounting", async () => {
     const onDrillSelect = vi.fn();
     const onMethodSelect = vi.fn();
