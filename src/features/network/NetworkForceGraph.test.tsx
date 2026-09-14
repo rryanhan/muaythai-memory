@@ -1,12 +1,23 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { zoomIdentity, type D3ZoomEvent, type ZoomTransform } from "d3";
 import { Profiler, type ProfilerOnRenderCallback } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { GraphResponse } from "@/data";
-import type { PhysicsSimulation } from "./network-physics";
+import {
+  getInitialZoomTransform,
+  getLayoutSize,
+  type PhysicsSimulation,
+} from "./network-physics";
 import type { NetworkGraphVisualState } from "./types";
 
 const mocks = vi.hoisted(() => ({
+  resizeListener: undefined as (() => void) | undefined,
   runNetworkSimulation: vi.fn(),
+  viewportHeight: 844,
+  viewportWidth: 390,
+  zoomListener: undefined as ((
+    event: D3ZoomEvent<SVGSVGElement, unknown>
+  ) => void) | undefined,
 }));
 
 vi.mock("d3", async (importOriginal) => {
@@ -17,7 +28,12 @@ vi.mock("d3", async (importOriginal) => {
       call: vi.fn(),
       on: vi.fn(),
     };
-    selection.call.mockReturnValue(selection);
+    selection.call.mockImplementation((callback, ...args) => {
+      if (typeof callback === "function") {
+        callback(selection, ...args);
+      }
+      return selection;
+    });
     selection.on.mockReturnValue(selection);
     return selection;
   }
@@ -33,8 +49,16 @@ vi.mock("d3", async (importOriginal) => {
     };
     behavior.extent.mockReturnValue(behavior);
     behavior.filter.mockReturnValue(behavior);
-    behavior.on.mockReturnValue(behavior);
+    behavior.on.mockImplementation((eventName, listener) => {
+      if (eventName === "zoom") {
+        mocks.zoomListener = listener;
+      }
+      return behavior;
+    });
     behavior.scaleExtent.mockReturnValue(behavior);
+    behavior.transform.mockImplementation((_selection, transform) => {
+      mocks.zoomListener?.({ transform } as D3ZoomEvent<SVGSVGElement, unknown>);
+    });
     behavior.translateExtent.mockReturnValue(behavior);
     return behavior;
   }
@@ -56,21 +80,28 @@ import { NetworkForceGraph } from "./NetworkForceGraph";
 describe("NetworkForceGraph accessible activation", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.resizeListener = undefined;
+    mocks.viewportHeight = 844;
+    mocks.viewportWidth = 390;
+    mocks.zoomListener = undefined;
     vi.stubGlobal("ResizeObserver", class {
+      constructor(listener: ResizeObserverCallback) {
+        mocks.resizeListener = () => listener([], this as unknown as ResizeObserver);
+      }
       observe() {}
       disconnect() {}
     });
-    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({
-      bottom: 844,
-      height: 844,
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(() => ({
+      bottom: mocks.viewportHeight,
+      height: mocks.viewportHeight,
       left: 0,
-      right: 390,
+      right: mocks.viewportWidth,
       top: 0,
-      width: 390,
+      width: mocks.viewportWidth,
       x: 0,
       y: 0,
       toJSON: () => ({}),
-    });
+    }));
   });
 
   afterEach(() => {
@@ -177,6 +208,163 @@ describe("NetworkForceGraph accessible activation", () => {
     expect(onRender).toHaveBeenCalledTimes(reactCommitCount);
   });
 
+  it("commits camera pan and zoom frames without reconciling the React tree", async () => {
+    const onRender = vi.fn<ProfilerOnRenderCallback>();
+    renderGraph({ onRender });
+
+    const drillElement = await screen.findByRole("button", { name: "Open drill Rear kick return" });
+    await waitFor(() => expect(mocks.zoomListener).toBeTypeOf("function"));
+    const cameraElement = document.querySelector<SVGGElement>(".network-force-camera");
+    const drillVisual = drillElement.querySelector<SVGGElement>(".network-force-node-visual");
+    expect(cameraElement).not.toBeNull();
+    expect(drillVisual).not.toBeNull();
+
+    const reactCommitCount = onRender.mock.calls.length;
+    const panScale = 0.8;
+    emitZoom(zoomIdentity.scale(panScale));
+    const nodeVisualAttributeSpy = vi.spyOn(drillVisual!, "setAttribute");
+    let finalTransform: ZoomTransform = zoomIdentity.scale(panScale);
+    for (let frame = 0; frame < 100; frame += 1) {
+      finalTransform = zoomIdentity
+        .translate(frame * 0.75, frame * -0.375)
+        .scale(panScale);
+      emitZoom(finalTransform);
+    }
+
+    expect(cameraElement).toHaveAttribute("transform", finalTransform.toString());
+    expect(nodeVisualAttributeSpy).not.toHaveBeenCalled();
+    expect(onRender).toHaveBeenCalledTimes(reactCommitCount);
+
+    finalTransform = zoomIdentity.translate(75, -37.5).scale(1.1);
+    emitZoom(finalTransform);
+    expect(drillVisual).toHaveAttribute(
+      "transform",
+      `scale(${expectedSemanticCompensation(finalTransform.k)})`,
+    );
+    expect(nodeVisualAttributeSpy).toHaveBeenCalledOnce();
+    expect(onRender).toHaveBeenCalledTimes(reactCommitCount);
+  });
+
+  it("reconciles only once when each semantic zoom threshold is crossed", async () => {
+    const onRender = vi.fn<ProfilerOnRenderCallback>();
+    renderGraph({ onRender });
+
+    const svg = await screen.findByLabelText("Muay Thai drill network graph");
+    await waitFor(() => expect(mocks.zoomListener).toBeTypeOf("function"));
+    expect(svg).toHaveAttribute("data-zoom-level", "near");
+    const initialCommitCount = onRender.mock.calls.length;
+
+    emitZoom(zoomIdentity.translate(10, 12).scale(0.61));
+    expect(svg).toHaveAttribute("data-zoom-level", "far");
+    expect(onRender).toHaveBeenCalledTimes(initialCommitCount + 1);
+
+    emitZoom(zoomIdentity.translate(40, 52).scale(0.58));
+    expect(svg).toHaveAttribute("data-zoom-level", "far");
+    expect(onRender).toHaveBeenCalledTimes(initialCommitCount + 1);
+
+    emitZoom(zoomIdentity.translate(22, 18).scale(0.63));
+    expect(svg).toHaveAttribute("data-zoom-level", "near");
+    expect(onRender).toHaveBeenCalledTimes(initialCommitCount + 2);
+  });
+
+  it("keeps D3 initial, reset, and resize transforms synchronized with the DOM", async () => {
+    renderGraph();
+
+    const svg = await screen.findByLabelText("Muay Thai drill network graph");
+    const drill = await screen.findByRole("button", { name: "Open drill Rear kick return" });
+    await waitFor(() => expect(mocks.zoomListener).toBeTypeOf("function"));
+    const cameraElement = document.querySelector<SVGGElement>(".network-force-camera");
+    const drillVisual = drill.querySelector<SVGGElement>(".network-force-node-visual");
+    const initialViewport = { width: 390, height: 844 };
+    const initialTransform = getInitialZoomTransform(
+      initialViewport,
+      getLayoutSize(initialViewport),
+    );
+
+    expect(cameraElement).toHaveAttribute("transform", initialTransform.toString());
+    expect(drillVisual).toHaveAttribute("transform", "scale(1)");
+
+    emitZoom(zoomIdentity.translate(32, -18).scale(0.58));
+    expect(svg).toHaveAttribute("data-zoom-level", "far");
+    fireEvent.click(screen.getByRole("button", { name: "Reset" }));
+    expect(cameraElement).toHaveAttribute("transform", initialTransform.toString());
+    expect(drillVisual).toHaveAttribute("transform", "scale(1)");
+    expect(svg).toHaveAttribute("data-zoom-level", "near");
+
+    emitZoom(zoomIdentity.translate(-45, 27).scale(1.4));
+    mocks.viewportWidth = 844;
+    mocks.viewportHeight = 390;
+    act(() => {
+      mocks.resizeListener?.();
+    });
+
+    const resizedViewport = { width: 844, height: 390 };
+    const resizedTransform = getInitialZoomTransform(
+      resizedViewport,
+      getLayoutSize(resizedViewport),
+    );
+    await waitFor(() => {
+      expect(svg).toHaveAttribute("viewBox", "0 0 844 390");
+      expect(cameraElement).toHaveAttribute("transform", resizedTransform.toString());
+      expect(drillVisual).toHaveAttribute("transform", "scale(1)");
+    });
+  });
+
+  it("gives newly mounted topology nodes the current semantic compensation", async () => {
+    const onDrillSelect = vi.fn();
+    const onMethodSelect = vi.fn();
+    const view = renderGraph({ onDrillSelect, onMethodSelect });
+
+    const initialDrill = await screen.findByRole("button", { name: "Open drill Rear kick return" });
+    await waitFor(() => expect(mocks.zoomListener).toBeTypeOf("function"));
+    const cameraElement = document.querySelector<SVGGElement>(".network-force-camera");
+    const cameraTransform = zoomIdentity.translate(-35, 24).scale(1.4);
+    emitZoom(cameraTransform);
+
+    const initialVisual = initialDrill.querySelector<SVGGElement>(".network-force-node-visual");
+    const currentCompensation = initialVisual?.getAttribute("transform");
+    expect(currentCompensation).toBe(`scale(${expectedSemanticCompensation(cameraTransform.k)})`);
+
+    const addedDrillId = "00000000-0000-4000-8000-000000000004";
+    const expandedGraph: GraphResponse = {
+      ...graph,
+      nodes: [
+        ...graph.nodes,
+        {
+          id: `drill:${addedDrillId}`,
+          entityId: addedDrillId,
+          type: "drill",
+          label: "Switch knee",
+          active: true,
+          matched: true,
+          selected: false,
+        },
+      ],
+    };
+    const expandedVisualState: NetworkGraphVisualState = {
+      ...visualState,
+      activeNodeIds: new Set(expandedGraph.nodes.map((node) => node.id)),
+    };
+
+    view.rerender(
+      <NetworkForceGraph
+        active
+        graph={expandedGraph}
+        badgeByIconKey={{}}
+        focusedMethodSlugs={[]}
+        visualState={expandedVisualState}
+        onMethodSelect={onMethodSelect}
+        onDrillSelect={onDrillSelect}
+      />,
+    );
+
+    const addedDrill = await screen.findByRole("button", { name: "Open drill Switch knee" });
+    const addedVisual = addedDrill.querySelector<SVGGElement>(".network-force-node-visual");
+    expect(cameraElement).toHaveAttribute("transform", cameraTransform.toString());
+    expect(initialVisual).toHaveAttribute("transform", currentCompensation);
+    expect(addedVisual).toHaveAttribute("transform", currentCompensation);
+  });
+
   it("ignores stale frame commits after replacing the topology or unmounting", async () => {
     const onDrillSelect = vi.fn();
     const onMethodSelect = vi.fn();
@@ -280,6 +468,27 @@ function renderGraph({
       ? <Profiler id="network-force-graph" onRender={onRender}>{component}</Profiler>
       : component,
   );
+}
+
+function emitZoom(transform: ZoomTransform): void {
+  const listener = mocks.zoomListener;
+  if (!listener) throw new Error("D3 zoom listener was not registered.");
+
+  act(() => {
+    listener({ transform } as D3ZoomEvent<SVGSVGElement, unknown>);
+  });
+}
+
+function expectedSemanticCompensation(cameraScale: number): number {
+  const viewport = { width: 390, height: 844 };
+  const baselineScale = getInitialZoomTransform(viewport, getLayoutSize(viewport)).k;
+  const relativeCameraScale = cameraScale / baselineScale;
+  const relativeVisibleScale = Math.min(
+    1.15,
+    Math.max(0.9, relativeCameraScale ** 0.15),
+  );
+
+  return baselineScale * relativeVisibleScale / cameraScale;
 }
 
 const drillId = "00000000-0000-4000-8000-000000000001";

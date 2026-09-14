@@ -84,8 +84,12 @@ export function NetworkForceGraph({
   const simulationRef = useRef<PhysicsSimulation | null>(null);
   const dragStateRef = useRef<DragState | null>(null);
   const activeRef = useRef(active);
+  const cameraTransformRef = useRef<ZoomTransform>(zoomIdentity);
+  const cameraScaleRef = useRef<number | null>(null);
+  const cameraBaselineScaleRef = useRef<number | null>(null);
+  const semanticNodeCompensationRef = useRef(1);
+  const zoomLevelRef = useRef<"near" | "far">("near");
   const [viewportSize, setViewportSize] = useState<Size | null>(null);
-  const [cameraTransform, setCameraTransform] = useState<ZoomTransform>(() => zoomIdentity);
   const [zoomLevel, setZoomLevel] = useState<"near" | "far">("near");
   const [physicsNodes, setPhysicsNodes] = useState<PhysicsNode[]>([]);
   const [physicsLinks, setPhysicsLinks] = useState<PhysicsLink[]>([]);
@@ -106,7 +110,11 @@ export function NetworkForceGraph({
     [physicsNodes],
   );
   const focusedMethodSet = useMemo(() => new Set(focusedMethodSlugs), [focusedMethodSlugs]);
-  const semanticNodeScale = getSemanticNodeScale(cameraTransform.k, initialCameraTransform.k);
+
+  const captureCameraElement = useCallback((element: SVGGElement | null) => {
+    cameraRef.current = element;
+    element?.setAttribute("transform", cameraTransformRef.current.toString());
+  }, []);
 
   const captureNodeElement = useCallback((element: SVGGElement | null) => {
     if (!element) return;
@@ -114,6 +122,7 @@ export function NetworkForceGraph({
     const nodeId = element.dataset.nodeId;
     if (!nodeId) return;
     nodeElementsRef.current.set(nodeId, element);
+    setNodeVisualCompensation(element, semanticNodeCompensationRef.current);
 
     return () => {
       if (nodeElementsRef.current.get(nodeId) === element) {
@@ -137,9 +146,32 @@ export function NetworkForceGraph({
   }, []);
 
   const applyZoomTransform = useCallback((transform: ZoomTransform) => {
-    setCameraTransform(transform);
-    setZoomLevel(transform.k < farZoomThreshold ? "far" : "near");
-  }, []);
+    cameraTransformRef.current = transform;
+    cameraRef.current?.setAttribute("transform", transform.toString());
+
+    if (
+      cameraScaleRef.current !== transform.k
+      || cameraBaselineScaleRef.current !== initialCameraTransform.k
+    ) {
+      cameraScaleRef.current = transform.k;
+      cameraBaselineScaleRef.current = initialCameraTransform.k;
+      const compensation = getSemanticNodeScale(
+        transform.k,
+        initialCameraTransform.k,
+      ).compensation;
+      semanticNodeCompensationRef.current = compensation;
+
+      for (const element of nodeElementsRef.current.values()) {
+        setNodeVisualCompensation(element, compensation);
+      }
+    }
+
+    const nextZoomLevel = transform.k < farZoomThreshold ? "far" : "near";
+    if (zoomLevelRef.current !== nextZoomLevel) {
+      zoomLevelRef.current = nextZoomLevel;
+      setZoomLevel(nextZoomLevel);
+    }
+  }, [initialCameraTransform.k]);
 
   const commitSimulationFrame = useCallback((simulation: PhysicsSimulation) => {
     if (simulationRef.current !== simulation) return;
@@ -415,7 +447,7 @@ export function NetworkForceGraph({
         viewBox={`0 0 ${renderSize.width} ${renderSize.height}`}
         aria-label="Muay Thai drill network graph"
       >
-        <g ref={cameraRef} className="network-force-camera" transform={cameraTransform.toString()}>
+        <g ref={captureCameraElement} className="network-force-camera">
           <g className="network-force-edges">
             {physicsLinks.map((link) => {
               const active = visualState.activeEdgeIds.has(link.id);
@@ -464,10 +496,7 @@ export function NetworkForceGraph({
                   onKeyDown={(event) => handleNodeKeyDown(node, event)}
                   onClick={(event) => handleNodeClick(node, event)}
                 >
-                  <g
-                    className="network-force-node-visual"
-                    transform={`scale(${semanticNodeScale.compensation})`}
-                  >
+                  <g className="network-force-node-visual">
                     <rect
                       className="network-force-hit-area"
                       x="-18"
@@ -508,10 +537,7 @@ export function NetworkForceGraph({
                   onKeyDown={(event) => handleNodeKeyDown(node, event)}
                   onClick={node.slug ? (event) => handleNodeClick(node, event) : undefined}
                 >
-                  <g
-                    className="network-force-node-visual"
-                    transform={`scale(${semanticNodeScale.compensation})`}
-                  >
+                  <g className="network-force-node-visual">
                     <rect
                       className="network-force-hit-area"
                       x={node.box.left - 8}
@@ -562,10 +588,7 @@ export function NetworkForceGraph({
                   onPointerUp={finishNodeDrag}
                   onPointerCancel={finishNodeDrag}
                 >
-                  <g
-                    className="network-force-node-visual"
-                    transform={`scale(${semanticNodeScale.compensation})`}
-                  >
+                  <g className="network-force-node-visual">
                     <rect
                       className="network-force-hit-area"
                       x={node.box.left - 5}
@@ -590,6 +613,13 @@ export function NetworkForceGraph({
       </button>
     </div>
   );
+}
+
+function setNodeVisualCompensation(element: SVGGElement, compensation: number): void {
+  const visual = element.firstElementChild;
+  if (!visual?.classList.contains("network-force-node-visual")) return;
+
+  visual.setAttribute("transform", `scale(${compensation})`);
 }
 
 function getSemanticNodeScale(cameraScale: number, baselineCameraScale: number): {
