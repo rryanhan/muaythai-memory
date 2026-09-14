@@ -22,6 +22,7 @@ import {
 } from "./backfill-journal-posters";
 import {
   assertValidJournalVideoRow,
+  createTimeoutFetch,
   loadJournalPosterBackfillRuntime,
   removeStoragePoster,
   writeLimitedVideoStream,
@@ -454,6 +455,151 @@ test("runtime initialization closes an opened database when later imports fail",
     /later import failed/,
   );
   assert.equal(closed, true);
+});
+
+test("timeout fetch aborts a pending underlying request", async () => {
+  const keepEventLoopAlive = setTimeout(() => undefined, 100);
+  let receivedSignal: AbortSignal | undefined;
+  const fetchImplementation = ((_input, init) => {
+    receivedSignal = init?.signal ?? undefined;
+    assert.ok(receivedSignal);
+    return new Promise<Response>((_resolve, reject) => {
+      const rejectWithReason = () => reject(receivedSignal?.reason);
+      if (receivedSignal?.aborted) {
+        rejectWithReason();
+      } else {
+        receivedSignal?.addEventListener("abort", rejectWithReason, {
+          once: true,
+        });
+      }
+    });
+  }) as typeof globalThis.fetch;
+
+  try {
+    await assert.rejects(
+      createTimeoutFetch(5, fetchImplementation)("https://example.test"),
+      (error: unknown) => {
+        assert.equal(error, receivedSignal?.reason);
+        assert.equal((error as DOMException).name, "TimeoutError");
+        return true;
+      },
+    );
+    assert.equal(receivedSignal?.aborted, true);
+  } finally {
+    clearTimeout(keepEventLoopAlive);
+  }
+});
+
+test("timeout fetch combines caller signals without changing Fetch precedence", async () => {
+  const receivedSignals: AbortSignal[] = [];
+  const fetchImplementation = ((_input, init) => {
+    assert.ok(init?.signal);
+    receivedSignals.push(init.signal);
+    return Promise.resolve(new Response(null, { status: 204 }));
+  }) as typeof globalThis.fetch;
+  const timeoutFetch = createTimeoutFetch(60_000, fetchImplementation);
+
+  const directController = new AbortController();
+  const directReason = new Error("caller stopped direct request");
+  await timeoutFetch("https://example.test/direct", {
+    signal: directController.signal,
+  });
+  directController.abort(directReason);
+  assert.equal(receivedSignals[0].aborted, true);
+  assert.equal(receivedSignals[0].reason, directReason);
+
+  const inheritedController = new AbortController();
+  const inheritedReason = new Error("caller stopped Request input");
+  await timeoutFetch(new Request("https://example.test/inherited", {
+    signal: inheritedController.signal,
+  }));
+  inheritedController.abort(inheritedReason);
+  assert.equal(receivedSignals[1].aborted, true);
+  assert.equal(receivedSignals[1].reason, inheritedReason);
+
+  const requestController = new AbortController();
+  const overrideController = new AbortController();
+  const overrideReason = new Error("caller stopped override signal");
+  const request = new Request("https://example.test/override", {
+    signal: requestController.signal,
+  });
+  await timeoutFetch(request, { signal: overrideController.signal });
+  requestController.abort(new Error("ignored Request signal"));
+  assert.equal(receivedSignals[2].aborted, false);
+  overrideController.abort(overrideReason);
+  assert.equal(receivedSignals[2].aborted, true);
+  assert.equal(receivedSignals[2].reason, overrideReason);
+
+  const nullController = new AbortController();
+  await timeoutFetch(
+    new Request("https://example.test/null", {
+      signal: nullController.signal,
+    }),
+    { signal: null },
+  );
+  nullController.abort(new Error("explicit null ignores Request signal"));
+  assert.equal(receivedSignals[3].aborted, false);
+
+  const preAbortedController = new AbortController();
+  const preAbortedReason = new Error("already stopped");
+  preAbortedController.abort(preAbortedReason);
+  await timeoutFetch("https://example.test/pre-aborted", {
+    signal: preAbortedController.signal,
+  });
+  assert.equal(receivedSignals[4].aborted, true);
+  assert.equal(receivedSignals[4].reason, preAbortedReason);
+});
+
+test("timeout fetch keeps its abort active after response headers", async () => {
+  const keepEventLoopAlive = setTimeout(() => undefined, 100);
+  let receivedSignal: AbortSignal | undefined;
+  const fetchImplementation = ((_input, init) => {
+    receivedSignal = init?.signal ?? undefined;
+    assert.ok(receivedSignal);
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        const failBody = () => controller.error(receivedSignal?.reason);
+        if (receivedSignal?.aborted) {
+          failBody();
+        } else {
+          receivedSignal?.addEventListener("abort", failBody, { once: true });
+        }
+      },
+    });
+    return Promise.resolve(new Response(body));
+  }) as typeof globalThis.fetch;
+
+  try {
+    const response = await createTimeoutFetch(5, fetchImplementation)(
+      "https://example.test/stream",
+    );
+    const reader = response.body?.getReader();
+    assert.ok(reader);
+    await assert.rejects(reader.read(), (error: unknown) => {
+      assert.equal(error, receivedSignal?.reason);
+      assert.equal((error as DOMException).name, "TimeoutError");
+      return true;
+    });
+    assert.equal(receivedSignal?.aborted, true);
+  } finally {
+    clearTimeout(keepEventLoopAlive);
+  }
+});
+
+test("timeout fetch rejects invalid timeout values before calling fetch", () => {
+  let fetchCalls = 0;
+  const fetchImplementation = (() => {
+    fetchCalls += 1;
+    return Promise.resolve(new Response());
+  }) as typeof globalThis.fetch;
+
+  for (const timeoutMilliseconds of [0, -1, 1.5, Number.NaN]) {
+    assert.throws(
+      () => createTimeoutFetch(timeoutMilliseconds, fetchImplementation),
+      /positive integer/,
+    );
+  }
+  assert.equal(fetchCalls, 0);
 });
 
 test("video row validation accepts only the recorded owner's canonical object", () => {

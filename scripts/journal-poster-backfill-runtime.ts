@@ -15,7 +15,7 @@ type JournalPosterBackfillRuntimeLoaderDependencies = {
   ) => Promise<JournalPosterBackfillRuntime>;
 };
 
-const JOURNAL_VIDEO_DOWNLOAD_TIMEOUT_MILLISECONDS = 2 * 60 * 1000;
+const JOURNAL_STORAGE_REQUEST_TIMEOUT_MILLISECONDS = 2 * 60 * 1000;
 const JOURNAL_VIDEO_OBJECT_NAME =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.(?:mov|mp4|webm)$/i;
 
@@ -56,7 +56,11 @@ async function initializeJournalPosterBackfillRuntime(
   const { and, asc, eq, gt, isNull } = drizzle;
   const { journalEntries, journalMedia } = schema;
   const bucket = supabase
-    .createSupabaseAdminClient()
+    .createSupabaseAdminClient({
+      fetch: createTimeoutFetch(
+        JOURNAL_STORAGE_REQUEST_TIMEOUT_MILLISECONDS,
+      ),
+    })
     .storage.from(journalConstants.JOURNAL_MEDIA_BUCKET);
 
   return {
@@ -109,9 +113,6 @@ async function initializeJournalPosterBackfillRuntime(
           {},
           {
             cache: "no-store",
-            signal: AbortSignal.timeout(
-              JOURNAL_VIDEO_DOWNLOAD_TIMEOUT_MILLISECONDS,
-            ),
           },
         )
         .asStream();
@@ -239,6 +240,30 @@ export type JournalVideoConstants = Pick<
   | "isJournalVideoMime"
   | "journalVideoExtension"
 >;
+
+export function createTimeoutFetch(
+  timeoutMilliseconds: number,
+  fetchImplementation: typeof globalThis.fetch = globalThis.fetch,
+): typeof globalThis.fetch {
+  if (!Number.isSafeInteger(timeoutMilliseconds) || timeoutMilliseconds < 1) {
+    throw new RangeError("Fetch timeout must be a positive integer.");
+  }
+
+  return (input, init) => {
+    const inputSignal = input instanceof Request ? input.signal : undefined;
+    // An explicit null signal overrides a Request input's signal according to
+    // the Fetch constructor semantics. Undefined continues to inherit it.
+    const callerSignal = init?.signal === null
+      ? undefined
+      : init?.signal ?? inputSignal;
+    const timeoutSignal = AbortSignal.timeout(timeoutMilliseconds);
+    const signal = callerSignal
+      ? AbortSignal.any([callerSignal, timeoutSignal])
+      : timeoutSignal;
+
+    return fetchImplementation(input, { ...init, signal });
+  };
+}
 
 export function assertValidJournalVideoRow(
   row: JournalPosterBackfillRow,

@@ -137,8 +137,9 @@ more may remain. Poster backfill instead scans every current candidate in
 deterministic pages of 25, so a permanently malformed early video does not
 prevent later entries from being repaired. It requires `ffmpeg`, caps each
 child process at two minutes, and exposes no application credentials to that
-child. Any failed candidate makes either command exit nonzero after closing its
-database client.
+child. Each poster-backfill Storage request also has a two-minute network bound
+that remains active while a downloaded response body is streaming. Any failed
+candidate makes either command exit nonzero after closing its database client.
 
 ## Storage And Authentication
 
