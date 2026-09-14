@@ -131,6 +131,54 @@ test("the expected target rejects a self-consistent wrong Supabase project", asy
   );
 });
 
+test("a pooler-style username on an arbitrary host does not establish project identity", async (context) => {
+  const directory = await mkdtemp(
+    path.join(tmpdir(), "access-control-environment-"),
+  );
+  context.after(() => rm(directory, { force: true, recursive: true }));
+
+  const environmentFile = path.join(directory, "forged-pooler-host.env");
+  const environment = deploymentEnvironment("staging", STAGING_PROJECT_REF);
+  environment.DATABASE_POOLER_URL =
+    `postgresql://postgres.${STAGING_PROJECT_REF}:password@evil.example:6543/postgres`;
+  await writeFile(environmentFile, serializeEnvironment(environment));
+
+  assert.throws(
+    () =>
+      loadAccessControlEnvironment(
+        [`--expect=staging`, `--env-file=${environmentFile}`],
+        {},
+      ),
+    new RegExp(
+      `DATABASE_POOLER_URL does not belong to Supabase project ${STAGING_PROJECT_REF}`,
+    ),
+  );
+});
+
+test("a comma-separated multi-host URL does not establish project identity", async (context) => {
+  const directory = await mkdtemp(
+    path.join(tmpdir(), "access-control-environment-"),
+  );
+  context.after(() => rm(directory, { force: true, recursive: true }));
+
+  const environmentFile = path.join(directory, "multi-host-pooler.env");
+  const environment = deploymentEnvironment("staging", STAGING_PROJECT_REF);
+  environment.DATABASE_POOLER_URL =
+    `postgresql://postgres.${STAGING_PROJECT_REF}:password@evil.example,aws-0-us-west-1.pooler.supabase.com:6543/postgres`;
+  await writeFile(environmentFile, serializeEnvironment(environment));
+
+  assert.throws(
+    () =>
+      loadAccessControlEnvironment(
+        [`--expect=staging`, `--env-file=${environmentFile}`],
+        {},
+      ),
+    new RegExp(
+      `DATABASE_POOLER_URL does not belong to Supabase project ${STAGING_PROJECT_REF}`,
+    ),
+  );
+});
+
 test("the shared target guard rejects production credentials mislabeled as staging before consumer work starts", async (context) => {
   const directory = await mkdtemp(
     path.join(tmpdir(), "known-deployment-environment-"),

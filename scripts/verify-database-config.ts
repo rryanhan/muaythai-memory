@@ -58,10 +58,16 @@ function verifyConnectionRules() {
     getMigrationDatabaseUrl({ DATABASE_DIRECT_URL: sessionUrl }),
     sessionUrl,
   );
-  assert.equal(
+  const derivedSessionUrl = new URL(
     getSupabaseSessionPoolerUrl({ DATABASE_POOLER_URL: transactionUrl }),
-    sessionUrl,
   );
+  const expectedSessionUrl = new URL(sessionUrl);
+  expectedSessionUrl.searchParams.set("sslmode", "require");
+  assert.equal(derivedSessionUrl.toString(), expectedSessionUrl.toString());
+  assert.equal(derivedSessionUrl.port, "5432");
+  assert.deepEqual(derivedSessionUrl.searchParams.getAll("sslmode"), [
+    "require",
+  ]);
   assert.throws(
     () => getSupabaseSessionPoolerUrl({ DATABASE_POOLER_URL: directUrl }),
     /Supabase pooler URL/,

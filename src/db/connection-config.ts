@@ -17,16 +17,21 @@ export function getRuntimeDatabaseConfig(
   }
 
   const url = parseDatabaseUrl(connectionString, "DATABASE_POOLER_URL");
-  if (isSupabaseSharedPooler(url) && effectivePort(url) !== "6543") {
-    throw new Error(
-      "DATABASE_POOLER_URL must use Supabase transaction mode on port 6543.",
-    );
+  let runtimeConnectionString = connectionString;
+  if (isSupabaseSharedPooler(url)) {
+    if (effectivePort(url) !== "6543") {
+      throw new Error(
+        "DATABASE_POOLER_URL must use Supabase transaction mode on port 6543.",
+      );
+    }
+
+    runtimeConnectionString = requireSupabaseSharedPoolerTls(url);
   }
 
   const defaultMax = environment.VERCEL ? 1 : 3;
   const maxConnections = parsePoolSize(environment.DATABASE_POOL_MAX, defaultMax);
 
-  return { connectionString, maxConnections };
+  return { connectionString: runtimeConnectionString, maxConnections };
 }
 
 export function getMigrationDatabaseUrl(
@@ -98,7 +103,47 @@ function parseDatabaseUrl(value: string, label: string): URL {
 }
 
 function isSupabaseSharedPooler(url: URL): boolean {
-  return url.hostname.endsWith(".pooler.supabase.com");
+  return isSupabaseSharedPoolerHostname(url.hostname);
+}
+
+const SECURE_SUPABASE_SSL_MODES = new Set([
+  "require",
+  "verify-ca",
+  "verify-full",
+]);
+
+function requireSupabaseSharedPoolerTls(url: URL): string {
+  const sslModeParameters = [...url.searchParams].filter(
+    ([name]) => name.toLowerCase() === "sslmode",
+  );
+
+  if (sslModeParameters.length > 1) {
+    throw new Error(
+      "DATABASE_POOLER_URL must include at most one sslmode parameter.",
+    );
+  }
+
+  const sslModeParameter = sslModeParameters[0];
+  if (!sslModeParameter) {
+    url.searchParams.append("sslmode", "require");
+    return url.toString();
+  }
+
+  const [name, mode] = sslModeParameter;
+  if (name !== "sslmode" || !SECURE_SUPABASE_SSL_MODES.has(mode)) {
+    throw new Error(
+      "DATABASE_POOLER_URL sslmode must be require, verify-ca, or verify-full.",
+    );
+  }
+
+  return url.toString();
+}
+
+/** Accepts one canonical Supabase pooler host, never postgres.js multi-host syntax. */
+export function isSupabaseSharedPoolerHostname(hostname: string): boolean {
+  return /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.pooler\.supabase\.com$/i.test(
+    hostname,
+  );
 }
 
 function effectivePort(url: URL): string {

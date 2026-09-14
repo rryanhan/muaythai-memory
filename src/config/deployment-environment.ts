@@ -2,6 +2,7 @@ import {
   describeDatabaseUrl,
   getMigrationDatabaseUrl,
   getRuntimeDatabaseConfig,
+  isSupabaseSharedPoolerHostname,
 } from "@/db/connection-config";
 
 export const DEPLOYMENT_ENVIRONMENTS = ["staging", "production"] as const;
@@ -133,7 +134,9 @@ function assertDatabaseProject(
   const directProjectRef = /^db\.([a-z0-9]+)\.supabase\.co$/i.exec(
     url.hostname,
   )?.[1];
-  const pooledProjectRef = /^postgres\.([a-z0-9]+)$/i.exec(username)?.[1];
+  const pooledProjectRef = isSupabaseSharedPoolerHostname(url.hostname)
+    ? /^postgres\.([a-z0-9]+)$/i.exec(username)?.[1]
+    : undefined;
   const databaseProjectRef = directProjectRef ?? pooledProjectRef;
 
   if (!databaseProjectRef || databaseProjectRef !== projectRef) {

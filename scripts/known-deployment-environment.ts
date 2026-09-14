@@ -25,6 +25,18 @@ const DEPLOYMENT_SENSITIVE_ENVIRONMENT_KEYS = [
   "NEXT_PUBLIC_SUPABASE_ANON_KEY",
   "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
   "NEXT_PUBLIC_SUPABASE_URL",
+  "NODE_TLS_REJECT_UNAUTHORIZED",
+  "PGDATABASE",
+  "PGHOST",
+  "PGHOSTADDR",
+  "PGPASSWORD",
+  "PGPORT",
+  "PGSERVICE",
+  "PGSERVICEFILE",
+  "PGSSL",
+  "PGSSLMODE",
+  "PGUSER",
+  "PGUSERNAME",
   "SUPABASE_SERVICE_ROLE_KEY",
   "TEST_USER_PASSWORD",
 ] as const;
@@ -104,7 +116,7 @@ export function createKnownDeploymentChildEnvironment(
   return childEnvironmentWithSelectedTarget as unknown as NodeJS.ProcessEnv;
 }
 
-function scrubDeploymentSensitiveEnvironment(
+export function scrubDeploymentSensitiveEnvironment(
   environment: DeploymentEnvironmentValues,
 ): void {
   for (const key of DEPLOYMENT_SENSITIVE_ENVIRONMENT_KEYS) {
