@@ -70,9 +70,10 @@ The environment-aware migration commands use Supabase session mode on port
 `5432`, derived in memory from the matching transaction-pooler URL. No derived
 credential is written to disk or sent to Vercel.
 
-Canonical Supabase pooler connections require encrypted transport. The runtime
-adds `sslmode=require` when the URL omits it and rejects plaintext-capable SSL
-modes. Local and non-Supabase PostgreSQL URLs are left unchanged.
+Canonical Supabase database connections require encrypted transport. The
+runtime and migration configuration add `sslmode=require` when the URL omits it
+and reject plaintext-capable SSL modes. Local and non-Supabase PostgreSQL URLs
+are left unchanged.
 
 After the staging application and schema pass smoke testing, release the same
 commit to production with the same compatibility order. Production requires a
@@ -109,15 +110,16 @@ the shared Training Methods, Tags, and Saved Lists. Never run
 
 ## Journal Media Maintenance
 
-The abandoned-upload cleanup validates its database and Storage targets before
-loading either client. The default development profile reads `.env.local` and
-accepts only a fully loopback stack or the fixed staging project; because this
-repository's local file may point to staging, always read the redacted preflight
-line before the cleanup begins. Prefer the explicit staging command for
-operator-run maintenance:
+The abandoned-upload cleanup and legacy-poster backfill validate their database
+and Storage targets before loading either client. The default development
+profile reads `.env.local` and accepts only a fully loopback stack or the fixed
+staging project; because this repository's local file may point to staging,
+always read the redacted preflight line before maintenance begins. Prefer
+explicit staging profiles for operator-run maintenance:
 
 ```bash
 npm run journal:cleanup -- --profile=staging
+npm run journal:backfill-posters -- --profile=staging
 ```
 
 Production uses its separate maintenance file and requires the exact project
@@ -126,11 +128,17 @@ reference as a second confirmation:
 ```bash
 npm run journal:cleanup -- --profile=production \
   --confirm-production=pbzqwvowkpfhxptvmrny
+npm run journal:backfill-posters -- --profile=production \
+  --confirm-production=pbzqwvowkpfhxptvmrny
 ```
 
-Each invocation processes one bounded batch of up to 25 candidates. Run it
-again if more may remain. Any failed candidate makes the command exit nonzero
-after closing its database client.
+Cleanup processes one bounded batch of up to 25 candidates; run it again if
+more may remain. Poster backfill instead scans every current candidate in
+deterministic pages of 25, so a permanently malformed early video does not
+prevent later entries from being repaired. It requires `ffmpeg`, caps each
+child process at two minutes, and exposes no application credentials to that
+child. Any failed candidate makes either command exit nonzero after closing its
+database client.
 
 ## Storage And Authentication
 

@@ -238,8 +238,10 @@ and direct TUS resumable uploads. Upload intents are created by the authenticate
 Next API, but video bytes travel directly from the browser to Supabase Storage.
 The browser generates a versioned poster image before completion; ready entries
 created by the current upload flow always have a poster. Legacy ready entries
-without one can be repaired with `npm run journal:backfill-posters` on a machine
-with `ffmpeg` installed.
+without one can be repaired on staging with
+`npm run journal:backfill-posters -- --profile=staging` on a machine with
+`ffmpeg` installed. Production repair requires the separately confirmed
+production maintenance profile documented in `docs/environments.md`.
 Supabase Storage is the object store for both avatars and journal media; an AWS
 S3 bucket is not required.
 

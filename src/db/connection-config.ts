@@ -25,7 +25,15 @@ export function getRuntimeDatabaseConfig(
       );
     }
 
-    runtimeConnectionString = requireSupabaseSharedPoolerTls(url);
+    runtimeConnectionString = requireSupabaseTls(url, "DATABASE_POOLER_URL");
+  } else if (isSupabaseDirectDatabase(url)) {
+    if (effectivePort(url) !== "5432") {
+      throw new Error(
+        "DATABASE_POOLER_URL must use Supabase direct database hosts on port 5432.",
+      );
+    }
+
+    runtimeConnectionString = requireSupabaseTls(url, "DATABASE_POOLER_URL");
   }
 
   const defaultMax = environment.VERCEL ? 1 : 3;
@@ -50,10 +58,14 @@ export function getMigrationDatabaseUrl(
     connectionString,
     "DATABASE_DIRECT_URL or DATABASE_URL",
   );
-  if (isSupabaseSharedPooler(url) && effectivePort(url) !== "5432") {
-    throw new Error(
-      "DATABASE_DIRECT_URL or DATABASE_URL must use a direct database host or Supabase session mode on port 5432.",
-    );
+  if (isSupabaseSharedPooler(url) || isSupabaseDirectDatabase(url)) {
+    if (effectivePort(url) !== "5432") {
+      throw new Error(
+        "DATABASE_DIRECT_URL or DATABASE_URL must use a direct database host or Supabase session mode on port 5432.",
+      );
+    }
+
+    return requireSupabaseTls(url, "DATABASE_DIRECT_URL or DATABASE_URL");
   }
 
   return connectionString;
@@ -106,21 +118,23 @@ function isSupabaseSharedPooler(url: URL): boolean {
   return isSupabaseSharedPoolerHostname(url.hostname);
 }
 
+function isSupabaseDirectDatabase(url: URL): boolean {
+  return /^db\.[a-z0-9]+\.supabase\.co$/i.test(url.hostname);
+}
+
 const SECURE_SUPABASE_SSL_MODES = new Set([
   "require",
   "verify-ca",
   "verify-full",
 ]);
 
-function requireSupabaseSharedPoolerTls(url: URL): string {
+function requireSupabaseTls(url: URL, label: string): string {
   const sslModeParameters = [...url.searchParams].filter(
     ([name]) => name.toLowerCase() === "sslmode",
   );
 
   if (sslModeParameters.length > 1) {
-    throw new Error(
-      "DATABASE_POOLER_URL must include at most one sslmode parameter.",
-    );
+    throw new Error(`${label} must include at most one sslmode parameter.`);
   }
 
   const sslModeParameter = sslModeParameters[0];
@@ -132,7 +146,7 @@ function requireSupabaseSharedPoolerTls(url: URL): string {
   const [name, mode] = sslModeParameter;
   if (name !== "sslmode" || !SECURE_SUPABASE_SSL_MODES.has(mode)) {
     throw new Error(
-      "DATABASE_POOLER_URL sslmode must be require, verify-ca, or verify-full.",
+      `${label} sslmode must be require, verify-ca, or verify-full.`,
     );
   }
 

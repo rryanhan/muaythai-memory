@@ -50,13 +50,17 @@ function verifyConnectionRules() {
       }),
     /integer from 1 through 10/,
   );
+  const expectedDirectUrl = new URL(directUrl);
+  expectedDirectUrl.searchParams.set("sslmode", "require");
   assert.equal(
     getMigrationDatabaseUrl({ DATABASE_DIRECT_URL: directUrl }),
-    directUrl,
+    expectedDirectUrl.toString(),
   );
+  const expectedConfiguredSessionUrl = new URL(sessionUrl);
+  expectedConfiguredSessionUrl.searchParams.set("sslmode", "require");
   assert.equal(
     getMigrationDatabaseUrl({ DATABASE_DIRECT_URL: sessionUrl }),
-    sessionUrl,
+    expectedConfiguredSessionUrl.toString(),
   );
   const derivedSessionUrl = new URL(
     getSupabaseSessionPoolerUrl({ DATABASE_POOLER_URL: transactionUrl }),
